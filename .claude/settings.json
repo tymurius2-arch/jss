@@ -6,5 +6,8 @@
         "repo": "heygen-com/hyperframes"
       }
     }
+  },
+  "enabledPlugins": {
+    "hyperframes@hyperframes": true
   }
 }
