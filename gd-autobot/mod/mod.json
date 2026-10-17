@@ -5,7 +5,7 @@
 	},
 	"id": "tymurius.gd-autobot",
 	"name": "AutoBot",
-	"version": "v1.1.0",
+	"version": "v1.2.0",
 	"developer": "tymurius",
 	"description": "Plays levels for you: finds a route by trial and error, then passes the level",
 	"settings": {
@@ -15,13 +15,13 @@
 			"description": "When on, the bot takes over in every level you enter. When off, use the Bot button on the level page or in the pause menu.",
 			"default": false
 		},
-		"speed": {
+		"learn-speed": {
 			"type": "float",
-			"name": "Search speed",
-			"description": "Game speed while the bot is searching for a route (1 = normal). The final run is always at normal speed.",
-			"default": 3.0,
+			"name": "Learning speed",
+			"description": "How fast the hidden learning runs (the game is sped up behind the learning screen). The real run is always at 1x.",
+			"default": 30.0,
 			"min": 1.0,
-			"max": 8.0
+			"max": 100.0
 		},
 		"use-practice": {
 			"type": "bool",

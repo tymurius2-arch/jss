@@ -2,12 +2,13 @@
 // Started by the "Bot" button on the level page or in the pause menu
 // (or on every level, if "Start on every level" is on).
 //
-// 1. Search: by default every try starts from the beginning in normal mode;
-//    with "Search in practice mode" it plays in practice mode instead. On every death the route search (see
+// 1. Learning: hidden behind a "learning" screen, sped up and muted. By default
+//    every try starts from the beginning in normal mode; with "Search in
+//    practice mode" it uses practice checkpoints instead. On every death the route search (see
 //    route_search.hpp) picks a new input plan; checkpoints are placed every
 //    0.2 s so a new try starts right before the changed spot.
 // 2. Final: when the end is reached, the found plan is played from the start in
-//    normal mode. If it dies there, the search continues in normal mode.
+//    normal mode at 1x. If it dies there, the search continues in normal mode.
 // 3. Done: the route is saved and replayed on every restart or next visit.
 
 #include <Geode/Geode.hpp>
@@ -46,6 +47,9 @@ struct Session {
     int lastCheckpointTick = 0;
     float bestPercent = 0.f;
     CCLabelBMFont* label = nullptr;
+    CCLayerColor* curtain = nullptr; // learning screen
+    CCLabelBMFont* curtainText = nullptr;
+    bool muted = false;
 };
 
 Session s;
@@ -118,9 +122,56 @@ void setSpeed(float speed) {
 
 void applyPhaseSpeed() {
     if (s.active && s.phase == Phase::Search)
-        setSpeed(static_cast<float>(Mod::get()->getSettingValue<double>("speed")));
+        setSpeed(static_cast<float>(Mod::get()->getSettingValue<double>("learn-speed")));
     else
         setSpeed(1.f);
+}
+
+void setMuted(bool mute) {
+    if (mute == s.muted) return;
+    auto engine = FMODAudioEngine::sharedEngine();
+    FMOD::ChannelGroup* master = nullptr;
+    if (engine && engine->m_system && engine->m_system->getMasterChannelGroup(&master) == FMOD_OK && master) {
+        master->setMute(mute);
+        s.muted = mute;
+    }
+}
+
+// Dark screen that hides the sped-up learning tries.
+void showCurtain(PlayLayer* pl) {
+    if (s.curtain) return;
+    auto size = CCDirector::sharedDirector()->getWinSize();
+    auto curtain = CCLayerColor::create({12, 14, 36, 255});
+    curtain->setContentSize(size);
+    curtain->setID("learning-screen"_spr);
+
+    auto title = CCLabelBMFont::create("AutoBot is learning the level", "goldFont.fnt");
+    title->setScale(0.8f);
+    title->setPosition({size.width / 2.f, size.height / 2.f + 24.f});
+    curtain->addChild(title);
+
+    auto text = CCLabelBMFont::create("", "bigFont.fnt");
+    text->setScale(0.45f);
+    text->setPosition({size.width / 2.f, size.height / 2.f - 16.f});
+    curtain->addChild(text);
+
+    pl->addChild(curtain, 999);
+    s.curtain = curtain;
+    s.curtainText = text;
+}
+
+void hideCurtain() {
+    if (s.curtain) s.curtain->removeFromParent();
+    s.curtain = nullptr;
+    s.curtainText = nullptr;
+}
+
+// Learning is hidden, muted and sped up; everything else looks like normal play.
+void applyPhaseLook(PlayLayer* pl) {
+    bool learning = s.active && s.phase == Phase::Search;
+    if (learning) showCurtain(pl);
+    else hideCurtain();
+    setMuted(learning);
 }
 
 void sendButton(PlayLayer* pl, bool down) {
@@ -160,12 +211,16 @@ SearchConfig searchConfig() {
 // ---------- status label ----------
 
 void updateLabel() {
+    if (s.curtainText && s.phase == Phase::Search) {
+        auto text = fmt::format("{:.0f}%   (try {})", s.bestPercent, s.search.attempts() + 1);
+        s.curtainText->setString(text.c_str());
+    }
     if (!s.label) return;
     std::string text;
     switch (s.phase) {
         case Phase::Search:
-            text = fmt::format("AutoBot: searching{} | deaths {} | best {:.1f}%",
-                s.practice ? " (practice)" : "", s.search.attempts(), s.bestPercent);
+            text = fmt::format("AutoBot: learning | try {} | best {:.0f}%",
+                s.search.attempts() + 1, s.bestPercent);
             break;
         case Phase::Final: text = "AutoBot: playing the route"; break;
         case Phase::Done: text = "AutoBot: level passed, route saved"; break;
@@ -184,6 +239,9 @@ void endSession() {
     s.resetQueued = false;
     s.held = false;
     s.label = nullptr;
+    s.curtain = nullptr; // removed together with the level
+    s.curtainText = nullptr;
+    setMuted(false);
     setSpeed(1.f);
 }
 
@@ -235,6 +293,8 @@ void onDeath(PlayLayer* pl, PlayerObject* player) {
         s.phase = Phase::GaveUp;
         s.active = false;
         setSpeed(1.f);
+        hideCurtain();
+        setMuted(false);
         updateLabel();
         return;
     }
@@ -286,6 +346,7 @@ void startSession(PlayLayer* pl) {
     }
 
     if (settingBool("safe-mode")) pl->m_isTestMode = true;
+    applyPhaseLook(pl);
     updateLabel();
     // Restart so the first try starts from a clean state.
     queueReset();
@@ -298,6 +359,8 @@ void stopSession(PlayLayer* pl) {
     s.phase = Phase::Off;
     s.resetQueued = false;
     setSpeed(1.f);
+    hideCurtain();
+    setMuted(false);
     if (s.label) s.label->setString("AutoBot: off");
 }
 
@@ -360,6 +423,7 @@ class $modify(AutoBotPlayLayer, PlayLayer) {
         s.held = false;
         if (settingBool("safe-mode")) m_isTestMode = true;
         applyPhaseSpeed();
+        applyPhaseLook(this);
         updateLabel();
 
         // A respawn at a checkpoint continues right at its tick.
@@ -382,9 +446,9 @@ class $modify(AutoBotPlayLayer, PlayLayer) {
     void levelComplete() {
         if (!playing()) return PlayLayer::levelComplete();
 
-        if (s.phase == Phase::Search && m_isPracticeMode) {
-            // Route found in practice: now play it from the start for real.
-            log::info("route found in practice after {} deaths", s.search.attempts());
+        if (s.phase == Phase::Search) {
+            // Route found while learning: now play it from the start for real, at 1x.
+            log::info("route found after {} deaths", s.search.attempts());
             sendButton(this, false);
             s.plan = s.search.plan();
             savePlan(s.key, s.plan, false);
@@ -399,6 +463,7 @@ class $modify(AutoBotPlayLayer, PlayLayer) {
         savePlan(s.key, s.plan, true);
         s.phase = Phase::Done;
         setSpeed(1.f);
+        applyPhaseLook(this);
         updateLabel();
         if (settingBool("safe-mode")) m_isTestMode = true;
         PlayLayer::levelComplete();
