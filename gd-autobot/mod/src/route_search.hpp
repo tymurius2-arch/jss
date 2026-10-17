@@ -16,6 +16,7 @@
 struct SearchConfig {
     int lookback = 150; // ticks before the death where edits are tried
     int stride = 2;     // step between tried ticks
+    int minProgress = 0; // an edit counts as progress only if it gets this many ticks further
 };
 
 class RouteSearch {

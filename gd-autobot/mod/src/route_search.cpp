@@ -6,6 +6,7 @@ void RouteSearch::start(Plan initial, SearchConfig config) {
     m_config = config;
     m_config.lookback = std::max(1, m_config.lookback);
     m_config.stride = std::max(1, m_config.stride);
+    m_config.minProgress = std::max(0, m_config.minProgress);
     m_plan = std::move(initial);
     m_bestPlan = m_plan;
     m_stack.clear();
@@ -42,7 +43,7 @@ bool RouteSearch::onDeath(int tick, bool holdMode) {
         // First death of the session: the starting plan becomes the root.
         pushNode(tick, 0, holdMode);
     }
-    else if (tick > m_stack.back().death) {
+    else if (tick > m_stack.back().death + m_config.minProgress) {
         // The edit helped: continue from here, later edits only after this one.
         pushNode(tick, m_lastEditTick + 1, holdMode);
     }

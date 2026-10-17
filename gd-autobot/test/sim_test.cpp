@@ -4,6 +4,7 @@
 #include "route_search.hpp"
 
 #include <algorithm>
+#include <cstdlib>
 #include <cmath>
 #include <cstdio>
 #include <random>
@@ -30,8 +31,12 @@ static bool onBlock(Level const& lv, double x, double y) {
     return false;
 }
 
+// Random start offset per try: simulates a game that is not perfectly repeatable.
+static double g_noise = 0;
+static std::mt19937 g_rng(7);
+
 static Result run(Level const& lv, RouteSearch const& rs, int maxTicks) {
-    double x = 0, y = 0, vy = 0;
+    double x = g_noise > 0 ? std::uniform_real_distribution<double>(0, g_noise)(g_rng) : 0, y = 0, vy = 0;
     for (int t = 0; t < maxTicks; ++t) {
         bool held = rs.hold(t - 1); // input of tick t-1 acts on step t
         bool ship = x >= lv.shipFrom && x < lv.shipTo;
@@ -93,11 +98,14 @@ static Level makeLevel(unsigned seed, int obstacles, int gap) {
 
 int main() {
     int failures = 0;
+    for (double noise : {0.0, 3.0}) {
+    g_noise = noise;
+    std::printf("--- noise %.0f ---\n", noise);
     for (unsigned seed = 1; seed <= 16; ++seed) {
         int gap = seed <= 8 ? 260 : 150; // the second half is denser
         Level lv = makeLevel(seed, seed <= 8 ? 14 : 30, gap);
         RouteSearch rs;
-        rs.start({}, SearchConfig{150, 2});
+        rs.start({}, SearchConfig{150, 2, 8}); // same settings as the mod
         int maxTicks = static_cast<int>(lv.length / SPEED) + 10;
         bool won = false;
         long long simulatedTicks = 0, practiceTicks = 0;
@@ -120,7 +128,8 @@ int main() {
         std::printf("seed %u: %s after %d deaths (best tick %d / %d); game time: %.1f min with restarts, %.1f min with checkpoints\n",
                     seed, won ? "PASSED" : "FAILED", rs.attempts(), rs.bestTick(), maxTicks,
                     simulatedTicks / 240.0 / 60.0, practiceTicks / 240.0 / 60.0);
-        if (!won) ++failures;
+        if (!won || rs.attempts() > 1000) ++failures;
+    }
     }
     return failures == 0 ? 0 : 1;
 }

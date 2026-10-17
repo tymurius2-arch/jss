@@ -209,6 +209,8 @@ SearchConfig searchConfig() {
     SearchConfig config;
     config.lookback = static_cast<int>(Mod::get()->getSettingValue<int64_t>("lookback"));
     config.stride = static_cast<int>(Mod::get()->getSettingValue<int64_t>("stride"));
+    config.minProgress = 8; // ignores tiny "progress" that is just noise
+
     return config;
 }
 
