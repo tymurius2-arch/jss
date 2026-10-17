@@ -196,7 +196,7 @@
     </div>
     <ul class="help" id="help" hidden>
       <li><b>Взлёт:</b> держи «ГАЗ» или <kbd>Пробел</kbd>. Когда загорится «ПЕРЕГРУЗКА», отпусти, иначе ракету разорвёт.</li>
-      <li><b>Руль:</b> тяни по экрану пальцем или мышью, или стрелки. Крен: <kbd>A</kbd> <kbd>D</kbd>.</li>
+      <li><b>Руль:</b> тяни по экрану пальцем или мышью, или стрелки. <kbd>A</kbd> <kbd>D</kbd> — сдвиг влево и вправо, <kbd>Q</kbd> <kbd>E</kbd> — наклон.</li>
       <li><b>Скорость:</b> <kbd>W</kbd> газ, <kbd>S</kbd> тормоз, <kbd>Shift</kbd> турбо быстрее света.</li>
       <li><b>Лазер:</b> <kbd>Пробел</kbd> или кнопка. Перегревается, давай ему остыть.</li>
       <li><b>Навигация:</b> <kbd>M</kbd> карта (нажми на планету, и автопилот полетит туда), <kbd>T</kbd> следующая цель, <kbd>F</kbd> автопилот.</li>
@@ -230,7 +230,7 @@
     </div>
     <div class="eyebrow" style="color:var(--cyan)">Атлас открытий</div>
     <div class="atlas" id="atlas"></div>
-    <p class="note">Голубые — посещённые, оранжевые — неизвестные миры, которые ты открыл, зачёркнутые — уничтоженные лазером. Управление: стрелки или палец — руль, <kbd>W</kbd>/<kbd>S</kbd> скорость, <kbd>Shift</kbd> турбо, <kbd>Пробел</kbd> лазер, <kbd>M</kbd> карта, <kbd>F</kbd> автопилот.</p>
+    <p class="note">Голубые — посещённые, оранжевые — неизвестные миры, которые ты открыл, зачёркнутые — уничтоженные лазером. Управление: стрелки или палец — руль, <kbd>A</kbd>/<kbd>D</kbd> влево-вправо, <kbd>W</kbd>/<kbd>S</kbd> скорость, <kbd>Shift</kbd> турбо, <kbd>Пробел</kbd> лазер, <kbd>M</kbd> карта, <kbd>F</kbd> автопилот.</p>
   </div>
 </section>
 
@@ -1605,8 +1605,8 @@ function steerInput() {
   if (k.has('ArrowDown')) pitch -= 1;
   if (k.has('ArrowLeft')) yaw -= 1;
   if (k.has('ArrowRight')) yaw += 1;
-  if (k.has('KeyA') || k.has('KeyQ')) roll -= 1;
-  if (k.has('KeyD') || k.has('KeyE')) roll += 1;
+  if (k.has('KeyQ')) roll -= 1;
+  if (k.has('KeyE')) roll += 1;
   if (input.stick) {
     const s = input.stick, R = Math.min(W, H) * .12;
     yaw += clamp((s.x - s.x0) / R, -1, 1);
@@ -1650,6 +1650,11 @@ function updateSpace(dt) {
   if (ship.speed > cap) ship.speed += (cap - ship.speed) * Math.min(1, dt * 4);
   fwd = shipFwd();
   ship.pos.addScaledVector(fwd, ship.speed * dt).addScaledVector(ship.bump, dt);
+  // сдвиг вбок на A / D: нос не поворачивается, корабль скользит влево-вправо
+  const side = (input.keys.has('KeyD') ? 1 : 0) - (input.keys.has('KeyA') ? 1 : 0);
+  ship.strafe = (ship.strafe || 0) + (side - (ship.strafe || 0)) * Math.min(1, dt * 6);
+  const right = V3(1, 0, 0).applyQuaternion(ship.quat);
+  ship.pos.addScaledVector(right, ship.strafe * Math.min(200, 14 + ship.speed * .15) * dt);
   ship.bump.multiplyScalar(Math.exp(-dt * 2));
   // столкновения
   for (const b of bodies) {
@@ -1689,7 +1694,9 @@ function updateSpace(dt) {
   AU.set(AU.hiss, .02 + thrustK * .04, .1);
   AU.set(AU.warp, clamp((ship.speed - 200) / 3000, 0, 1) * .12, .2);
   if (AU.warp && AU.ctx) AU.warp.f.frequency.setTargetAtTime(300 + ship.speed * .3, AU.ctx.currentTime, .2);
-  rocket.root.position.copy(ship.pos); rocket.root.quaternion.copy(ship.quat);
+  rocket.root.position.copy(ship.pos);
+  // при сдвиге корабль слегка наклоняется в сторону движения
+  rocket.root.quaternion.copy(ship.quat).multiply(tmpQ.setFromAxisAngle(V3(0, 1, 0), (ship.strafe || 0) * .45));
   rocket.wingPivots.forEach((pv) => { pv.rotation.z = Math.min(0, pv.rotation.z + dt * .8); });
   updateLaser(dt);
   updateDrones(dt);
