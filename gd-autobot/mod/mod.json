@@ -1,0 +1,61 @@
+{
+	"geode": "5.11.2",
+	"gd": {
+		"win": "2.2081"
+	},
+	"id": "tymurius.gd-autobot",
+	"name": "AutoBot",
+	"version": "v1.0.0",
+	"developer": "tymurius",
+	"description": "Detects when you enter a level and finds a route through it on its own",
+	"settings": {
+		"enabled": {
+			"type": "bool",
+			"name": "Enable bot",
+			"description": "When on, the bot takes control as soon as you enter a level.",
+			"default": true
+		},
+		"speed": {
+			"type": "float",
+			"name": "Search speed",
+			"description": "Game speed while the bot is searching for a route (1 = normal). The final run is always at normal speed.",
+			"default": 2.0,
+			"min": 1.0,
+			"max": 4.0
+		},
+		"use-practice": {
+			"type": "bool",
+			"name": "Search in practice mode",
+			"description": "Uses practice checkpoints so every new try starts close to the obstacle. Much faster.",
+			"default": true
+		},
+		"safe-mode": {
+			"type": "bool",
+			"name": "Safe mode",
+			"description": "Bot runs do not save progress, stars or leaderboard results.",
+			"default": true
+		},
+		"lookback": {
+			"type": "int",
+			"name": "Lookback (ticks)",
+			"description": "How far before a death (in 1/240 s ticks) the bot tries new inputs.",
+			"default": 150,
+			"min": 40,
+			"max": 600
+		},
+		"stride": {
+			"type": "int",
+			"name": "Timing step (ticks)",
+			"description": "Step between tried input timings. 1 is the most precise and the slowest.",
+			"default": 2,
+			"min": 1,
+			"max": 8
+		},
+		"show-status": {
+			"type": "bool",
+			"name": "Show status",
+			"description": "Shows the bot status in the top-left corner of the level.",
+			"default": true
+		}
+	}
+}

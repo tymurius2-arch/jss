@@ -1,0 +1,3 @@
+mod/build/
+test/sim_test
+*.exe
