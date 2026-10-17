@@ -14,6 +14,7 @@
 #include "route_search.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <fstream>
 
 using namespace geode::prelude;
