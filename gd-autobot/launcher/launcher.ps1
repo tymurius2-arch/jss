@@ -3,7 +3,7 @@ $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $AppId        = 322170
-$GeodeVersion = 'v5.11.2'
+$GeodeFallback = 'v5.11.2'   # если GitHub API недоступен
 $ModFile      = 'tymurius.gd-autobot.geode'
 $ModUrl       = "https://github.com/tymurius2-arch/jss/releases/download/gd-autobot-latest/$ModFile"
 $Root         = Split-Path -Parent $PSScriptRoot
@@ -63,9 +63,17 @@ if ($running) {
 # 1. Geode — загрузчик модов.
 if (-not (Test-Path (Join-Path $gd 'Geode.dll'))) {
     Say ''
-    Say "Geode не установлен. Скачиваю установщик Geode $GeodeVersion..." 'Yellow'
-    $installer = Join-Path $env:TEMP "geode-installer-$GeodeVersion-win.exe"
-    Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/geode-sdk/geode/releases/download/$GeodeVersion/geode-installer-$GeodeVersion-win.exe" -OutFile $installer
+    # Берём самую свежую версию Geode: так лаунчер сам подхватит выпуск для новых версий игры (например, 2.209).
+    $installerUrl = "https://github.com/geode-sdk/geode/releases/download/$GeodeFallback/geode-installer-$GeodeFallback-win.exe"
+    try {
+        $release = Invoke-RestMethod -UseBasicParsing -Uri 'https://api.github.com/repos/geode-sdk/geode/releases/latest'
+        $asset = $release.assets | Where-Object { $_.name -like 'geode-installer-*-win.exe' } | Select-Object -First 1
+        if ($asset) { $installerUrl = $asset.browser_download_url }
+    } catch { }
+    $installer = Join-Path $env:TEMP (Split-Path -Leaf $installerUrl)
+    Say ''
+    Say "Geode не установлен. Скачиваю установщик: $(Split-Path -Leaf $installerUrl)" 'Yellow'
+    Invoke-WebRequest -UseBasicParsing -Uri $installerUrl -OutFile $installer
     Say 'Откроется установщик Geode. Выберите папку игры (если спросит) и нажмите Install.' 'Yellow'
     Say "Папка игры: $gd" 'Yellow'
     Start-Process -FilePath $installer -Wait
