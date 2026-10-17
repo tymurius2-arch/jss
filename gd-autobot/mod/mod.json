@@ -5,7 +5,7 @@
 	},
 	"id": "tymurius.gd-autobot",
 	"name": "AutoBot",
-	"version": "v1.2.0",
+	"version": "v1.2.1",
 	"developer": "tymurius",
 	"description": "Plays levels for you: finds a route by trial and error, then passes the level",
 	"settings": {
@@ -19,7 +19,7 @@
 			"type": "float",
 			"name": "Learning speed",
 			"description": "How fast the hidden learning runs (the game is sped up behind the learning screen). The real run is always at 1x.",
-			"default": 30.0,
+			"default": 10.0,
 			"min": 1.0,
 			"max": 100.0
 		},
