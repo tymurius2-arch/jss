@@ -70,6 +70,6 @@ gd-autobot/
 └── test/sim_test.cpp       — проверка поиска на простом симуляторе куба и корабля
 ```
 
-Мод собирается в GitHub Actions (`.github/workflows/gd-autobot.yml`). Готовый `.geode` лежит в артефактах сборки, а после пуша в `main` — в релизе `gd-autobot-latest`.
+Мод собирается в GitHub Actions (`.github/workflows/gd-autobot.yml`). Готовый `.geode` лежит в артефактах сборки, а также в релизе `gd-autobot-latest` (обновляется при каждом пуше в `main` и в ветку бота).
 
 Собрать вручную: поставь [Geode CLI и SDK](https://docs.geode-sdk.org/getting-started/), затем в `mod/` выполни `geode build`.

@@ -36,9 +36,9 @@ jobs:
           name: gd-autobot-mod
           path: ${{ steps.build.outputs.build-output }}/*.geode
 
-      # The launcher downloads the mod from this release.
+      # The launcher downloads the mod from this release (latest build of main or the bot branch).
       - name: Publish release
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/claude/adoring-albattani-ao2m7t'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: gd-autobot-latest
