@@ -73,6 +73,34 @@
   #start .btn-main { font-size: 20px; padding: 18px; border-radius: 16px; }
   #start .count { color: var(--accent); font-weight: 800; }
   #start .btn-ghost { width: 100%; margin-top: 10px; font-size: 18px; padding: 16px; border-radius: 16px; }
+  .btn-endless { width: 100%; margin-top: 10px; font-size: 18px; padding: 16px; border-radius: 16px;
+    background: linear-gradient(90deg, #7a5cff, #ff5c9d); color: #fff; }
+  .btn-endless:hover { filter: brightness(1.08); }
+  .hud-left { display: flex; align-items: center; gap: 6px 10px; flex-wrap: wrap; min-width: 0; }
+  .streak { color: var(--mid); font-weight: 800; }
+  .hud-stop { background: var(--card2); color: var(--muted); font-size: 13px; padding: 6px 10px; border-radius: 99px; }
+  .bar.endless > div { width: 100% !important; background: linear-gradient(90deg, #7a5cff, #ff5c9d); opacity: .6; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0 0 16px; }
+  .stats > div { background: var(--card2); border-radius: 12px; padding: 10px 6px; }
+  .stats b { display: block; font-size: 22px; }
+  .stats span { font-size: 12px; color: var(--muted); }
+  .history-note { color: var(--muted); font-size: 13px; margin: -8px 0 14px; text-align: left; }
+  /* переключатель режима ответа */
+  .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: var(--card2); padding: 6px; border-radius: 16px; margin: 0 0 14px; }
+  .seg button { background: none; color: var(--muted); padding: 12px 8px; border-radius: 12px; font-size: 16px; line-height: 1.2; }
+  .seg button small { display: block; font-size: 12px; font-weight: 600; opacity: .8; margin-top: 2px; }
+  .seg button.on { background: var(--text); color: var(--bg); }
+  #start .seg button { font-size: 17px; }
+
+  /* режим «Выбор»: четыре варианта цены */
+  .choices { margin-top: 14px; }
+  .choice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
+  .choice-grid button {
+    background: var(--card2); color: var(--text); font-size: 22px; font-weight: 800; padding: 18px 8px;
+    border: 2px solid transparent; border-radius: 14px; font-variant-numeric: tabular-nums;
+  }
+  .choice-grid button:hover { border-color: var(--accent); }
+  .choice-grid button.picked { background: var(--accent); color: #1a1400; }
   .summary { color: var(--muted); font-size: 15px; line-height: 1.5; margin: 16px 0 0; }
   .summary b { color: var(--text); }
 
@@ -231,7 +259,12 @@
     <h1>Угадай <span>цену</span></h1>
     <p class="sub">Показываем товар с маркетплейса — ты называешь цену. Чем ближе, тем больше очков. Против тебя играет ИИ.<br>В игре <span class="count" id="countAll"></span> товаров.</p>
     <div class="card">
+      <div class="seg" id="modeSegStart" role="radiogroup" aria-label="Режим ответа">
+        <button data-mode="choice" role="radio">🔘 Выбор<small>4 варианта цены</small></button>
+        <button data-mode="type" role="radio">✍️ Наугад<small>пишешь число сам</small></button>
+      </div>
       <button class="btn-main" id="startBtn">Играть</button>
+      <button class="btn-endless" id="endlessBtn">♾️ Бесконечный режим</button>
       <button class="btn-ghost" id="settingsBtn">⚙️ Настройки</button>
       <p class="summary" id="summary"></p>
       <p class="sub" id="bestLine" style="margin:12px 0 0;text-align:center"></p>
@@ -245,6 +278,15 @@
       <h2>Настройки</h2>
     </div>
     <div class="card">
+      <div class="set-block">
+        <div class="label">Режим ответа</div>
+        <div class="seg" id="modeSegSettings" role="radiogroup" aria-label="Режим ответа" style="margin:0">
+          <button data-mode="choice" role="radio">🔘 Выбор<small>4 варианта цены</small></button>
+          <button data-mode="type" role="radio">✍️ Наугад<small>пишешь число сам</small></button>
+        </div>
+        <p class="set-hint">В «Выборе» за правильный вариант — 1000 очков, за неправильный — 0. В «Наугад» чем ближе число, тем больше очков.</p>
+      </div>
+
       <div class="set-block">
         <div class="label">Цена товаров</div>
         <div class="range-row">
@@ -280,7 +322,9 @@
           <button class="chip" data-n="10">10</button>
           <button class="chip" data-n="15">15</button>
           <button class="chip" data-n="20">20</button>
+          <button class="chip" data-n="0">∞ Бесконечно</button>
         </div>
+        <p class="set-hint">В бесконечном режиме товары идут без конца, пока не нажмёшь «Закончить».</p>
       </div>
 
       <div class="set-block">
@@ -301,8 +345,12 @@
   <!-- Раунд -->
   <section id="game" class="hidden">
     <div class="hud">
-      <div id="roundLabel">Раунд 1/10</div>
-      <div><span class="score" id="scoreLabel">0</span> : <span class="ai" id="aiLabel">0</span></div>
+      <div class="hud-left">
+        <span id="roundLabel">Раунд 1/10</span>
+        <span class="streak hidden" id="streakLabel"></span>
+        <button class="hud-stop hidden" id="stopBtn">Закончить</button>
+      </div>
+      <div style="white-space:nowrap;flex:none"><span class="score" id="scoreLabel">0</span> : <span class="ai" id="aiLabel">0</span></div>
     </div>
     <div class="bar"><div id="progress"></div></div>
     <div class="card" id="gameCard">
@@ -324,6 +372,11 @@
         <input type="range" id="slider" min="0" max="1000" value="500" aria-label="Цена">
         <button class="btn-main" id="guessBtn" type="submit">Ответить</button>
       </form>
+
+      <div class="choices hidden" id="choices">
+        <div class="label">Сколько это стоит?</div>
+        <div class="choice-grid" id="choiceGrid"></div>
+      </div>
 
       <div class="suspense hidden" id="suspense" aria-live="polite">
         <div class="label">Настоящая цена…</div>
@@ -351,11 +404,17 @@
   <!-- Итог -->
   <section id="end" class="hidden">
     <div class="card final">
-      <div class="label">Твой счёт</div>
+      <div class="label" id="finalLabel">Твой счёт</div>
       <div class="big" id="finalScore">0</div>
+      <div class="stats hidden" id="endlessStats">
+        <div><b id="stRounds">0</b><span>раундов</span></div>
+        <div><b id="stAvg">0</b><span>в среднем за раунд</span></div>
+        <div><b id="stStreak">0</b><span>лучшая серия побед</span></div>
+      </div>
       <div class="vs"><span style="color:var(--accent)" id="finalYou"></span><span style="color:var(--ai)" id="finalAi"></span></div>
       <p class="sub" id="verdict" style="margin-bottom:16px"></p>
       <ul class="history" id="history"></ul>
+      <p class="history-note hidden" id="historyNote"></p>
       <div class="row">
         <button class="btn-main" id="againBtn" style="flex:1">Ещё раз</button>
         <button class="btn-ghost" id="menuBtn">Меню</button>
@@ -397,7 +456,7 @@
 
   // ---------- настройки ----------
   const SETTINGS_KEY = "priceGuessSettings";
-  const DEFAULTS = { min: 0, max: MAX, shops: Object.keys(SHOPS), rounds: 10 };
+  const DEFAULTS = { min: 0, max: MAX, shops: Object.keys(SHOPS), rounds: 10, mode: "type" };
   let settings = { ...DEFAULTS };
   try {
     const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "null");
@@ -409,12 +468,15 @@
     if (settings.min > settings.max) [settings.min, settings.max] = [settings.max, settings.min];
     settings.shops = (settings.shops || []).filter((s) => SHOPS[s]);
     if (!settings.shops.length) settings.shops = Object.keys(SHOPS);
-    if (![5, 10, 15, 20].includes(settings.rounds)) settings.rounds = 10;
+    if (![0, 5, 10, 15, 20].includes(settings.rounds)) settings.rounds = 10;   // 0 = бесконечно
+    if (!["choice", "type"].includes(settings.mode)) settings.mode = "type";
   }
   function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) {} }
   function clampPrice(v) { v = Math.round(Number(v) || 0); return Math.min(MAX, Math.max(0, v)); }
 
   let rounds = settings.rounds;
+  let endless = false, streak = 0, bestStreak = 0;
+  let mode = settings.mode, choiceOpts = [];
   let deck = [], round = 0, score = 0, aiScore = 0, current = null, hinted = false, history = [];
 
   $("rate").textContent = RATE;
@@ -574,11 +636,18 @@
   }
 
   // ---------- хранилище рекорда ----------
-  function getBest() { try { return Number(localStorage.getItem("priceGuessBest")) || 0; } catch (e) { return 0; } }
-  function setBest(v) { try { localStorage.setItem("priceGuessBest", String(v)); } catch (e) {} }
+  function getNum(k) { try { return Number(localStorage.getItem(k)) || 0; } catch (e) { return 0; } }
+  function setNum(k, v) { try { localStorage.setItem(k, String(v)); } catch (e) {} }
+  // у «Выбора» свои рекорды, у «Наугад» — прежние ключи
+  function recKey(k) { return settings.mode === "choice" ? k + "Choice" : k; }
+  function getBest() { return getNum(recKey("priceGuessBest")); }
+  function setBest(v) { setNum(recKey("priceGuessBest"), v); }
   function showBest() {
-    const b = getBest();
-    $("bestLine").textContent = b ? "Рекорд: " + fmt(b) + " очков" : "";
+    const b = getBest(), e = getNum(recKey("priceGuessBestEndless")), st = getNum(recKey("priceGuessBestStreak"));
+    const parts = [];
+    if (b) parts.push("Рекорд: " + fmt(b) + " очков");
+    if (e || st) parts.push("∞: " + fmt(e) + " очков, серия " + fmt(st));
+    $("bestLine").textContent = parts.join(" · ");
   }
 
   // ---------- утилиты ----------
@@ -600,17 +669,44 @@
 
   // ИИ-соперник: чем дороже вещь, тем точнее «знает» цену, но всегда ошибается случайно
   function aiGuess(price) {
-    const g = price * Math.exp(gauss() * 0.42);
-    // округляем «по-магазинному»: 1 299, 49, 15 999
+    return shopRound(price * Math.exp(gauss() * 0.42));
+  }
+
+  // цена «как в магазине»: 1 299, 449, 37
+  function shopRound(g) {
     if (g >= 1000) return Math.max(1, Math.round(g / 100) * 100 - 1);
     if (g >= 100) return Math.max(1, Math.round(g / 10) * 10 - 1);
     return Math.max(1, Math.round(g));
   }
 
+  // Режим «Выбор»: настоящая цена + 3 правдоподобных неверных варианта
+  function makeChoices(price) {
+    const factors = shuffle([0.3, 0.45, 0.6, 0.75, 1.35, 1.6, 2, 2.6, 3.3]);
+    const opts = [price];
+    for (const f of factors) {
+      if (opts.length === 4) break;
+      const v = shopRound(price * f * (0.95 + Math.random() * 0.1));
+      // каждый вариант заметно отличается от остальных (хотя бы на 15%)
+      if (opts.every((o) => Math.abs(Math.log(v / o)) > Math.log(1.15))) opts.push(v);
+    }
+    let k = 4;
+    while (opts.length < 4) { opts.push(Math.max(1, Math.round(price * k))); k += 2; }
+    return opts.sort((a, b) => a - b);
+  }
+
+  // ИИ в «Выборе» выбирает вариант, ближайший к своей догадке
+  function aiPick(options, price) {
+    const g = aiGuess(price);
+    return options.reduce((best, o) => Math.abs(Math.log(o / g)) < Math.abs(Math.log(best / g)) ? o : best, options[0]);
+  }
+
   function aiComment(price, guess, ai, youPts, aiPts) {
     const ratio = guess / price;
     const lines = [];
-    if (youPts === MAX_PTS) lines.push("Почти копейка в копейку. Признаю, ты лучше меня.");
+    if (mode === "choice" && guess !== price && (ratio < 0.87 || ratio > 1.15)) lines.push("Неверно.");
+    if (mode === "choice" && guess === price) lines.push("Верно!");
+    else if (mode === "choice" && guess !== price && ratio >= 0.87 && ratio <= 1.15) lines.push("Неверно, но было очень близко.");
+    else if (youPts === MAX_PTS && mode !== "choice") lines.push("Почти копейка в копейку. Признаю, ты лучше меня.");
     else if (ratio > 3) lines.push("Ого, ты переоценил раза в " + ratio.toFixed(1).replace(".", ",") + ". Продавец был бы счастлив.");
     else if (ratio < 1 / 3) lines.push("Дешевле в " + (1 / ratio).toFixed(1).replace(".", ",") + " раза, чем на самом деле. Так даже на AliExpress не бывает.");
     else if (ratio > 1.15) lines.push("Многовато. Реальная цена на " + Math.round((ratio - 1) * 100) + "% ниже.");
@@ -619,7 +715,7 @@
 
     if (aiPts > youPts) lines.push("Этот раунд мой 😎");
     else if (aiPts < youPts) lines.push("Этот раунд твой.");
-    else lines.push("Ничья.");
+    else lines.push(mode === "choice" && youPts === 0 ? "Оба мимо." : "Ничья.");
     return "<b>ИИ:</b> " + lines.join(" ");
   }
 
@@ -636,20 +732,16 @@
   }
   function pool() { return ALL.filter((p) => matches(p, settings)); }
 
-  function startGame() {
-    rounds = settings.rounds;
-    const items = pool();
-    if (items.length < 1) { openSettings(); return; }
-    // Магазины чередуются по очереди-случайно, чтобы маленькие магазины тоже попадались,
-    // и одна категория не идёт два раза подряд
+  // Колода: магазины чередуются случайно, чтобы маленькие магазины тоже попадались,
+  // и одна категория не идёт два раза подряд
+  function buildDeck(items, size, prevCat) {
     const byShop = {};
-    for (const p of shuffle(items)) (byShop[p.shop] = byShop[p.shop] || []).push(p);
-    const deckSize = Math.min(items.length, rounds * 4);   // запас на случай битых картинок
+    for (const p of shuffle(items.slice())) (byShop[p.shop] = byShop[p.shop] || []).push(p);
     const out = [];
-    while (out.length < deckSize) {
+    while (out.length < size) {
       const shops = Object.keys(byShop).filter((k) => byShop[k].length);
       if (!shops.length) break;
-      const prev = out.length ? out[out.length - 1].cat : null;
+      const prev = out.length ? out[out.length - 1].cat : prevCat;
       let src = byShop[shops[Math.floor(Math.random() * shops.length)]];
       let i = src.findIndex((p) => p.cat !== prev);
       if (i < 0) {
@@ -658,19 +750,48 @@
       }
       out.push(src.splice(i, 1)[0]);
     }
-    deck = out;
-    round = 0; score = 0; aiScore = 0; history = [];
+    return out;
+  }
+
+  // В бесконечном режиме колода пополняется: сначала идут все ещё не показанные товары,
+  // а когда показаны все — круг начинается заново
+  let shownIds = new Set();
+  function refillDeck() {
+    const items = pool();
+    let fresh = items.filter((p) => !shownIds.has(p.id) && !deck.includes(p));
+    if (!fresh.length) { shownIds = new Set(); fresh = items.filter((p) => !deck.includes(p) && p !== current); }
+    const prevCat = deck.length ? deck[deck.length - 1].cat : current ? current.cat : null;
+    deck.push(...buildDeck(fresh, 40, prevCat));
+  }
+
+  function startGame(opts) {
+    mode = settings.mode;
+    endless = opts && opts.endless != null ? opts.endless : settings.rounds === 0;
+    rounds = endless ? Infinity : settings.rounds;
+    const items = pool();
+    if (items.length < 1) { openSettings(); return; }
+    shownIds = new Set();
+    current = null;
+    deck = endless ? [] : buildDeck(items, Math.min(items.length, rounds * 4));   // запас на случай битых картинок
+    if (endless) refillDeck();
+    round = 0; score = 0; aiScore = 0; history = []; streak = 0; bestStreak = 0;
+    $("stopBtn").classList.toggle("hidden", !endless);
+    $("streakLabel").classList.toggle("hidden", !endless);
+    document.querySelector("#game .bar").classList.toggle("endless", endless);
     show("game");
     nextRound();
   }
 
   function nextRound() {
     stopSuspense();
+    if (endless && deck.length < 3) refillDeck();
     if (round >= rounds || !deck.length) return finish();
     round++;
     current = deck.shift();
+    shownIds.add(current.id);
     hinted = false;
-    $("roundLabel").textContent = "Раунд " + round + "/" + rounds;
+    $("roundLabel").textContent = endless ? "Раунд " + round + " · ∞" : "Раунд " + round + "/" + rounds;
+    paintStreak();
     $("scoreLabel").textContent = fmt(score);
     $("aiLabel").textContent = fmt(aiScore);
     $("progress").style.width = ((round - 1) / rounds * 100) + "%";
@@ -694,6 +815,7 @@
     $("loading").classList.remove("hidden");
     $("loading").textContent = "Загружаем…";
     $("guessForm").classList.add("hidden");   // отвечать можно только когда видно картинку
+    $("choices").classList.add("hidden");
     clearTimeout(imgTimer);
     const fail = () => {
       if (p !== current) return;
@@ -709,7 +831,7 @@
       clearTimeout(imgTimer);
       if (img.naturalWidth < 20 || img.naturalHeight < 20) return fail();   // пустая заглушка вместо фото
       img.classList.add("ready"); $("loading").classList.add("hidden");
-      $("guessForm").classList.remove("hidden");
+      showAnswerUI();
     };
     img.onerror = fail;
     imgTimer = setTimeout(fail, 10000);       // слишком долго грузится — тоже пропускаем
@@ -725,21 +847,44 @@
   const SUSPENSE_MS = 5000;
   let suspenseRaf = 0, suspenseTimer = 0;
 
+  function showAnswerUI() {
+    if (mode === "choice") {
+      choiceOpts = makeChoices(current.price);
+      $("choiceGrid").innerHTML = choiceOpts.map((v, i) =>
+        '<button type="button" data-v="' + v + '" aria-keyshortcuts="' + (i + 1) + '">' + fmt(v) + " ₴</button>").join("");
+      $("choices").classList.remove("hidden");
+    } else {
+      $("guessForm").classList.remove("hidden");
+    }
+  }
+
   function submitGuess(e) {
     e.preventDefault();
-    if (suspenseTimer) return;          // ответ уже отправлен, ждём
     const guess = readGuess();
     if (!guess) return;
+    answer(guess);
+  }
+
+  function answer(guess) {
+    if (suspenseTimer || !current) return;          // ответ уже отправлен, ждём
     const price = current.price;
-    const ai = aiGuess(price);
-    let youPts = points(guess, price);
+    let ai, youPts, aiPts;
+    if (mode === "choice") {
+      ai = aiPick(choiceOpts, price);
+      youPts = guess === price ? MAX_PTS : 0;
+      aiPts = ai === price ? MAX_PTS : 0;
+    } else {
+      ai = aiGuess(price);
+      youPts = points(guess, price);
+      aiPts = points(ai, price);
+    }
     if (hinted) youPts = Math.round(youPts * 0.7);
-    const aiPts = points(ai, price);
     const r = { guess, ai, price, youPts, aiPts };
 
     // 5 секунд ожидания: тряска, мелькающие цены, барабанная дробь
     $("hintBtn").classList.add("hidden");
     $("guessForm").classList.add("hidden");
+    $("choices").classList.add("hidden");
     $("suspense").classList.remove("hidden");
     $("susYou").textContent = fmt(guess) + " ₴";
     $("susAi").textContent = "думает…";
@@ -798,6 +943,10 @@
     $("aiLabel").textContent = fmt(aiScore);
     $("progress").style.width = (round / rounds * 100) + "%";
     $("nextBtn").textContent = round >= rounds ? "Итоги" : "Дальше";
+    // серия побед подряд над ИИ (ничья серию не обрывает)
+    if (youPts > aiPts) { streak++; bestStreak = Math.max(bestStreak, streak); }
+    else if (youPts < aiPts) streak = 0;
+    paintStreak();
 
     // кто выиграл раунд — та и музыка
     const card = $("gameCard"), v = $("verdictLine");
@@ -813,11 +962,16 @@
       v.className = "verdict lose"; card.classList.add("lose");
       Sound.lose();
     } else {
-      v.textContent = "🤝 Ничья";
+      v.textContent = mode === "choice" && youPts === 0 ? "😬 Оба мимо" : "🤝 Ничья";
       v.className = "verdict tie";
       Sound.tie();
     }
     $("nextBtn").focus();
+  }
+
+  function paintStreak() {
+    if (!endless) return;
+    $("streakLabel").textContent = streak ? "🔥 " + streak + " подряд" : "";
   }
 
   function setPts(el, pts, extra) {
@@ -826,6 +980,7 @@
   }
 
   function finish() {
+    stopSuspense();
     const played = history.length;
     $("finalScore").textContent = fmt(score);
     $("finalYou").textContent = "Ты " + fmt(score);
@@ -833,13 +988,30 @@
     const avg = played ? score / played : 0;
     let v = score > aiScore ? "Ты обыграл ИИ! " : score < aiScore ? "ИИ победил. " : "Ничья с ИИ. ";
     v += avg >= 800 ? "Ты явно часто сидишь на маркетплейсах." : avg >= 500 ? "Неплохо чувствуешь цены." : avg >= 250 ? "Есть куда расти — попробуй ещё раз." : "Цены — явно не твоё 🙂";
-    const best = getBest();
-    if (score > best) { setBest(score); v += " Новый рекорд!"; }
+    $("finalLabel").textContent = endless ? "Бесконечный режим · твой счёт" : "Твой счёт";
+    $("endlessStats").classList.toggle("hidden", !endless);
+    if (endless) {
+      $("stRounds").textContent = fmt(played);
+      $("stAvg").textContent = fmt(avg);
+      $("stStreak").textContent = fmt(bestStreak);
+      const rec = [];
+      if (played && score > getNum(recKey("priceGuessBestEndless"))) { setNum(recKey("priceGuessBestEndless"), score); rec.push("счёт"); }
+      if (bestStreak > getNum(recKey("priceGuessBestStreak"))) { setNum(recKey("priceGuessBestStreak"), bestStreak); rec.push("серия побед"); }
+      if (rec.length) v += " Новый рекорд: " + rec.join(" и ") + "!";
+    } else {
+      const best = getBest();
+      if (score > best) { setBest(score); v += " Новый рекорд!"; }
+    }
+    if (!played) v = "Ни одного раунда не сыграно.";
     $("verdict").textContent = v;
-    if (score > aiScore) { Sound.gameWin(); confetti(); } else if (score < aiScore) Sound.gameLose(); else Sound.tie();
-    $("history").innerHTML = history.map((h) =>
+    if (played) { if (score > aiScore) { Sound.gameWin(); confetti(); } else if (score < aiScore) Sound.gameLose(); else Sound.tie(); }
+    // в длинной игре показываем последние 30 товаров, свежие сверху
+    const list = endless ? history.slice(-30).reverse() : history;
+    $("history").innerHTML = list.map((h) =>
       "<li><span>" + escapeHtml(h.title) + "</span><span>" + fmt(h.price) + " ₴ · <b>+" + fmt(h.youPts) + "</b></span></li>"
     ).join("");
+    $("historyNote").classList.toggle("hidden", !(endless && history.length > 30));
+    $("historyNote").textContent = "Показаны последние 30 из " + fmt(history.length) + " товаров.";
     show("end");
   }
 
@@ -884,12 +1056,13 @@
       '<button class="chip shop' + (draft.shops.includes(id) ? " on" : "") + '" data-shop="' + id + '">' +
       '<i style="background:' + s.color + '"></i>' + s.name + " <small>" + fmtCount(shopCount(id, draft)) + "</small></button>").join("");
     document.querySelectorAll("#roundChips .chip").forEach((c) => c.classList.toggle("on", +c.dataset.n === draft.rounds));
+    paintSeg("modeSegSettings", draft.mode);
     $("soundSwitch").classList.toggle("on", Sound.enabled);
     $("soundSwitch").setAttribute("aria-checked", Sound.enabled ? "true" : "false");
     const n = ALL.filter((p) => matches(p, draft)).length;
     const f = $("fits");
     if (n === 0) { f.textContent = "Под эти настройки не подходит ни одного товара — расширь диапазон цен или выбери другие магазины."; f.className = "fits bad"; }
-    else if (n < draft.rounds) { f.textContent = "Подходит товаров: " + fmtCount(n) + " — меньше, чем раундов. Игра будет короче."; f.className = "fits bad"; }
+    else if (draft.rounds && n < draft.rounds) { f.textContent = "Подходит товаров: " + fmtCount(n) + " — меньше, чем раундов. Игра будет короче."; f.className = "fits bad"; }
     else { f.textContent = "Подходит товаров: " + fmtCount(n); f.className = "fits"; }
     $("setDone").disabled = n === 0;
   }
@@ -900,14 +1073,23 @@
     renderSummary(); showBest(); show("start");
   }
 
+  function paintSeg(id, m) {
+    document.querySelectorAll("#" + id + " button").forEach((b) => {
+      b.classList.toggle("on", b.dataset.mode === m);
+      b.setAttribute("aria-checked", b.dataset.mode === m ? "true" : "false");
+    });
+  }
+
   function renderSummary() {
+    paintSeg("modeSegStart", settings.mode);
     const all = settings.shops.length === Object.keys(SHOPS).length;
     const shops = all ? "все" : settings.shops.map((s) => SHOPS[s].name).join(", ");
     const price = settings.min === 0 && settings.max === MAX ? "любая" : fmt(settings.min) + " – " + fmt(settings.max) + " ₴";
     const n = pool().length;
-    $("summary").innerHTML = "Магазины: <b>" + escapeHtml(shops) + "</b> · Цена: <b>" + price + "</b><br>Раундов: <b>" +
-      settings.rounds + "</b> · Звук: <b>" + (Sound.enabled ? "вкл" : "выкл") + "</b> · Товаров: <b>" + fmtCount(n) + "</b>";
+    $("summary").innerHTML = "Режим: <b>" + (settings.mode === "choice" ? "выбор" : "наугад") + "</b> · Магазины: <b>" + escapeHtml(shops) + "</b> · Цена: <b>" + price + "</b><br>Раундов: <b>" +
+      (settings.rounds || "∞") + "</b> · Звук: <b>" + (Sound.enabled ? "вкл" : "выкл") + "</b> · Товаров: <b>" + fmtCount(n) + "</b>";
     $("startBtn").disabled = n === 0;
+    $("endlessBtn").disabled = n === 0;
   }
 
   function setPrice(which, value) {
@@ -944,6 +1126,26 @@
   $("setDone").onclick = () => closeSettings(true);
   $("setBack").onclick = () => closeSettings(false);
   $("settingsBtn").onclick = openSettings;
+  $("modeSegStart").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    settings.mode = b.dataset.mode; saveSettings(); renderSummary(); showBest();
+  });
+  $("modeSegSettings").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    draft.mode = b.dataset.mode; renderSettings();
+  });
+  $("choiceGrid").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b || suspenseTimer) return;
+    b.classList.add("picked");
+    answer(Number(b.dataset.v));
+  });
+  // в «Выборе» можно отвечать клавишами 1–4
+  document.addEventListener("keydown", (e) => {
+    if ($("choices").classList.contains("hidden") || suspenseTimer) return;
+    const i = Number(e.key) - 1;
+    const btn = $("choiceGrid").children[i];
+    if (btn) btn.click();
+  });
 
   $("startBtn").onclick = () => { Sound.unlock(); startGame(); };
   $("soundBtn").onclick = () => {
@@ -951,7 +1153,9 @@
     if (draft && !$("settings").classList.contains("hidden")) renderSettings();
   };
   paintSoundBtn();
-  $("againBtn").onclick = startGame;
+  $("againBtn").onclick = () => startGame({ endless });
+  $("endlessBtn").onclick = () => { Sound.unlock(); startGame({ endless: true }); };
+  $("stopBtn").onclick = () => { if (!suspenseTimer) finish(); };   // во время ожидания ответа не прерываем
   $("menuBtn").onclick = () => { stopSuspense(); renderSummary(); showBest(); show("start"); };
   $("nextBtn").onclick = nextRound;
   $("guessForm").addEventListener("submit", submitGuess);
