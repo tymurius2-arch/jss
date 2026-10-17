@@ -81,6 +81,11 @@
     display: flex; flex-direction: column; overflow: hidden;
   }
   #palette h2, #stats h2 { font: 15px var(--display); margin: 0; padding: 12px 14px 6px; letter-spacing: .4px; }
+  #palette h2 span { font: 12px var(--body); color: var(--muted); }
+  #sizeChips { display: flex; gap: 4px; padding: 0 10px 6px; flex-wrap: wrap; }
+  .chip { border: 1px solid var(--line); background: rgba(255,255,255,.04); border-radius: 999px; padding: 3px 9px; font-size: 12px; color: var(--muted); }
+  .chip:hover { border-color: rgba(63,210,255,.45); color: var(--ink); }
+  .chip.on { background: var(--cyan); border-color: var(--cyan); color: #001522; font-weight: 700; }
   #partList { overflow-y: auto; padding: 0 10px 10px; flex: 1; scrollbar-width: thin; }
   #partList h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); margin: 12px 4px 6px; font-weight: 500; }
   .pgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
@@ -231,7 +236,8 @@
     #top { left: 8px; right: 8px; padding-left: 10px; }
     #top .brand span { display: none; }
     #top nav .btn { padding: 6px 9px; font-size: 13px; }
-    #palette { left: 8px; right: 8px; top: auto; bottom: 8px; width: auto; height: 158px; }
+    #palette { left: 8px; right: 8px; top: auto; bottom: 8px; width: auto; height: 186px; }
+    #sizeChips { flex-wrap: nowrap; overflow-x: auto; padding: 8px 8px 0; }
     #palette h2, #partInfo, #partList h3 { display: none; }
     #partList { display: flex; gap: 6px; overflow-x: auto; overflow-y: hidden; padding: 8px; }
     .pgrid { display: contents; }
@@ -285,7 +291,8 @@
 
 <section id="build">
   <aside id="palette" class="glass">
-    <h2>Детали</h2>
+    <h2>Детали <span id="partCount"></span></h2>
+    <div id="sizeChips"></div>
     <div id="partList"></div>
     <div id="partInfo"><b>Наведи на деталь</b>Здесь появится её описание. Нажми, чтобы добавить на ракету.</div>
   </aside>
@@ -377,8 +384,9 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
    космос начинается на 70 км, орбита требует ~3400 м/с.
    ====================================================================== */
 const G0 = 9.81, PR = 600000, MU = G0 * PR * PR, ATM = 70000, SCALE_H = 5600;
-const PAD_H = 2.25, PAD_R = 9, CAP_R = 650, CRASH_V = 12, FIN_MASS = 0.12, MAX_PARTS = 22;
-const RAD = { T: 0.32, S: 0.625, L: 1.25 };
+const PAD_H = 2.25, PAD_R = 9, CAP_R = 650, CRASH_V = 12, FIN_MASS = 0.12, MAX_PARTS = 40;
+const RAD = { T: 0.32, S: 0.625, L: 1.25, X: 1.875 };
+const SIZE_NAME = { T: '0,625 м', S: '1,25 м', L: '2,5 м', X: '3,75 м' };
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -464,6 +472,34 @@ function makeTextures() {
     panelLines(g, w, h, 3, 8);
     g.fillStyle = '#c0362c'; g.fillRect(0, h * 0.5 - 7, w, 14);
   });
+  const tankTex = (base, quad, stripe, extra) => canvasTex(512, 512, (g, w, h) => {
+    g.fillStyle = base; g.fillRect(0, 0, w, h);
+    speckle(g, w, h, 900, ['rgba(0,0,0,.035)', 'rgba(255,255,255,.06)'], 2, 9, 13);
+    if (quad) { const band = h * 0.12; g.fillStyle = quad; for (let i = 0; i < 4; i += 2) { g.fillRect(i * w / 4, 0, w / 4, band); g.fillRect((i + 1) * w / 4, h - band, w / 4, band); } }
+    panelLines(g, w, h, 3, 8);
+    if (stripe) { g.fillStyle = stripe; g.fillRect(0, h * 0.5 - 7, w, 14); }
+    if (extra) extra(g, w, h);
+  });
+  TEX.tankBlack = tankTex('#1f2228', '#e9e8e3', '#e9e8e3');
+  TEX.tankGrey = tankTex('#9aa0a8', '#1b1d22', '#c0362c');
+  TEX.tankSilver = tankTex('#c7ccd4', null, null, (g, w, h) => { g.globalAlpha = 0.25; for (let x = 0; x < w; x += 3) { g.fillStyle = x % 6 ? '#fff' : '#8a9099'; g.fillRect(x, 0, 1, h); } g.globalAlpha = 1; });
+  TEX.tankStripe = tankTex('#f1f0eb', null, null, (g, w, h) => { g.fillStyle = '#c8322a'; for (let y = 0; y < h; y += 128) g.fillRect(0, y + 40, w, 48); });
+  TEX.tankGreen = tankTex('#56633f', '#2a3020', null, (g, w, h) => { g.fillStyle = 'rgba(240,235,200,.85)'; g.font = 'bold 40px Rubik, sans-serif'; g.textAlign = 'center'; g.fillText('ТОПЛИВО', w * 0.5, h * 0.53); });
+  TEX.tankGold = canvasTex(512, 512, (g, w, h) => {
+    g.fillStyle = '#c9963c'; g.fillRect(0, 0, w, h); const r = rnd(31);
+    for (let i = 0; i < 260; i++) { g.fillStyle = `hsla(${38 + r() * 10},${55 + r() * 25}%,${40 + r() * 35}%,.55)`; g.beginPath(); const x = r() * w, y = r() * h; g.moveTo(x, y); for (let k = 0; k < 4; k++) g.lineTo(x + (r() - .5) * 90, y + (r() - .5) * 90); g.fill(); }
+  });
+  TEX.srbPlain = canvasTex(256, 1024, (g, w, h) => {
+    g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
+    speckle(g, w, h, 900, ['rgba(0,0,0,.03)'], 2, 8, 6);
+    g.fillStyle = '#8b8f97'; for (let i = 1; i < 6; i++) g.fillRect(0, h * i / 6 - 6, w, 12);
+    g.fillStyle = '#16181d'; g.fillRect(0, 0, w, 30); g.fillRect(0, 0, w / 4, h * 0.08);
+  });
+  TEX.pv = canvasTex(256, 256, (g, w, h) => {
+    g.fillStyle = '#0e1d44'; g.fillRect(0, 0, w, h);
+    for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { const gr = g.createLinearGradient(x * 32, y * 32, x * 32 + 32, y * 32 + 32); gr.addColorStop(0, '#1a3a8a'); gr.addColorStop(1, '#0b1a40'); g.fillStyle = gr; g.fillRect(x * 32 + 2, y * 32 + 2, 28, 28); }
+    g.strokeStyle = '#b8c0cc'; g.lineWidth = 2; g.strokeRect(1, 1, w - 2, h - 2);
+  }, { rx: 2, ry: 4 });
   TEX.foam = canvasTex(512, 512, (g, w, h) => {
     g.fillStyle = '#c4682c'; g.fillRect(0, 0, w, h);
     speckle(g, w, h, 5000, ['rgba(90,30,0,.12)', 'rgba(255,190,120,.10)', 'rgba(120,50,10,.08)'], 1, 4, 7);
@@ -597,15 +633,26 @@ function makeMaterials() {
   MAT.canopy = new THREE.MeshStandardMaterial({ map: TEX.canopy, roughness: 0.8, side: THREE.DoubleSide });
   MAT.line = new THREE.LineBasicMaterial({ color: 0x333333 });
   MAT.tankCache = {};
+  MAT.fabricBlue = new THREE.MeshStandardMaterial({ color: 0x2f6fe4, roughness: 0.85 });
+  MAT.pv = new THREE.MeshPhysicalMaterial({ map: TEX.pv, metalness: 0.5, roughness: 0.25, clearcoat: 1 });
+  MAT.paintY = new THREE.MeshStandardMaterial({ color: 0xe0a82a, roughness: 0.5, metalness: 0.5 });
+  MAT.lamp = new THREE.MeshBasicMaterial({ color: new THREE.Color(7, 6.6, 5.6) });
+  MAT.blueGlow = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.6, 1.6, 5), side: THREE.DoubleSide });
+  MAT.greenGlow = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.4, 4, 1) });
+  MAT.finWhite = new THREE.MeshPhysicalMaterial({ color: 0xf2f2ee, roughness: 0.35, clearcoat: 0.5 });
+  MAT.finDark = new THREE.MeshPhysicalMaterial({ color: 0x23262d, roughness: 0.45, clearcoat: 0.4 });
 }
-function tankMat(kind, h) {
-  const key = kind + h;
+const SKIN = { T: 'white', S: 'white', L: 'foam', X: 'grey' };
+function tankMat(style, h) {
+  style = SKIN[style] || style;
+  const key = style + h;
   if (MAT.tankCache[key]) return MAT.tankCache[key];
-  const base = kind === 'L' ? TEX.foam : TEX.tank;
+  const base = { white: TEX.tank, foam: TEX.foam, black: TEX.tankBlack, grey: TEX.tankGrey, silver: TEX.tankSilver, stripe: TEX.tankStripe, green: TEX.tankGreen, gold: TEX.tankGold }[style] || TEX.tank;
   const map = base.clone(); map.repeat.set(1, Math.max(1, Math.round(h / 1.9))); map.needsUpdate = true;
-  const m = kind === 'L'
-    ? new THREE.MeshStandardMaterial({ map, bumpMap: map, bumpScale: 1.2, roughness: 0.82, metalness: 0 })
-    : new THREE.MeshPhysicalMaterial({ map, bumpMap: map, bumpScale: 0.5, roughness: 0.34, metalness: 0.05, clearcoat: 0.4, clearcoatRoughness: 0.2 });
+  let m;
+  if (style === 'foam' || style === 'green') m = new THREE.MeshStandardMaterial({ map, bumpMap: map, bumpScale: 1.2, roughness: 0.82, metalness: 0 });
+  else if (style === 'silver' || style === 'gold') m = new THREE.MeshStandardMaterial({ map, bumpMap: map, bumpScale: 0.6, roughness: style === 'gold' ? 0.35 : 0.24, metalness: 0.9 });
+  else m = new THREE.MeshPhysicalMaterial({ map, bumpMap: map, bumpScale: 0.5, roughness: 0.34, metalness: 0.05, clearcoat: 0.4, clearcoatRoughness: 0.2 });
   return (MAT.tankCache[key] = m);
 }
 
@@ -618,7 +665,7 @@ const PARTS = [
     desc: 'Кабина космонавта. Через неё ракетой управляют: она поворачивает ракету и держит курс.' },
   { id: 'probe', cat: 'command', name: 'Зонд «Спутник»', top: 'S', bot: 'S', h: 0.55, mass: 0.1, control: true,
     desc: 'Беспилотный блок управления. Лёгкий — подходит для спутников без экипажа.' },
-  { id: 'chute', cat: 'command', name: 'Парашют «Купол»', top: null, bot: 'T', h: 0.32, mass: 0.1, chute: true, topOnly: true,
+  { id: 'chute', cat: 'command', name: 'Парашют «Купол»', top: null, bot: 'T', h: 0.32, mass: 0.1, chute: true, area: 650, topOnly: true,
     desc: 'Всегда встаёт на самый верх. Раскрывается при снижении ниже 5 км и опускает ракету со скоростью ~6–9 м/с.' },
   { id: 'noseS', cat: 'aero', name: 'Обтекатель М', top: null, bot: 'S', h: 1.3, mass: 0.06, nose: true, topOnly: true,
     desc: 'Острый нос для ракеты без капсулы. Уменьшает сопротивление воздуха.' },
@@ -643,13 +690,118 @@ const PARTS = [
   { id: 'decS', cat: 'struct', name: 'Разделитель М', top: 'S', bot: 'S', h: 0.22, mass: 0.05, decoupler: true,
     desc: 'Делит ракету на ступени. По пробелу отстреливает всё, что ниже, и включает следующую ступень.' },
   { id: 'decL', cat: 'struct', name: 'Разделитель Б', top: 'L', bot: 'L', h: 0.3, mass: 0.2, decoupler: true, desc: 'Разделитель для широких ступеней 2,5 м.' },
-  { id: 'adSL', cat: 'struct', name: 'Переходник М→Б', top: 'S', bot: 'L', h: 1.0, mass: 0.2, desc: 'Сверху узкий (1,25 м), снизу широкий (2,5 м).' },
-  { id: 'adLS', cat: 'struct', name: 'Переходник Б→М', top: 'L', bot: 'S', h: 1.0, mass: 0.2, desc: 'Сверху широкий (2,5 м), снизу узкий (1,25 м).' },
+  { id: 'adSL', cat: 'struct', name: 'Переходник М→Б', top: 'S', bot: 'L', h: 1.0, mass: 0.2, adapter: true, desc: 'Сверху узкий (1,25 м), снизу широкий (2,5 м).' },
+  { id: 'adLS', cat: 'struct', name: 'Переходник Б→М', top: 'L', bot: 'S', h: 1.0, mass: 0.2, adapter: true, desc: 'Сверху широкий (2,5 м), снизу узкий (1,25 м).' },
+  // ----- новые детали -----
+  // управление
+  { id: 'podMini', cat: 'command', name: 'Капсула «Кроха»', top: 'T', bot: 'T', h: 0.69, mass: 0.45, control: true, crew: true, gen: 'scaled', base: 'pod', k: 0.512,
+    desc: 'Тесная одноместная капсула диаметром 0,625 м. Лёгкая — для мини-ракет.' },
+  { id: 'pod3', cat: 'command', name: 'Капсула «Союз-3»', top: 'S', bot: 'L', h: 2.7, mass: 2.7, control: true, crew: true, gen: 'scaled', base: 'pod', k: 2,
+    desc: 'Большая капсула на троих космонавтов, снизу 2,5 м. Сверху помещается парашют «Купол-2».' },
+  { id: 'probeMini', cat: 'command', name: 'Зонд «Кроха»', top: 'T', bot: 'T', h: 0.28, mass: 0.04, control: true, gen: 'scaled', base: 'probe', k: 0.512,
+    desc: 'Крошечный блок управления 0,625 м для лёгких беспилотных ракет.' },
+  { id: 'probeL', cat: 'command', name: 'Зонд «Октан»', top: 'L', bot: 'L', h: 1.1, mass: 0.3, control: true, gen: 'scaled', base: 'probe', k: 2,
+    desc: 'Большой беспилотный блок управления для широких ступеней 2,5 м.' },
+  { id: 'chuteDouble', cat: 'command', name: 'Парашют «Двойной»', top: null, bot: 'T', h: 0.34, mass: 0.18, chute: true, area: 1000, topOnly: true, gen: 'chute2',
+    desc: 'Два купола вместо одного: спуск медленнее и мягче.' },
+  { id: 'chuteS', cat: 'command', name: 'Парашют «Купол-2»', top: null, bot: 'S', h: 0.62, mass: 0.25, chute: true, area: 1400, topOnly: true, gen: 'scaled', base: 'chute', k: 1.95,
+    desc: 'Парашют 1,25 м — для тяжёлых капсул вроде «Союза-3».' },
+  { id: 'chuteL', cat: 'command', name: 'Парашют «Великан»', top: null, bot: 'L', h: 1.25, mass: 0.6, chute: true, area: 3200, topOnly: true, gen: 'scaled', base: 'chute', k: 3.9,
+    desc: 'Огромный парашют 2,5 м. Мягко опустит даже целую ступень.' },
+  // аэродинамика
+  { id: 'noseT', cat: 'aero', name: 'Обтекатель Мини', top: null, bot: 'T', h: 0.7, mass: 0.02, nose: true, topOnly: true, desc: 'Острый носик для мини-ракет 0,625 м.' },
+  { id: 'noseX', cat: 'aero', name: 'Обтекатель Гигант', top: null, bot: 'X', h: 4.2, mass: 0.6, nose: true, topOnly: true, desc: 'Головной обтекатель для ступеней 3,75 м.' },
+  { id: 'coneS', cat: 'aero', name: 'Конус М', top: null, bot: 'S', h: 1.5, mass: 0.07, nose: true, topOnly: true, shape: 'cone', tip: 'dark', desc: 'Прямой острый конус 1,25 м.' },
+  { id: 'coneL', cat: 'aero', name: 'Конус Б', top: null, bot: 'L', h: 3.0, mass: 0.28, nose: true, topOnly: true, shape: 'cone', tip: 'dark', desc: 'Прямой острый конус 2,5 м.' },
+  { id: 'domeS', cat: 'aero', name: 'Купол М', top: null, bot: 'S', h: 0.7, mass: 0.05, nose: true, topOnly: true, shape: 'blunt', tip: 'white', desc: 'Скруглённый нос, как у старых ракет. Короткий и лёгкий.' },
+  { id: 'domeL', cat: 'aero', name: 'Купол Б', top: null, bot: 'L', h: 1.4, mass: 0.2, nose: true, topOnly: true, shape: 'blunt', tip: 'white', desc: 'Скруглённый нос 2,5 м.' },
+  { id: 'finsSmall', cat: 'aero', name: 'Малые крылья', h: 0, mass: 0.05, fins: true, desc: 'Лёгкие маленькие стабилизаторы для мини-ракет.' },
+  { id: 'finsBig', cat: 'aero', name: 'Большие крылья', h: 0, mass: 0.3, fins: true, desc: 'Крупные белые стабилизаторы для тяжёлых ракет.' },
+  { id: 'finsDelta', cat: 'aero', name: 'Дельта-крылья', h: 0, mass: 0.2, fins: true, desc: 'Треугольные крылья, как у сверхзвуковых самолётов.' },
+  { id: 'finsGrid', cat: 'aero', name: 'Решётчатые рули', h: 0, mass: 0.15, fins: true, torque: 1.2, desc: 'Решётки, как у многоразовых ракет. Держат ракету ровно и помогают поворачивать.' },
+  { id: 'finsWing', cat: 'aero', name: 'Крылья «Буран»', h: 0, mass: 0.45, fins: true, desc: 'Широкие стреловидные крылья, как у космоплана.' },
+  // баки
+  { id: 'tankT1', cat: 'tank', name: 'Бак Мини-25', top: 'T', bot: 'T', h: 0.5, mass: 0.015, fuel: 0.1, gen: 'tank', desc: 'Крошечный бак 0,625 м: 0,1 т топлива.' },
+  { id: 'tankT2', cat: 'tank', name: 'Бак Мини-50', top: 'T', bot: 'T', h: 1.0, mass: 0.03, fuel: 0.25, gen: 'tank', desc: 'Мини-бак 0,625 м: 0,25 т топлива.' },
+  { id: 'tankT4', cat: 'tank', name: 'Бак Мини-100', top: 'T', bot: 'T', h: 1.9, mass: 0.06, fuel: 0.5, gen: 'tank', skin: 'stripe', desc: 'Длинный мини-бак 0,625 м: 0,5 т топлива.' },
+  { id: 'tankS1s', cat: 'tank', name: 'Бак «Полоска»', top: 'S', bot: 'S', h: 1.0, mass: 0.0625, fuel: 0.5, gen: 'tank', skin: 'stripe', desc: 'Как ФТ-100, только в красную полоску.' },
+  { id: 'tankS2b', cat: 'tank', name: 'Бак «Ночь»', top: 'S', bot: 'S', h: 1.9, mass: 0.125, fuel: 1.0, gen: 'tank', skin: 'black', desc: 'Чёрный бак: 1 т топлива.' },
+  { id: 'tankS3s', cat: 'tank', name: 'Бак «Серебро»', top: 'S', bot: 'S', h: 2.8, mass: 0.19, fuel: 1.5, gen: 'tank', skin: 'silver', desc: 'Блестящий металлический бак: 1,5 т топлива.' },
+  { id: 'tankS2g', cat: 'tank', name: 'Бак «Золото»', top: 'S', bot: 'S', h: 1.9, mass: 0.125, fuel: 1.0, gen: 'tank', skin: 'gold', desc: 'Бак в золотой теплоизоляции, как у спутников.' },
+  { id: 'tankS8', cat: 'tank', name: 'Бак ФТ-800', top: 'S', bot: 'S', h: 7.5, mass: 0.5, fuel: 4.0, gen: 'tank', skin: 'grey', desc: 'Очень длинный бак 1,25 м: 4 т топлива.' },
+  { id: 'tankL1', cat: 'tank', name: 'Бак Б-400', top: 'L', bot: 'L', h: 1.0, mass: 0.25, fuel: 2, gen: 'tank', desc: 'Короткий широкий бак: 2 т топлива.' },
+  { id: 'tankL4w', cat: 'tank', name: 'Бак Б-1600 «Белый»', top: 'L', bot: 'L', h: 3.75, mass: 1.0, fuel: 8, gen: 'tank', skin: 'white', desc: 'Широкий бак в белой окраске: 8 т топлива.' },
+  { id: 'tankL2g', cat: 'tank', name: 'Бак «Хаки»', top: 'L', bot: 'L', h: 1.9, mass: 0.5, fuel: 4, gen: 'tank', skin: 'green', desc: 'Широкий бак защитного цвета: 4 т топлива.' },
+  { id: 'tankL8', cat: 'tank', name: 'Бак Б-3200', top: 'L', bot: 'L', h: 7.5, mass: 2.0, fuel: 16, gen: 'tank', desc: 'Гигантский бак 2,5 м: 16 т топлива.' },
+  { id: 'tankX2', cat: 'tank', name: 'Бак Г-1800', top: 'X', bot: 'X', h: 1.9, mass: 1.1, fuel: 9, gen: 'tank', desc: 'Бак 3,75 м: 9 т топлива.' },
+  { id: 'tankX4', cat: 'tank', name: 'Бак Г-3600', top: 'X', bot: 'X', h: 3.75, mass: 2.2, fuel: 18, gen: 'tank', desc: 'Бак 3,75 м: 18 т топлива.' },
+  { id: 'tankX8', cat: 'tank', name: 'Бак Г-7200', top: 'X', bot: 'X', h: 7.5, mass: 4.5, fuel: 36, gen: 'tank', skin: 'foam', desc: 'Самый большой бак: 36 т топлива, 3,75 м.' },
+  // двигатели
+  { id: 'engMini', cat: 'engine', name: 'Двигатель «Шмель»', top: 'T', bot: 'T', h: 0.55, mass: 0.12, engine: { thrust: 20, ispSL: 260, ispVac: 320 }, gen: 'eng',
+    nozzles: [[0, 0, 0.22]], look: { len: 0.32, bell: 'silver' }, desc: 'Малыш 0,625 м: 20 кН. Для мини-ракет.' },
+  { id: 'engVortex', cat: 'engine', name: 'Двигатель «Вихрь»', top: 'S', bot: 'S', h: 2.0, mass: 4.0, engine: { thrust: 900, ispSL: 290, ispVac: 315 }, gen: 'eng',
+    nozzles: [[0, 0, 0.55]], look: { len: 1.2, pumps: 3 }, desc: 'Очень мощный и тяжёлый для своего размера: 900 кН на диаметре 1,25 м.' },
+  { id: 'engTwin', cat: 'engine', name: 'Двигатель «Близнецы»', top: 'L', bot: 'L', h: 1.6, mass: 2.0, engine: { thrust: 450, ispSL: 280, ispVac: 310 }, gen: 'eng',
+    nozzles: [[0.58, 0, 0.5], [-0.58, 0, 0.5]], look: { len: 0.95 }, desc: 'Два сопла на широкой ступени: 450 кН.' },
+  { id: 'engSkipper', cat: 'engine', name: 'Двигатель «Шкипер»', top: 'L', bot: 'L', h: 2.2, mass: 3.0, engine: { thrust: 650, ispSL: 280, ispVac: 320 }, gen: 'eng',
+    nozzles: [[0, 0, 1.0]], look: { len: 1.5, pumps: 3 }, desc: 'Одно большое сопло: 650 кН. Хорош и у земли, и в космосе.' },
+  { id: 'engPoodle', cat: 'engine', name: 'Двигатель «Пудель»', top: 'L', bot: 'L', h: 1.4, mass: 1.75, engine: { thrust: 250, ispSL: 90, ispVac: 350 }, gen: 'eng',
+    nozzles: [[0, 0, 1.0]], look: { len: 1.0, bell: 'silver', mount: 'truss' }, desc: 'Вакуумный двигатель для широкой верхней ступени.' },
+  { id: 'engAero', cat: 'engine', name: 'Аэроспайк «Ветер»', top: 'S', bot: 'S', h: 1.2, mass: 1.0, engine: { thrust: 180, ispSL: 290, ispVac: 340 }, gen: 'spike',
+    nozzles: [[0, 0, 0.5]], desc: 'Двигатель-клин без колокола. Почти одинаково экономен и у земли, и в космосе.' },
+  { id: 'engNuke', cat: 'engine', name: 'Атомный «Атом»', top: 'S', bot: 'S', h: 2.6, mass: 3.0, engine: { thrust: 60, ispSL: 185, ispVac: 800 }, gen: 'eng', plume: 'nuke',
+    nozzles: [[0, 0, 0.45]], look: { len: 0.9, core: true, bell: 'silver' }, desc: 'Ядерный двигатель: в космосе в 2,5 раза экономнее обычного, но слабый и тяжёлый. Только для космоса.' },
+  { id: 'engIon', cat: 'engine', name: 'Ионный «Луч»', top: 'T', bot: 'T', h: 0.4, mass: 0.25, engine: { thrust: 2, ispSL: 100, ispVac: 4200 }, gen: 'ion', plume: 'ion',
+    nozzles: [[0, 0, 0.24]], desc: 'Синее свечение и невероятная экономия (Isp 4200 с), но тяга крошечная — 2 кН. Только в космосе, с ускорением времени.' },
+  { id: 'engRhino', cat: 'engine', name: 'Двигатель «Носорог»', top: 'X', bot: 'X', h: 2.6, mass: 9.0, engine: { thrust: 2000, ispSL: 205, ispVac: 340 }, gen: 'eng',
+    nozzles: [[0, 0, 1.6]], look: { len: 1.9, pumps: 4 }, desc: 'Огромное сопло 3,75 м: 2000 кН. Лучше всего работает высоко.' },
+  { id: 'engMammoth', cat: 'engine', name: 'Двигатель «Мамонт»', top: 'X', bot: 'X', h: 2.4, mass: 15.0, engine: { thrust: 4000, ispSL: 300, ispVac: 315 }, gen: 'eng',
+    nozzles: [[0, 0, 0.55], [1.1, 0, 0.55], [-1.1, 0, 0.55], [0, 1.1, 0.55], [0, -1.1, 0.55], [0.78, 0.78, 0.5], [-0.78, 0.78, 0.5], [0.78, -0.78, 0.5], [-0.78, -0.78, 0.5]],
+    look: { len: 1.2 }, desc: 'Девять сопел и 4000 кН тяги. Самый мощный двигатель для старта гигантов.' },
+  { id: 'srbMini', cat: 'engine', name: 'Ускоритель «Искорка»', top: 'T', bot: 'T', h: 1.4, mass: 0.1, fuel: 0.4, solid: true, engine: { thrust: 30, ispSL: 140, ispVac: 170 }, gen: 'srb',
+    nozzles: [[0, 0, 0.22]], desc: 'Маленький твердотопливный ускоритель 0,625 м. Горит ~22 с.' },
+  { id: 'srbS2', cat: 'engine', name: 'Ускоритель «Гром»', top: 'S', bot: 'S', h: 7.5, mass: 1.5, fuel: 7.5, solid: true, engine: { thrust: 590, ispSL: 175, ispVac: 210 }, gen: 'srb', tint: 0xd8d2c4,
+    nozzles: [[0, 0, 0.48]], desc: 'Длинный твердотопливный ускоритель: 590 кН, горит ~26 с.' },
+  { id: 'srbL', cat: 'engine', name: 'Ускоритель «Буря»', top: 'L', bot: 'L', h: 8.0, mass: 3.0, fuel: 25, solid: true, engine: { thrust: 1500, ispSL: 180, ispVac: 210 }, gen: 'srb', tint: 0xc9cdd6,
+    nozzles: [[0, 0, 0.9]], desc: 'Широкий твердотопливный ускоритель 2,5 м: 1500 кН.' },
+  { id: 'srbX', cat: 'engine', name: 'Ускоритель «Ураган»', top: 'X', bot: 'X', h: 10.0, mass: 7.0, fuel: 60, solid: true, engine: { thrust: 3500, ispSL: 185, ispVac: 215 }, gen: 'srb', tint: 0xf0e6d8,
+    nozzles: [[0, 0, 1.3]], desc: 'Гигантский твердотопливный ускоритель 3,75 м: 3500 кН.' },
+  // соединения
+  { id: 'decT', cat: 'struct', name: 'Разделитель Мини', top: 'T', bot: 'T', h: 0.15, mass: 0.01, decoupler: true, desc: 'Разделитель ступеней для мини-ракет 0,625 м.' },
+  { id: 'decX', cat: 'struct', name: 'Разделитель Г', top: 'X', bot: 'X', h: 0.4, mass: 0.45, decoupler: true, desc: 'Разделитель для ступеней 3,75 м.' },
+  { id: 'adTS', cat: 'struct', name: 'Переходник Мини→М', top: 'T', bot: 'S', h: 0.6, mass: 0.04, adapter: true, desc: 'Сверху 0,625 м, снизу 1,25 м.' },
+  { id: 'adST', cat: 'struct', name: 'Переходник М→Мини', top: 'S', bot: 'T', h: 0.6, mass: 0.04, adapter: true, desc: 'Сверху 1,25 м, снизу 0,625 м.' },
+  { id: 'adLX', cat: 'struct', name: 'Переходник Б→Г', top: 'L', bot: 'X', h: 1.2, mass: 0.4, adapter: true, desc: 'Сверху 2,5 м, снизу 3,75 м.' },
+  { id: 'adXL', cat: 'struct', name: 'Переходник Г→Б', top: 'X', bot: 'L', h: 1.2, mass: 0.4, adapter: true, desc: 'Сверху 3,75 м, снизу 2,5 м.' },
+  { id: 'adSX', cat: 'struct', name: 'Переходник М→Г', top: 'S', bot: 'X', h: 2.0, mass: 0.5, adapter: true, desc: 'Длинный переходник: сверху 1,25 м, снизу 3,75 м.' },
+  { id: 'trussS', cat: 'struct', name: 'Ферма М', top: 'S', bot: 'S', h: 1.0, mass: 0.08, truss: true, gen: 'truss', desc: 'Ажурная решётчатая проставка 1,25 м.' },
+  { id: 'trussL', cat: 'struct', name: 'Ферма Б', top: 'L', bot: 'L', h: 1.5, mass: 0.3, truss: true, gen: 'truss', desc: 'Решётчатая проставка 2,5 м.' },
+  // полезный груз и наука
+  { id: 'sciT', cat: 'payload', name: 'Термометр и барометр', top: 'T', bot: 'T', h: 0.3, mass: 0.03, science: true, gen: 'sciT', desc: 'Маленький научный блок: меряет температуру и давление.' },
+  { id: 'sciS', cat: 'payload', name: 'Научный блок «Знание»', top: 'S', bot: 'S', h: 0.8, mass: 0.2, science: true, gen: 'sci', desc: 'Набор научных приборов. Долети с ним до космоса — засчитается эксперимент.' },
+  { id: 'dogs', cat: 'payload', name: 'Контейнер «Белка и Стрелка»', top: 'T', bot: 'T', h: 0.8, mass: 0.3, science: true, gen: 'dogs', desc: 'Герметичный контейнер для собак-космонавтов. Не забудь вернуть их на парашюте!' },
+  { id: 'scope', cat: 'payload', name: 'Телескоп «Око»', top: 'S', bot: 'S', h: 2.2, mass: 0.6, science: true, gen: 'scope', desc: 'Космический телескоп. Чтобы смотреть на звёзды, его нужно поднять выше атмосферы.' },
+  { id: 'sat', cat: 'payload', name: 'Спутник связи «Луч»', top: 'S', bot: 'S', h: 1.2, mass: 0.5, gen: 'sat', desc: 'Спутник со сложенными солнечными батареями. Груз для орбитальных ракет.' },
+  { id: 'lab', cat: 'payload', name: 'Лаборатория «Мир»', top: 'L', bot: 'L', h: 3.0, mass: 3.5, science: true, gen: 'lab', desc: 'Модуль космической станции с иллюминаторами.' },
+  { id: 'rover', cat: 'payload', name: 'Луноход в контейнере', top: 'L', bot: 'L', h: 1.6, mass: 1.5, gen: 'rover', desc: 'Шестиколёсный луноход на транспортной раме.' },
+  { id: 'cargo', cat: 'payload', name: 'Грузовой отсек', top: 'L', bot: 'L', h: 2.0, mass: 1.0, gen: 'cargo', desc: 'Закрытый отсек для грузов 2,5 м.' },
+  // оборудование
+  { id: 'wheelS', cat: 'utility', name: 'Маховик М', top: 'S', bot: 'S', h: 0.25, mass: 0.1, torque: 1.5, gen: 'wheel', desc: 'Раскручивает внутри себя колесо и поворачивает ракету. Ракета слушается руля лучше.' },
+  { id: 'wheelL', cat: 'utility', name: 'Маховик Б', top: 'L', bot: 'L', h: 0.35, mass: 0.3, torque: 4, gen: 'wheel', desc: 'Мощный маховик 2,5 м для тяжёлых ракет.' },
+  { id: 'battS', cat: 'utility', name: 'Аккумулятор', top: 'S', bot: 'S', h: 0.2, mass: 0.05, gen: 'batt', desc: 'Кольцо аккумуляторов 1,25 м. Светится, когда заряжено.' },
+  { id: 'solarS', cat: 'utility', name: 'Солнечные панели М', top: 'S', bot: 'S', h: 0.6, mass: 0.1, gen: 'solar', desc: 'Две солнечные батареи по бокам ракеты.' },
+  { id: 'solarL', cat: 'utility', name: 'Солнечные панели Б', top: 'L', bot: 'L', h: 0.8, mass: 0.3, gen: 'solar', desc: 'Большие солнечные батареи для станций.' },
+  { id: 'heatS', cat: 'utility', name: 'Теплозащита М', top: 'S', bot: 'S', h: 0.2, mass: 0.3, gen: 'heat', desc: 'Тепловой щит 1,25 м — ставится под капсулу, как у настоящих спускаемых аппаратов.' },
+  { id: 'heatL', cat: 'utility', name: 'Теплозащита Б', top: 'L', bot: 'L', h: 0.3, mass: 1.2, gen: 'heat', desc: 'Тепловой щит 2,5 м для больших капсул.' },
+  { id: 'lightS', cat: 'utility', name: 'Прожекторы', top: 'S', bot: 'S', h: 0.3, mass: 0.04, gen: 'light', desc: 'Четыре ярких прожектора — красиво светятся в полёте.' },
+  { id: 'antenna', cat: 'utility', name: 'Антенна дальней связи', top: 'S', bot: 'S', h: 0.4, mass: 0.1, gen: 'antenna', desc: 'Тарелка для связи с Землёй.' },
 ];
 const PART = Object.fromEntries(PARTS.map(p => [p.id, p]));
-const CATS = [['command', 'Управление'], ['aero', 'Аэродинамика'], ['tank', 'Топливные баки'], ['engine', 'Двигатели'], ['struct', 'Соединения']];
+const CATS = [['command', 'Управление и парашюты'], ['aero', 'Аэродинамика'], ['tank', 'Топливные баки'], ['engine', 'Двигатели'], ['struct', 'Соединения'], ['payload', 'Груз и наука'], ['utility', 'Оборудование']];
 const partR = (d) => Math.max(RAD[d.top] || 0, RAD[d.bot] || 0);
-const finnable = (d) => !!(d.fuel || d.engine || d.id === 'adSL' || d.id === 'adLS');
+const finnable = (d) => !!(d.fuel || d.engine || d.adapter || d.truss || d.cat === 'payload');
+const finId = (f) => f === true ? 'fins' : f;
+const finMass = (f) => f ? (PART[finId(f)] || PART.fins).mass : 0;
 
 /* ---------- 3D-модели деталей ---------- */
 const UP = new THREE.Vector3(0, 1, 0);
@@ -664,11 +816,232 @@ function bellProfile(rE, rT, len, n = 18) {
   return pts;
 }
 
+/* ---------- универсальные модели для новых деталей ---------- */
+function strut(p1, p2, r, mat) {
+  const len = p1.distanceTo(p2), m = orient(cyl(r, r, len, mat, 6), p2.clone().sub(p1));
+  m.position.copy(p1).add(p2).multiplyScalar(0.5); return m;
+}
+function genTank(d, add) {
+  const R = RAD[d.top];
+  const body = cyl(R, R, d.h - 0.08, tankMat(d.skin || d.top, d.h), 64, true); body.position.y = d.h / 2; add(body);
+  add(ring(R, 0, 0.014, 0.06, MAT.darkMetal)); add(ring(R, d.h - 0.06, 0.014, 0.06, MAT.darkMetal));
+  const c1 = cyl(R, R, 0.01, MAT.dark, 48); c1.position.y = 0.04; add(c1);
+  const c2 = cyl(R, R, 0.01, MAT.dark, 48); c2.position.y = d.h - 0.04; add(c2);
+  const k = Math.max(0.5, R / 0.625);
+  const cab = sh(new THREE.Mesh(new THREE.BoxGeometry(0.06 * k, d.h - 0.2, 0.05 * k), MAT.darkMetal)); cab.position.set(R + 0.02 * k, d.h / 2, 0); add(cab);
+}
+function genEngine(d, add) {
+  const R = RAD[d.top], L = d.look || {}, top = d.h;
+  const plateH = Math.min(0.25, d.h * 0.18);
+  const len = L.len || d.h * 0.6;
+  if (L.mount === 'truss') {
+    add(lathe([[R, top - 0.08], [R, top], [0, top]], MAT.darkMetal));
+    for (let i = 0; i < 8; i++) {
+      const a = i * Math.PI / 4;
+      add(strut(new THREE.Vector3(Math.cos(a) * R * 0.85, top - 0.08, Math.sin(a) * R * 0.85), new THREE.Vector3(Math.cos(a + 0.4) * R * 0.25, len + 0.1, Math.sin(a + 0.4) * R * 0.25), 0.02 * Math.max(1, R), MAT.darkMetal));
+    }
+  } else add(lathe([[R * 0.4, top - plateH - 0.12], [R * 0.85, top - plateH], [R, top - plateH * 0.5], [R, top], [0, top]], MAT.darkMetal, 48));
+  const bellMat = { silver: MAT.bellSilver, dark: MAT.dark }[L.bell] || MAT.bell;
+  const maxE = Math.max(...d.nozzles.map(n => n[2]));
+  for (const [x, z, rE] of d.nozzles) {
+    const ln = len * (0.7 + 0.3 * rE / maxE), rT = rE * 0.34;
+    const b = lathe(bellProfile(rE, rT, ln), bellMat, 40); b.position.set(x, 0, z); add(b);
+    const rg = ring(rE, 0, 0.012, 0.03, MAT.darkMetal); rg.position.set(x, 0, z); add(rg);
+    const chH = top - plateH - ln;
+    if (chH > 0.03) { const ch = cyl(rT * 1.3, rT * 1.1, chH, MAT.metal, 24); ch.position.set(x, ln + chH / 2, z); add(ch); }
+  }
+  if (L.core) {
+    const ch = top - plateH - len;
+    const core = cyl(R * 0.88, R * 0.88, ch, MAT.darkMetal, 32); core.position.y = len + ch / 2; add(core);
+    const band = cyl(R * 0.9, R * 0.9, ch * 0.25, MAT.hazard, 32, true); band.position.y = len + ch * 0.55; add(band);
+    for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3, f = sh(new THREE.Mesh(new THREE.BoxGeometry(0.03, ch * 0.8, R * 0.5), MAT.metal)); f.position.set(Math.cos(a) * R * 1.05, len + ch / 2, Math.sin(a) * R * 1.05); f.rotation.y = -a; add(f); }
+  } else {
+    const n = L.pumps ?? 2, ph = Math.max(0.05, (top - plateH - len) * 0.85);
+    if (top - plateH - len > 0.12) for (let i = 0; i < n; i++) {
+      const a = i * 2 * Math.PI / n + 0.6, p = cyl(R * 0.1, R * 0.1, ph, MAT.gold, 16);
+      p.position.set(Math.cos(a) * R * 0.55, len + (top - plateH - len) / 2, Math.sin(a) * R * 0.55); add(p);
+    }
+  }
+}
+function genSpike(d, add) {
+  const R = RAD[d.top];
+  add(lathe([[R * 0.85, d.h - 0.2], [R, d.h - 0.1], [R, d.h], [0, d.h]], MAT.darkMetal, 48));
+  add(lathe([[0.04, 0], [R * 0.3, d.h * 0.3], [R * 0.62, d.h * 0.62], [R * 0.82, d.h - 0.2], [0, d.h - 0.2]], MAT.bellSilver, 48));
+  for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6, b = sh(new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.12, 0.08), MAT.dark)); b.position.set(Math.cos(a) * R * 0.86, d.h - 0.26, Math.sin(a) * R * 0.86); b.rotation.y = -a; add(b); }
+}
+function genIon(d, add) {
+  const R = RAD[d.top];
+  add(lathe([[R * 0.9, 0.05], [R, 0.1], [R, d.h], [0, d.h]], MAT.gold, 32));
+  const grid = new THREE.Mesh(new THREE.CircleGeometry(R * 0.82, 32), MAT.blueGlow); grid.rotation.x = Math.PI / 2; grid.position.y = 0.05; add(grid);
+  add(ring(R * 0.82, 0.02, 0.03, 0.05, MAT.darkMetal));
+}
+const SRB_MATS = {};
+function genSRB(d, add) {
+  const R = RAD[d.top], sk = 0.55 * Math.max(0.6, R / 0.625), rE = d.nozzles[0][2];
+  let mat = MAT.srb;
+  if (d.tint) mat = SRB_MATS[d.tint] || (SRB_MATS[d.tint] = new THREE.MeshPhysicalMaterial({ map: TEX.srbPlain, color: d.tint, roughness: 0.45, clearcoat: 0.25 }));
+  const bh = d.h - sk - 0.07;
+  const body = cyl(R, R, bh, mat, 48, true); body.position.y = sk + bh / 2; add(body);
+  add(lathe([[R, d.h - 0.07], [R + 0.015, d.h - 0.07], [R + 0.015, d.h], [0, d.h]], MAT.darkMetal));
+  add(lathe([[rE, sk * 0.35], [R * 1.12, sk * 0.62], [R * 1.06, sk], [R, sk]], MAT.darkMetal));
+  add(lathe(bellProfile(rE, rE * 0.48, sk * 0.8), MAT.dark, 40));
+}
+function genTruss(d, add) {
+  const R = RAD[d.top], t = 0.03 * Math.max(1, R / 0.625);
+  const p1 = cyl(R, R, 0.06, MAT.darkMetal, 48); p1.position.y = 0.03; add(p1);
+  const p2 = cyl(R, R, 0.06, MAT.darkMetal, 48); p2.position.y = d.h - 0.03; add(p2);
+  const n = 6, pts = [];
+  for (let i = 0; i < n; i++) { const a = i * 2 * Math.PI / n; pts.push([Math.cos(a) * R * 0.85, Math.sin(a) * R * 0.85]); }
+  pts.forEach(([x, z], i) => {
+    const [x2, z2] = pts[(i + 1) % n];
+    add(strut(new THREE.Vector3(x, 0.06, z), new THREE.Vector3(x, d.h - 0.06, z), t, MAT.paintY));
+    add(strut(new THREE.Vector3(x, 0.06, z), new THREE.Vector3(x2, d.h - 0.06, z2), t * 0.6, MAT.paintY));
+  });
+  const core = cyl(R * 0.25, R * 0.25, d.h - 0.12, MAT.metal, 16); core.position.y = d.h / 2; add(core);
+}
+function genSimple(d, add) {
+  const R = RAD[d.top] || RAD[d.bot];
+  const rings = () => { add(ring(R, 0, 0.012, 0.04, MAT.darkMetal)); add(ring(R, d.h - 0.04, 0.012, 0.04, MAT.darkMetal)); };
+  switch (d.gen) {
+    case 'chute2': {
+      add(lathe([[0.3, 0], [0.315, 0], [0.315, 0.08], [0.3, 0.1]], MAT.darkMetal));
+      const base = cyl(0.3, 0.3, 0.02, MAT.dark, 24); base.position.y = 0.1; add(base);
+      for (const x of [-0.15, 0.15]) { const dm = lathe([[0.14, 0], [0.13, 0.1], [0.08, 0.2], [0, 0.23]], MAT.fabricBlue, 24); dm.position.set(x, 0.11, 0); add(dm); }
+      break;
+    }
+    case 'sciT': {
+      add(lathe([[R, 0], [R, d.h * 0.7], [R * 0.6, d.h], [0, d.h]], MAT.metal, 24));
+      add(strut(new THREE.Vector3(R * 0.5, d.h * 0.5, 0), new THREE.Vector3(R * 1.6, d.h * 1.2, 0), 0.012, MAT.darkMetal));
+      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.03, 10, 8), MAT.red); bulb.position.set(R * 1.6, d.h * 1.2, 0); add(bulb);
+      const box = sh(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.1, 0.1), MAT.gold)); box.position.set(-R * 0.95, d.h * 0.4, 0); add(box);
+      break;
+    }
+    case 'sci': {
+      rings();
+      const b = cyl(R * 0.97, R * 0.97, d.h - 0.08, MAT.white, 8); b.position.y = d.h / 2; add(b);
+      for (let i = 0; i < 3; i++) {
+        const a = i * 2.1, bx = sh(new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.3, 0.18), i === 1 ? MAT.dark : MAT.gold));
+        bx.position.set(Math.cos(a) * R, d.h / 2, Math.sin(a) * R); bx.rotation.y = -a; add(bx);
+      }
+      add(strut(new THREE.Vector3(R * 0.8, d.h * 0.7, 0.2), new THREE.Vector3(R + 0.7, d.h * 0.9, 0.5), 0.015, MAT.metal));
+      const s = new THREE.Mesh(new THREE.SphereGeometry(0.07, 12, 8), MAT.metal); s.position.set(R + 0.7, d.h * 0.9, 0.5); add(s);
+      const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), MAT.greenGlow); lamp.position.set(0, d.h * 0.75, R * 0.97); add(lamp);
+      break;
+    }
+    case 'dogs': {
+      add(ring(R, 0, 0.012, 0.05, MAT.darkMetal));
+      const sp = new THREE.Mesh(new THREE.SphereGeometry(R * 0.95, 32, 20), MAT.metal); sp.position.y = d.h / 2; sh(sp); add(sp);
+      const w = orient(cyl(0.12, 0.12, 0.04, MAT.glass, 24), new THREE.Vector3(1, 0.2, 0)); w.position.set(R * 0.9, d.h / 2 + 0.05, 0); add(w);
+      const band = cyl(R * 0.97, R * 0.97, 0.06, MAT.red, 32, true); band.position.y = d.h / 2 - 0.15; add(band);
+      break;
+    }
+    case 'scope': {
+      add(ring(R, 0, 0.012, 0.06, MAT.darkMetal));
+      const tube = cyl(R * 0.9, R * 0.9, d.h - 0.25, MAT.white, 48, true); tube.position.y = 0.15 + (d.h - 0.25) / 2; add(tube);
+      const base = cyl(R, R, 0.15, MAT.gold, 48); base.position.y = 0.075; add(base);
+      const ap = new THREE.Mesh(new THREE.CircleGeometry(R * 0.85, 40), MAT.dark); ap.rotation.x = -Math.PI / 2; ap.position.y = d.h - 0.12; add(ap);
+      const rim = sh(new THREE.Mesh(new THREE.TorusGeometry(R * 0.9, 0.03, 8, 48), MAT.gold)); rim.rotation.x = Math.PI / 2; rim.position.y = d.h - 0.1; add(rim);
+      const mirror = new THREE.Mesh(new THREE.CircleGeometry(R * 0.3, 24), MAT.bellSilver); mirror.rotation.x = -Math.PI / 2; mirror.position.y = d.h - 0.11; add(mirror);
+      break;
+    }
+    case 'sat': {
+      rings();
+      const b = sh(new THREE.Mesh(new THREE.BoxGeometry(R * 1.1, d.h - 0.35, R * 1.1), MAT.gold)); b.position.y = 0.05 + (d.h - 0.35) / 2; add(b);
+      for (const sx of [-1, 1]) { const p = sh(new THREE.Mesh(new THREE.BoxGeometry(0.04, d.h - 0.45, R * 1.05), MAT.pv)); p.position.set(sx * R * 0.6, 0.05 + (d.h - 0.35) / 2, 0); add(p); }
+      const dish = lathe([[0.02, 0], [R * 0.35, 0.08], [R * 0.45, 0.14]], MAT.bellSilver, 32); dish.position.y = d.h - 0.3; add(dish);
+      add(strut(new THREE.Vector3(0, d.h - 0.3, 0), new THREE.Vector3(0, d.h - 0.05, 0), 0.012, MAT.darkMetal));
+      break;
+    }
+    case 'lab': {
+      rings();
+      const b = cyl(R, R, d.h - 0.08, MAT.white, 64, true); b.position.y = d.h / 2; add(b);
+      for (let i = 0; i < 8; i++) {
+        const a = i * Math.PI / 4, n = new THREE.Vector3(Math.cos(a), 0, Math.sin(a));
+        const w = orient(cyl(0.14, 0.14, 0.04, MAT.glass, 20), n); w.position.copy(n).multiplyScalar(R).setY(d.h * 0.62); add(w);
+        const hr = sh(new THREE.Mesh(new THREE.BoxGeometry(0.03, d.h * 0.7, 0.03), MAT.gold)); hr.position.copy(n).multiplyScalar(R + 0.06).setY(d.h / 2); hr.position.applyAxisAngle(UP, 0.2); add(hr);
+      }
+      const band = cyl(R + 0.01, R + 0.01, 0.12, MAT.red, 64, true); band.position.y = d.h * 0.3; add(band);
+      break;
+    }
+    case 'rover': {
+      const plate = cyl(R, R, 0.08, MAT.darkMetal, 48); plate.position.y = 0.04; add(plate);
+      const top = cyl(R, R, 0.06, MAT.darkMetal, 48); top.position.y = d.h - 0.03; add(top);
+      for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + Math.PI / 4; add(strut(new THREE.Vector3(Math.cos(a) * R * 0.9, 0.08, Math.sin(a) * R * 0.9), new THREE.Vector3(Math.cos(a) * R * 0.9, d.h - 0.06, Math.sin(a) * R * 0.9), 0.04, MAT.paintY)); }
+      const body = sh(new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.35, 1.3), MAT.white)); body.position.y = 0.6; add(body);
+      const tub = sh(new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.45, 0.3, 24), MAT.gold)); tub.position.y = 0.9; add(tub);
+      const pv = sh(new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.03, 1.2), MAT.pv)); pv.position.y = 1.08; add(pv);
+      for (let i = 0; i < 6; i++) { const w = sh(new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.14, 18), MAT.dark)); w.rotation.z = Math.PI / 2; w.position.set(i < 3 ? -0.52 : 0.52, 0.3, (i % 3 - 1) * 0.5); add(w); }
+      add(strut(new THREE.Vector3(0.3, 1.1, 0.45), new THREE.Vector3(0.3, 1.45, 0.45), 0.025, MAT.metal));
+      const camb = sh(new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.1, 0.1), MAT.dark)); camb.position.set(0.3, 1.48, 0.45); add(camb);
+      break;
+    }
+    case 'cargo': {
+      rings();
+      const b = cyl(R, R, d.h - 0.08, tankMat('silver', 2.0), 64, true); b.position.y = d.h / 2; add(b);
+      for (const y of [0.25, d.h - 0.25]) { const hz = cyl(R + 0.01, R + 0.01, 0.14, MAT.hazard, 64, true); hz.position.y = y; add(hz); }
+      break;
+    }
+    case 'wheel': {
+      rings();
+      const b = cyl(R * 0.98, R * 0.98, d.h - 0.08, MAT.dark, 48); b.position.y = d.h / 2; add(b);
+      const t = sh(new THREE.Mesh(new THREE.TorusGeometry(R * 0.98, 0.025 * Math.max(1, R), 8, 48), MAT.gold)); t.rotation.x = Math.PI / 2; t.position.y = d.h / 2; add(t);
+      break;
+    }
+    case 'batt': {
+      rings();
+      const b = cyl(R * 0.97, R * 0.97, d.h - 0.08, MAT.darkMetal, 48); b.position.y = d.h / 2; add(b);
+      for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4, l = sh(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.05, 0.02), MAT.greenGlow)); l.position.set(Math.cos(a) * R * 0.98, d.h / 2, Math.sin(a) * R * 0.98); l.rotation.y = -a + Math.PI / 2; add(l); }
+      break;
+    }
+    case 'solar': {
+      rings();
+      const b = cyl(R * 0.9, R * 0.9, d.h - 0.08, MAT.metal, 32); b.position.y = d.h / 2; add(b);
+      const span = R * 2.4;
+      for (const sx of [-1, 1]) {
+        add(strut(new THREE.Vector3(sx * R * 0.85, d.h / 2, 0), new THREE.Vector3(sx * (R + 0.3), d.h / 2, 0), 0.02, MAT.darkMetal));
+        const p = sh(new THREE.Mesh(new THREE.BoxGeometry(span, 0.03, d.h * 0.9), MAT.pv)); p.position.set(sx * (R + 0.3 + span / 2), d.h / 2, 0); p.rotation.x = Math.PI / 2; add(p);
+      }
+      break;
+    }
+    case 'heat': add(lathe([[0, 0], [R * 0.75, 0.01], [R * 1.03, d.h * 0.45], [R, d.h], [0, d.h]], MAT.shield, 48)); break;
+    case 'light': {
+      rings();
+      const b = cyl(R * 0.97, R * 0.97, d.h - 0.08, MAT.darkMetal, 32); b.position.y = d.h / 2; add(b);
+      for (let i = 0; i < 4; i++) {
+        const a = i * Math.PI / 2, n = new THREE.Vector3(Math.cos(a), 0, Math.sin(a));
+        const housing = orient(cyl(0.09, 0.07, 0.1, MAT.dark, 16), n); housing.position.copy(n).multiplyScalar(R + 0.03).setY(d.h / 2); add(housing);
+        const lens = orient(new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.01, 16), MAT.lamp), n); lens.position.copy(n).multiplyScalar(R + 0.085).setY(d.h / 2); add(lens);
+      }
+      break;
+    }
+    case 'antenna': {
+      rings();
+      const b = cyl(R * 0.95, R * 0.95, d.h - 0.08, MAT.metal, 32); b.position.y = d.h / 2; add(b);
+      add(strut(new THREE.Vector3(R * 0.9, d.h / 2, 0), new THREE.Vector3(R + 0.5, d.h / 2 + 0.3, 0), 0.025, MAT.darkMetal));
+      const dish = orient(lathe([[0.03, 0], [0.25, 0.04], [0.42, 0.12], [0.5, 0.18]], MAT.white, 32), new THREE.Vector3(0.6, 1, 0));
+      dish.position.set(R + 0.5, d.h / 2 + 0.3, 0); dish.material = MAT.white; add(dish);
+      const feed = strut(new THREE.Vector3(R + 0.5, d.h / 2 + 0.3, 0), new THREE.Vector3(R + 0.65, d.h / 2 + 0.6, 0), 0.01, MAT.darkMetal); add(feed);
+      break;
+    }
+  }
+}
+
 function buildPart(d) {
   const g = new THREE.Group();
   const add = (m) => { g.add(m); return m; };
   const r = partR(d);
-  switch (d.id) {
+  if (d.gen === 'scaled') {
+    const inner = buildPart(PART[d.base]); inner.scale.setScalar(d.k); add(inner);
+    g.userData.def = d; return g;
+  }
+  if (d.gen === 'tank') genTank(d, add);
+  else if (d.gen === 'eng') genEngine(d, add);
+  else if (d.gen === 'spike') genSpike(d, add);
+  else if (d.gen === 'ion') genIon(d, add);
+  else if (d.gen === 'srb') genSRB(d, add);
+  else if (d.gen === 'truss') genTruss(d, add);
+  else if (d.gen) genSimple(d, add);
+  switch (d.gen ? '' : d.id) {
     case 'pod': {
       add(lathe([[0, 0], [0.5, 0], [0.645, 0.04], [0.665, 0.1], [0.63, 0.15], [0, 0.15]], MAT.shield));
       add(lathe([[0.625, 0.13], [0.622, 0.17], [0.345, 1.12], [0.345, 1.15]], MAT.pod, 64));
@@ -712,19 +1085,23 @@ function buildPart(d) {
       add(lathe([[0.3, 0.11], [0.29, 0.2], [0.2, 0.29], [0.08, 0.32], [0, 0.322]], MAT.fabric));
       break;
     }
-    case 'noseS': case 'noseL': {
+    case 'noseS': case 'noseL': case 'noseT': case 'noseX': case 'coneS': case 'coneL': case 'domeS': case 'domeL': {
       const R = r, H = d.h, pts = [], tip = [];
+      const prof = d.shape === 'cone' ? (t) => R * (1 - t) : d.shape === 'blunt' ? (t) => R * Math.sqrt(Math.max(0, 1 - t * t)) : (t) => R * Math.pow(1 - Math.pow(t, 1.8), 0.6);
       for (let i = 0; i <= 24; i++) {
-        const t = i / 24, rr = R * Math.pow(1 - Math.pow(t, 1.8), 0.6), y = t * H;
+        const t = i / 24, rr = prof(t), y = t * H;
         if (t <= 0.78) pts.push([rr, y]);
         if (t >= 0.78) tip.push([rr, y]);
       }
       pts.unshift([0, 0]); tip.push([0, H]);
-      add(lathe(pts, MAT.white, 64)); add(lathe(tip, MAT.red, 64));
+      add(lathe(pts, MAT.white, 64)); add(lathe(tip, d.tip === 'dark' ? MAT.dark : d.tip === 'white' ? MAT.white : MAT.red, 64));
       add(ring(R, 0, 0.012, 0.06, MAT.darkMetal));
       break;
     }
     case 'tankS1': case 'tankS2': case 'tankS4': case 'tankL2': case 'tankL4': {
+      genTank(d, add); break;
+    }
+    case '__oldtank': {
       const kind = d.top; const R = RAD[kind];
       const body = cyl(R, R, d.h - 0.08, tankMat(kind, d.h), 64, true); body.position.y = d.h / 2; add(body);
       add(ring(R, 0, 0.014, 0.06, MAT.darkMetal)); add(ring(R, d.h - 0.06, 0.014, 0.06, MAT.darkMetal));
@@ -775,13 +1152,13 @@ function buildPart(d) {
       add(lathe(bellProfile(0.42, 0.2, 0.45), MAT.dark, 40));
       break;
     }
-    case 'decS': case 'decL': {
+    case 'decS': case 'decL': case 'decT': case 'decX': {
       const R = RAD[d.top];
       const b = cyl(R + 0.01, R + 0.01, d.h - 0.06, MAT.hazard, 64, true); b.position.y = d.h / 2; add(b);
       add(ring(R, 0, 0.025, 0.03, MAT.darkMetal)); add(ring(R, d.h - 0.03, 0.025, 0.03, MAT.darkMetal));
       break;
     }
-    case 'adSL': case 'adLS': {
+    case 'adSL': case 'adLS': case 'adTS': case 'adST': case 'adLX': case 'adXL': case 'adSX': {
       const rb = RAD[d.bot], rt = RAD[d.top];
       add(lathe([[0, 0], [rb, 0], [rb, 0.06], [rt, d.h - 0.06], [rt, d.h], [0, d.h]], tankMat('S', 1.0), 64));
       add(ring(rb, 0, 0.014, 0.06, MAT.darkMetal)); add(ring(rt, d.h - 0.06, 0.014, 0.06, MAT.darkMetal));
@@ -798,21 +1175,39 @@ function finsSize(d) {
   const chord = Math.min(h * 0.85, r * 2.2, 2.6);
   return { r: d.engine && !d.fuel ? RAD[d.top] * 0.95 : r, chord, span: r * 1.05 + 0.25 };
 }
-function buildFins(d) {
-  const { r, chord, span } = finsSize(d);
+const FIN_LOOK = { fins: [1, 1, 'red'], finsSmall: [0.6, 0.6, 'red'], finsBig: [1.25, 1.5, 'white'], finsDelta: [1.2, 1.15, 'red'], finsGrid: [0.55, 0.8, 'grid'], finsWing: [1.35, 2.1, 'dark'] };
+function buildFins(d, type = 'fins') {
+  type = finId(type) || 'fins';
+  const base = finsSize(d), [kc, ks, look] = FIN_LOOK[type] || FIN_LOOK.fins;
+  const r = base.r, chord = base.chord * kc, span = base.span * ks;
   const g = new THREE.Group();
-  const s = new THREE.Shape();
-  s.moveTo(0, 0); s.lineTo(span, -0.28 * chord); s.lineTo(span, 0.12 * chord); s.lineTo(0, chord); s.closePath();
-  const geo = new THREE.ExtrudeGeometry(s, { depth: 0.05, bevelEnabled: true, bevelThickness: 0.015, bevelSize: 0.015, bevelSegments: 2 });
-  geo.translate(0, 0, -0.025);
-  for (let i = 0; i < 4; i++) {
-    const m = sh(new THREE.Mesh(geo, MAT.red));
-    const a = i * Math.PI / 2 + Math.PI / 4;
-    m.position.set(Math.cos(a) * (r - 0.02), 0.08 + chord * 0.28, Math.sin(a) * (r - 0.02));
-    m.rotation.y = -a;
-    g.add(m);
+  const mat = look === 'white' ? MAT.finWhite : look === 'dark' ? MAT.finDark : MAT.red;
+  let geo;
+  if (look === 'grid') {
+    const t = 0.03, bars = [];
+    const box = (w, h, x, y) => { const b = new THREE.BoxGeometry(w, h, 0.08); b.translate(x, y, 0); bars.push(b); };
+    box(span, t, span / 2, 0); box(span, t, span / 2, chord); box(t, chord, 0, chord / 2); box(t, chord, span, chord / 2);
+    for (let k = 1; k < 4; k++) { box(span, t * 0.6, span / 2, chord * k / 4); box(t * 0.6, chord, span * k / 4, chord / 2); }
+    geo = bars;
+  } else {
+    const s = new THREE.Shape();
+    if (type === 'finsDelta') { s.moveTo(0, -0.05 * chord); s.lineTo(span, -0.05 * chord); s.lineTo(0, chord); }
+    else if (type === 'finsWing') { s.moveTo(0, 0); s.lineTo(span, -0.05 * chord); s.lineTo(span, 0.18 * chord); s.lineTo(span * 0.25, chord * 0.75); s.lineTo(0, chord); }
+    else { s.moveTo(0, 0); s.lineTo(span, -0.28 * chord); s.lineTo(span, 0.12 * chord); s.lineTo(0, chord); }
+    s.closePath();
+    geo = new THREE.ExtrudeGeometry(s, { depth: 0.05, bevelEnabled: true, bevelThickness: 0.015, bevelSize: 0.015, bevelSegments: 2 });
+    geo.translate(0, 0, -0.025);
   }
-  g.userData.fins = true;
+  for (let i = 0; i < 4; i++) {
+    const a = i * Math.PI / 2 + Math.PI / 4;
+    const holder = new THREE.Group();
+    holder.position.set(Math.cos(a) * (r - 0.02), 0.08 + chord * 0.28, Math.sin(a) * (r - 0.02));
+    if (look === 'grid') holder.position.y = Math.max(0.1, (d.h || 1.6) - chord - 0.1);
+    holder.rotation.y = -a;
+    for (const gg of Array.isArray(geo) ? geo : [geo]) holder.add(sh(new THREE.Mesh(gg, look === 'grid' ? MAT.darkMetal : mat)));
+    g.add(holder);
+  }
+  g.userData.fins = true; g.userData.finType = type;
   return g;
 }
 
@@ -838,7 +1233,7 @@ function analyze(design) {
     const s = { idx, dry: 0, liq: 0, sol: 0, engines: [] };
     for (const i of idx) {
       const d = PART[parts[i].id];
-      s.dry += d.mass + (parts[i].fins ? FIN_MASS : 0);
+      s.dry += d.mass + finMass(parts[i].fins);
       if (d.fuel) { if (d.solid) s.sol += d.fuel; else s.liq += d.fuel; }
       if (d.engine) s.engines.push(d);
     }
@@ -875,9 +1270,8 @@ function analyze(design) {
     for (let i = 0; i < parts.length - 1; i++) {
       const a = PART[parts[i].id], b = PART[parts[i + 1].id];
       if (a.engine && !b.decoupler) msgs.push(['warn', `Под двигателем «${a.name.replace(/^Двигатель |^Ускоритель /, '')}» стоит ${b.name}. Выхлоп упрётся в неё — ставь двигатель низом ступени или добавь разделитель.`]);
-      if (a.bot && b.top && a.bot !== b.top && !(a.bot === 'T' && b.top === 'S'))
-        msgs.push(['warn', `«${a.name}» и «${b.name}» разного диаметра — поставь переходник.`]);
-      if (a.chute && b.top !== 'T') msgs.push(['warn', 'Парашют лучше ставить на капсулу.']);
+      if (a.chute) { if (RAD[a.bot] > RAD[b.top]) msgs.push(['warn', `«${a.name}» шире детали под ним — возьми парашют поменьше.`]); }
+      else if (a.bot && b.top && a.bot !== b.top) msgs.push(['warn', `«${a.name}» (${SIZE_NAME[a.bot]}) и «${b.name}» (${SIZE_NAME[b.top]}) разного диаметра — поставь переходник.`]);
     }
     if (!has(d => d.control)) msgs.push(['warn', 'Нет капсулы или зонда — ракетой нельзя будет управлять.']);
     if (!parts.some(p => p.fins)) msgs.push(['warn', 'Нет стабилизаторов — в воздухе ракета может закувыркаться.']);
@@ -1074,12 +1468,12 @@ gl_FragColor = vec4(uCol*(pow(f,2.0)*0.9 + scan*0.06), 1.0); }`,
 let uidSeq = 1;
 let design = { parts: [] };
 let A = analyze(design);
-function loadDesign(parts) { design = { parts: parts.map(p => ({ id: p.id, fins: !!p.fins, uid: uidSeq++ })) }; hangar.sel = null; onDesignChange(true); }
+function loadDesign(parts) { design = { parts: parts.filter(p => PART[p.id]).map(p => ({ id: p.id, fins: p.fins ? (PART[finId(p.fins)] ? finId(p.fins) : 'fins') : false, uid: uidSeq++ })) }; hangar.sel = null; onDesignChange(true); }
 function saveDesign() { store.set('design', design.parts.map(p => ({ id: p.id, fins: p.fins }))); }
 
 function addPart(id) {
   const d = PART[id];
-  if (d.fins) return addFins();
+  if (d.fins) return addFins(d.id);
   if (design.parts.length >= MAX_PARTS) { toast('Слишком много деталей', 'bad'); return; }
   const p = { id, fins: false, uid: uidSeq++, fresh: true };
   if (d.topOnly) {
@@ -1092,7 +1486,7 @@ function addPart(id) {
   Sound.clunk();
   onDesignChange();
 }
-function addFins() {
+function addFins(id = 'fins') {
   let i = hangar.sel ? design.parts.findIndex(q => q.uid === hangar.sel) : -1;
   if (i >= 0 && !finnable(PART[design.parts[i].id])) { toast('Стабилизаторы ставятся на бак, двигатель или переходник', 'bad'); return; }
   if (i < 0) {
@@ -1101,8 +1495,8 @@ function addFins() {
     i = pick(d => d.fuel); if (i < 0) i = pick(d => d.engine); if (i < 0) i = pick(finnable);
   }
   if (i < 0) { toast('Сначала поставь бак или двигатель', 'bad'); return; }
-  if (design.parts[i].fins) { toast('Здесь стабилизаторы уже стоят'); return; }
-  design.parts[i].fins = true; design.parts[i].freshFins = true;
+  if (design.parts[i].fins === id) { toast('Здесь такие крылья уже стоят'); return; }
+  design.parts[i].fins = id; design.parts[i].freshFins = true;
   Sound.clunk(); onDesignChange();
 }
 function selIndex() { return hangar.sel ? design.parts.findIndex(q => q.uid === hangar.sel) : -1; }
@@ -1113,7 +1507,7 @@ function moveSel(dir) {
   if (a.topOnly || b.topOnly) { toast('Это деталь для самой верхушки'); return; }
   [design.parts[i], design.parts[j]] = [design.parts[j], design.parts[i]]; Sound.click(); onDesignChange();
 }
-function toggleSelFins() { const i = selIndex(); if (i < 0) return; design.parts[i].fins = !design.parts[i].fins; Sound.clunk(); onDesignChange(); }
+function toggleSelFins() { const i = selIndex(); if (i < 0) return; design.parts[i].fins = design.parts[i].fins ? false : 'fins'; design.parts[i].freshFins = true; Sound.clunk(); onDesignChange(); }
 
 function onDesignChange(instant) {
   A = analyze(design);
@@ -1129,13 +1523,13 @@ function onDesignChange(instant) {
     }
     g.userData.ty = ys[i];
     const fins = g.children.find(c => c.userData.fins);
-    if (p.fins && !fins) { const f = buildFins(PART[p.id]); g.add(f); if (p.freshFins) f.scale.setScalar(0.01); }
-    if (!p.fins && fins) { g.remove(fins); disposeTree(fins); }
+    if (fins && fins.userData.finType !== p.fins) { g.remove(fins); disposeTree(fins); }
+    if (p.fins && (!fins || fins.userData.finType !== p.fins)) { const f = buildFins(PART[p.id], p.fins); g.add(f); if (p.freshFins) f.scale.setScalar(0.01); }
     delete p.fresh; delete p.freshFins;
   });
   for (const [uid, g] of hangar.groups) if (!alive.has(uid)) { hangar.rocket.remove(g); disposeTree(g); hangar.groups.delete(uid); }
   if (hangar.sel && !alive.has(hangar.sel)) hangar.sel = null;
-  cam.tdist = clamp(height * 1.35 + 7, 8, 70);
+  cam.tdist = clamp(height * 1.35 + 7, 8, 160);
   hangar.height = height;
   $('emptyHint').hidden = design.parts.length > 0;
   saveDesign(); renderStats(); renderSel();
@@ -1164,7 +1558,7 @@ function placeShell(mesh, uid) {
   const g = uid && hangar.groups.get(uid);
   if (!g) { mesh.visible = false; return; }
   const p = design.parts.find(q => q.uid === uid); const d = PART[p.id];
-  let r = partR(d) + 0.08; if (p.fins) r += finsSize(d).span;
+  let r = partR(d) + 0.08; if (p.fins) r += finsSize(d).span * ((FIN_LOOK[p.fins] || FIN_LOOK.fins)[1]);
   mesh.visible = true; mesh.scale.set(r, Math.max(0.3, d.h + 0.1), r); mesh.position.y = g.position.y + d.h / 2;
 }
 function updateHangar(dt, t) {
@@ -1189,14 +1583,26 @@ function partSpec(d) {
   if (d.engine) return `${d.engine.thrust} кН`;
   if (d.fuel) return `топливо ${fmtN(d.fuel, d.fuel < 1 ? 1 : 0)} т`;
   if (d.fins) return '×4 крыла';
+  if (d.chute) return `купол ${fmtN(Math.sqrt(d.area / 650) * 13)} м`;
+  if (d.science) return 'наука';
+  if (d.torque) return 'поворот +';
   return fmtT(d.mass);
 }
-function buildPalette(thumbs) {
+let sizeFilter = 'all', lastThumbs = {};
+const partSizes = (d) => d.fins ? ['T', 'S', 'L', 'X'] : [d.top, d.bot].filter(Boolean);
+function buildPalette(thumbs = lastThumbs) {
+  lastThumbs = thumbs;
+  $('partCount').textContent = `· ${PARTS.length}`;
+  const chips = $('sizeChips');
+  chips.innerHTML = [['all', 'Все'], ['T', '0,6'], ['S', '1,25'], ['L', '2,5'], ['X', '3,75']].map(([k, t]) => `<button class="chip${k === sizeFilter ? ' on' : ''}" data-s="${k}">${k === 'all' ? t : 'Ø ' + t}</button>`).join('');
+  chips.querySelectorAll('.chip').forEach(b => b.onclick = () => { sizeFilter = b.dataset.s; Sound.click(); buildPalette(thumbs); });
   const list = $('partList'); list.innerHTML = '';
   for (const [cat, title] of CATS) {
-    const h = document.createElement('h3'); h.textContent = title; list.appendChild(h);
+    const items = PARTS.filter(p => p.cat === cat && (sizeFilter === 'all' || partSizes(p).includes(sizeFilter)));
+    if (!items.length) continue;
+    const h = document.createElement('h3'); h.textContent = `${title} · ${items.length}`; list.appendChild(h);
     const grid = document.createElement('div'); grid.className = 'pgrid';
-    for (const d of PARTS.filter(p => p.cat === cat)) {
+    for (const d of items) {
       const b = document.createElement('button'); b.className = 'pcard'; b.dataset.part = d.id;
       b.innerHTML = `<img alt="" src="${thumbs[d.id] || ''}"><span class="nm">${d.name}</span><span class="sp">${partSpec(d)}</span>`;
       b.addEventListener('click', () => { addPart(d.id); });
@@ -1210,6 +1616,8 @@ function showInfo(d) {
   const lines = [`масса ${fmtT(d.mass)}`];
   if (d.fuel) lines.push(`топливо ${fmtN(d.fuel, 1)} т`);
   if (d.engine) lines.push(`тяга ${d.engine.thrust} кН`, `Isp ${d.engine.ispSL}/${d.engine.ispVac} с`);
+  const sz = [d.top, d.bot].filter(Boolean);
+  if (sz.length) lines.push('Ø ' + [...new Set(sz)].map(k => SIZE_NAME[k]).join(' → '));
   $('partInfo').innerHTML = `<b>${d.name}</b>${d.desc}<div style="margin-top:4px;color:#cfdaea">${lines.join(' · ')}</div>`;
 }
 function renderStats() {
@@ -1238,7 +1646,7 @@ function renderSel() {
   if (i < 0) { el.hidden = true; return; }
   const p = design.parts[i], d = PART[p.id];
   el.hidden = false;
-  el.innerHTML = `<div class="t">${d.name}${p.fins ? ' + стабилизаторы' : ''}</div><div class="d">${d.desc}</div><div class="acts">
+  el.innerHTML = `<div class="t">${d.name}${p.fins ? ' + ' + PART[p.fins].name.toLowerCase() : ''}</div><div class="d">${d.desc}</div><div class="acts">
     <button class="btn" data-a="up" ${i === 0 || d.topOnly ? 'disabled' : ''}>↑ Выше</button>
     <button class="btn" data-a="dn" ${i === design.parts.length - 1 || d.topOnly ? 'disabled' : ''}>↓ Ниже</button>
     ${finnable(d) ? `<button class="btn" data-a="fin">${p.fins ? '✕ Снять крылья' : '+ Крылья'}</button>` : ''}
@@ -1263,7 +1671,7 @@ function makeThumbs() {
     let obj;
     if (d.fins) {
       obj = new THREE.Group(); const fake = { h: 1.6, top: 'S', bot: 'S', fuel: 1 };
-      obj.add(buildFins(fake));
+      obj.add(buildFins(fake, d.id));
       const ghost = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.62, 1.6, 32), new THREE.MeshStandardMaterial({ color: 0x44506a, transparent: true, opacity: 0.35, roughness: 0.4 }));
       ghost.position.y = 0.8; obj.add(ghost);
     } else obj = buildPart(d);
@@ -1504,7 +1912,7 @@ void main(){
   // солнце
   world.sun = new THREE.DirectionalLight(0xfff3e2, SUN_I);
   world.sun.castShadow = true;
-  const sc = world.sun.shadow.camera; sc.left = -32; sc.right = 32; sc.top = 32; sc.bottom = -32; sc.near = 1; sc.far = 900;
+  const sc = world.sun.shadow.camera; sc.left = -48; sc.right = 48; sc.top = 48; sc.bottom = -48; sc.near = 1; sc.far = 900;
   world.sun.shadow.mapSize.set(settings.quality === 'low' ? 1024 : 2048, settings.quality === 'low' ? 1024 : 2048);
   world.sun.shadow.bias = -0.0004; world.sun.shadow.normalBias = 0.04;
   s.add(world.sun, world.sun.target);
@@ -1537,7 +1945,7 @@ function buildLaunchSite(s) {
   const trench = sh(new THREE.Mesh(new THREE.BoxGeometry(6, 1.6, 26), conc)); trench.position.set(0, 0.9, 18); site.add(trench);
   for (let i = 0; i < 4; i++) {
     const a = i * Math.PI / 2 + Math.PI / 4;
-    const arm = sh(new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.2, 0.4), MAT.darkMetal)); arm.position.set(Math.cos(a) * 2.6, PAD_H + 0.6, Math.sin(a) * 2.6); site.add(arm);
+    const arm = sh(new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.2, 0.4), MAT.darkMetal)); arm.position.set(Math.cos(a - Math.PI / 4) * 2.7, PAD_H + 0.6, Math.sin(a - Math.PI / 4) * 2.7); site.add(arm);
   }
   // башня обслуживания
   const paint = new THREE.MeshStandardMaterial({ color: 0xb8402c, roughness: 0.55, metalness: 0.5 });
@@ -1681,9 +2089,11 @@ const plumeGeo = (() => {
   const pts = []; for (let i = 0; i <= 28; i++) { const t = 1 - i / 28; pts.push(new THREE.Vector2(Math.max(0.02, 0.92 + 0.3 * t - 1.05 * t * t * t), -t)); }
   return new THREE.LatheGeometry(pts, 32);
 })();
-function plumeMaterial(core) {
+const PLUME_TINT = { ion: [[0.35, 0.65, 1.0], 0.9], nuke: [[0.75, 0.9, 1.0], 0.45] };
+function plumeMaterial(core, kind) {
+  const [tc, ta] = PLUME_TINT[kind] || [[1, 1, 1], 0];
   return new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uThr: { value: 0 }, uVac: { value: 0 }, uSeed: { value: Math.random() * 10 }, uCore: { value: core ? 1 : 0 } },
+    uniforms: { uTime: { value: 0 }, uThr: { value: 0 }, uVac: { value: 0 }, uSeed: { value: Math.random() * 10 }, uCore: { value: core ? 1 : 0 }, uTint: { value: new THREE.Vector3(...tc) }, uTintA: { value: ta } },
     vertexShader: `#include <common>
 #include <logdepthbuf_pars_vertex>
 uniform float uVac; varying float vT; varying vec3 vN; varying vec3 vV;
@@ -1691,7 +2101,7 @@ void main(){ vec3 p = position; vT = -p.y; p.xz *= 1.0 + uVac*2.6*vT; vec4 mv = 
 #include <logdepthbuf_vertex>
 }`,
     fragmentShader: `#include <logdepthbuf_pars_fragment>
-uniform float uTime, uThr, uVac, uSeed, uCore; varying float vT; varying vec3 vN; varying vec3 vV;
+uniform float uTime, uThr, uVac, uSeed, uCore, uTintA; uniform vec3 uTint; varying float vT; varying vec3 vN; varying vec3 vV;
 void main(){
   #include <logdepthbuf_fragment>
   float t = clamp(vT, 0.0, 1.0);
@@ -1703,6 +2113,7 @@ void main(){
   vec3 c = mix(vec3(1.0,0.93,0.78), vec3(1.0,0.55,0.18), smoothstep(0.0,0.35,t));
   c = mix(c, vec3(0.9,0.28,0.08), smoothstep(0.4,1.0,t));
   c = mix(c, vec3(0.55,0.7,1.0), uVac*0.55*(1.0-uCore));
+  c = mix(c, uTint, uTintA);
   float I = fall*edge*fl*diam*uThr*(uCore > 0.5 ? 7.0 : 2.6)*(1.0 - uVac*0.6);
   gl_FragColor = vec4(c*I, 1.0);
 }`,
@@ -1730,13 +2141,13 @@ function createFlight() {
     for (const i of idx) {
       const d = PART[parts[i].id];
       const m = buildPart(d); m.position.y = ys[i]; g.add(m);
-      const rec = { d, y: ys[i], h: d.h, dry: d.mass + (parts[i].fins ? FIN_MASS : 0), cap: d.fuel && !d.solid ? d.fuel : 0, mesh: m };
-      if (parts[i].fins) { const f = buildFins(d); m.add(f); seg.fins.push(ys[i] + finsSize(d).chord * 0.4); }
+      const rec = { d, y: ys[i], h: d.h, dry: d.mass + finMass(parts[i].fins), cap: d.fuel && !d.solid ? d.fuel : 0, mesh: m, torque: (d.torque || 0) + ((parts[i].fins && PART[finId(parts[i].fins)].torque) || 0) };
+      if (parts[i].fins) { const f = buildFins(d, parts[i].fins); m.add(f); seg.fins.push(ys[i] + finsSize(d).chord * 0.4); }
       seg.dry += rec.dry;
       if (rec.cap) { seg.liq += rec.cap; seg.liqMax += rec.cap; }
       if (d.engine) {
         const e = { def: d, rec, fuel: d.solid ? d.fuel : 0, fuelMax: d.solid ? d.fuel : 0, out: 0, plumes: [] };
-        const mo = plumeMaterial(false), mc = plumeMaterial(true);
+        const mo = plumeMaterial(false, d.plume), mc = plumeMaterial(true, d.plume);
         for (const [x, z, r] of d.nozzles) {
           const outer = new THREE.Mesh(plumeGeo, mo), core = new THREE.Mesh(plumeGeo, mc);
           outer.position.set(x, ys[i] + 0.02, z); core.position.copy(outer.position);
@@ -1747,7 +2158,7 @@ function createFlight() {
         e.mo = mo; e.mc = mc;
         seg.engines.push(e);
       }
-      if (d.chute) seg.chuteY = ys[i] + d.h;
+      if (d.chute) { seg.chuteY = ys[i] + d.h; seg.chuteArea = d.area || 650; }
       if (d.control) seg.ctrl = true;
       seg.parts.push(rec);
     }
@@ -1771,7 +2182,7 @@ function createFlight() {
     const lp = []; for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; lp.push(0, 0, 0, Math.cos(a), 1.35, Math.sin(a)); }
     const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(lp, 3));
     canopy.add(new THREE.LineSegments(lg, MAT.line));
-    canopy.position.y = chuteSeg.chuteY; canopy.visible = false; chuteSeg.group.add(canopy);
+    canopy.position.y = chuteSeg.chuteY; canopy.visible = false; canopy.userData.k = Math.sqrt(chuteSeg.chuteArea / 650); chuteSeg.group.add(canopy);
   }
   const light = new THREE.PointLight(0xffa05a, 0, 0, 2); root.add(light);
   const plasma = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), new THREE.ShaderMaterial({
@@ -1792,7 +2203,7 @@ float f = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 2.0); gl_FragColor =
     root, stack, segs, active: 0, actions, stageIdx: 0, canopy, light, plasma,
     x: 0, y: PR + PAD_H, vx: 0, vy: 0, ang: Math.PI / 2, angVel: 0, hold: Math.PI / 2, sas: 'hold',
     throttle: 1, spool: 0, engineOn: false, thrust: 0, liftedOff: false, done: false, result: null, t: 0,
-    chute: chuteSeg ? { state: 0, open: 0 } : null, chuteCdA: 0, maxAlt: 0, maxSpd: 0, goals: {}, q: 0, gf: 1,
+    chute: chuteSeg ? { state: 0, open: 0, area: chuteSeg.chuteArea } : null, chuteCdA: 0, maxAlt: 0, maxSpd: 0, goals: {}, q: 0, gf: 1,
     height, base: 0, comY: 0, cdA: 0, mass: 0,
   };
   recalcRocket(true);
@@ -1812,7 +2223,7 @@ function clearFlight() {
 }
 function liveSegs() { return fl.segs.slice(fl.active); }
 function recalcRocket(first) {
-  let m = 0, my = 0, top = 0, maxR = 0, stable = false, ctrl = false, nose = false;
+  let m = 0, my = 0, top = 0, maxR = 0, stable = false, ctrl = false, nose = false, torque = 0, science = false;
   const segs = liveSegs();
   for (const s of segs) {
     for (const p of s.parts) {
@@ -1821,6 +2232,7 @@ function recalcRocket(first) {
       if (p.d.solid) { const e = s.engines.find(e => e.rec === p); if (e) pm += e.fuel; }
       m += pm; my += pm * (p.y + p.h / 2);
       maxR = Math.max(maxR, partR(p.d));
+      torque += p.torque; if (p.d.science) science = true;
     }
     if (s.ctrl) ctrl = true;
     top = Math.max(top, s.top);
@@ -1835,7 +2247,7 @@ function recalcRocket(first) {
     fl.x = ox + dx * comY; fl.y = oy + dy * comY;
   }
   fl.comY = comY; fl.mass = m; fl.top = top; fl.base = segs.length ? segs[0].bottom : 0;
-  fl.cdA = (nose ? 0.32 : 0.75) * Math.PI * maxR * maxR; fl.stable = stable; fl.ctrl = ctrl;
+  fl.cdA = (nose ? 0.32 : 0.75) * Math.PI * maxR * maxR; fl.stable = stable; fl.ctrl = ctrl; fl.torque = torque; fl.science = science;
 }
 
 function doStage() {
@@ -1920,7 +2332,7 @@ function stepFlight(dt) {
     // сначала частичное раскрытие (тормозит с большой скорости), полностью — ниже 110 м/с
     if (c.state === 2) { const tgt = v > 110 ? 0.2 : 1; c.open = Math.min(tgt, c.open + dt * (tgt < 1 ? 0.15 : 0.35)); if (c.open >= 1) c.state = 3; }
   }
-  F.chuteCdA = c ? 650 * c.open * c.open : 0;
+  F.chuteCdA = c ? c.area * c.open * c.open : 0;
   if (rho > 0 && v > 0.01) {
     const s = Math.sin(aoa);
     const cdA = F.cdA * (1 + 3 * s * s) + F.chuteCdA;
@@ -1932,7 +2344,7 @@ function stepFlight(dt) {
   // вращение: удержание курса (SAS) + аэродинамика
   const grounded = F.grounded && !F.liftedOff;
   if (!grounded) {
-    const auth = F.ctrl ? 1.6 / Math.sqrt(mass) + Math.min(2.2, 0.02 * thrust / mass) : Math.min(0.8, 0.008 * thrust / mass);
+    const auth = F.ctrl ? (1.6 + F.torque) / Math.sqrt(mass) + Math.min(2.2, 0.02 * thrust / mass) : Math.min(0.8, 0.008 * thrust / mass);
     const chuteOn = c && c.open > 0.05;
     let angAcc = 0;
     if (inp.rot !== 0 && auth > 0) { angAcc += -inp.rot * auth; F.hold = F.ang; }
@@ -2046,14 +2458,14 @@ function updateDebris(dt) {
 }
 
 /* ---------- цели миссии ---------- */
-const GOALS = [['lift', 'Оторваться от земли'], ['km1', 'Высота 1 км'], ['km10', 'Высота 10 км'], ['space', 'Космос — 70 км'], ['orbit', 'Выйти на орбиту'], ['land', 'Мягкая посадка']];
+const GOALS = [['lift', 'Оторваться от земли'], ['km1', 'Высота 1 км'], ['km10', 'Высота 10 км'], ['space', 'Космос — 70 км'], ['orbit', 'Выйти на орбиту'], ['science', 'Научный эксперимент в космосе'], ['land', 'Мягкая посадка']];
 function renderGoals() { $('goals').innerHTML = GOALS.map(([id, t]) => `<li data-g="${id}" class="${fl && fl.goals[id] ? 'ok' : ''}">${t}</li>`).join(''); }
 function goal(id, ok = true) {
   if (!fl || fl.goals[id] || !ok) return;
   if (id === 'crash') return;
   fl.goals[id] = true;
   const g = GOALS.find(x => x[0] === id); if (!g) return;
-  const msg = { lift: 'Взлёт!', km1: '1 километр!', km10: '10 километров!', space: '🌌 Ты в космосе!', orbit: '🛰 Орбита!', land: 'Мягкая посадка!' }[id];
+  const msg = { lift: 'Взлёт!', km1: '1 километр!', km10: '10 километров!', space: '🌌 Ты в космосе!', orbit: '🛰 Орбита!', science: '🔬 Эксперимент проведён!', land: 'Мягкая посадка!' }[id];
   toast(msg, 'gold'); if (id !== 'lift') Sound.win();
   renderGoals();
 }
@@ -2086,7 +2498,7 @@ function updateFlightVisuals(dt, t = 0) {
   if (F.done) for (const s of F.segs) for (const e of s.engines) for (const p of e.plumes) p.outer.visible = p.core.visible = false;
   if (seg && !F.done) {
     for (const e of seg.engines) {
-      const on = e.out > 0.01;
+      const on = e.out > 0.01 || (e.def.plume === 'ion' && F.engineOn && seg.liq > 0 && F.throttle > 0);
       anyOut = Math.max(anyOut, e.out);
       const flick = 0.92 + Math.random() * 0.12;
       for (const u of [e.mo, e.mc]) { u.uniforms.uTime.value = t; u.uniforms.uThr.value = e.out * flick; u.uniforms.uVac.value = vac; }
@@ -2145,7 +2557,8 @@ function updateFlightVisuals(dt, t = 0) {
     F.canopy.visible = o > 0.01 && !(F.done && F.result === 'crashed');
     if (F.canopy.visible) {
       const deflate = F.done ? Math.max(0.15, 1 - (performance.now() - (F.doneT || (F.doneT = performance.now()))) / 2500) : 1;
-      F.canopy.scale.set(6.5 * o * deflate, 9 * Math.max(0.2, o) * deflate, 6.5 * o * deflate);
+      const ck = F.canopy.userData.k || 1;
+      F.canopy.scale.set(6.5 * ck * o * deflate, 9 * ck * Math.max(0.2, o) * deflate, 6.5 * ck * o * deflate);
     }
   }
 }
@@ -2335,7 +2748,7 @@ function toHangar() {
     renderPass.scene = hangar.scene; camera.near = 0.1; resize();
     $('build').hidden = false; $('flight').hidden = true; $('result').hidden = true;
     ['btnTpl', 'btnNew'].forEach(id => $(id).hidden = false);
-    cam.yaw = 1.25; cam.pitch = 0.18; cam.min = 3; cam.max = 120; cam.tdist = clamp((hangar.height || 0) * 1.35 + 7, 8, 70);
+    cam.yaw = 1.25; cam.pitch = 0.18; cam.min = 3; cam.max = 260; cam.tdist = clamp((hangar.height || 0) * 1.35 + 7, 8, 160);
     Sound.engine(0, 0); Sound.windLevel(0);
     tutOnMode();
   });
@@ -2424,7 +2837,7 @@ const TUT_FLIGHT = TUT.findIndex(s => s.flight), TUT_LAUNCH = TUT_FLIGHT - 1;
 const tut = { on: false, i: 0, shown: -1, crash: false };
 function startTutorial() {
   closeModal();
-  const go = () => { tut.on = true; tut.i = 0; tut.shown = -1; loadDesign([]); renderTut(); };
+  const go = () => { tut.on = true; tut.i = 0; tut.shown = -1; sizeFilter = 'all'; buildPalette(); loadDesign([]); renderTut(); };
   if (mode === 'flight') { toHangar(); setTimeout(go, 700); } else go();
 }
 function endTutorial(done) { tut.on = false; $('tutorial').hidden = true; clearHl(); if (done) store.set('tutDone', true); }
@@ -2472,6 +2885,13 @@ const TEMPLATES = [
   { ic: '🚀', name: '«Восход» — две ступени', desc: 'Классическая двухступенчатая ракета. При аккуратном развороте выходит на орбиту.', parts: [{ id: 'chute' }, { id: 'pod' }, { id: 'tankS4' }, { id: 'engSpark' }, { id: 'decS' }, { id: 'tankS4' }, { id: 'tankS4', fins: true }, { id: 'engHammer' }] },
   { ic: '🛰', name: '«Спутник»', desc: 'Беспилотный зонд под обтекателем. Цель — оставить его на орбите.', parts: [{ id: 'noseS' }, { id: 'probe' }, { id: 'tankS2' }, { id: 'engSpark' }, { id: 'decS' }, { id: 'tankS4' }, { id: 'tankS4', fins: true }, { id: 'engHammer' }] },
   { ic: '🏋', name: '«Титан» — тяжёлая', desc: 'Широкая первая ступень с четырёхсопловым двигателем. Запас Δv больше 5 км/с.', parts: [{ id: 'chute' }, { id: 'pod' }, { id: 'tankS4' }, { id: 'engSpark' }, { id: 'decS' }, { id: 'adSL' }, { id: 'tankL4' }, { id: 'tankL4', fins: true }, { id: 'engTitan' }] },
+  { ic: '🐜', name: 'Мини-ракета', desc: 'Всё размером 0,625 м: капсула «Кроха», мини-бак и двигатель «Шмель».', parts: [{ id: 'chute' }, { id: 'podMini' }, { id: 'tankT4', fins: 'finsSmall' }, { id: 'engMini' }] },
+  { ic: '🐕', name: '«Белка и Стрелка»', desc: 'Собаки-космонавты летят в космос и возвращаются на парашюте. Засчитывается эксперимент.', parts: [{ id: 'chute' }, { id: 'dogs' }, { id: 'probeMini' }, { id: 'adTS' }, { id: 'tankS4', fins: true }, { id: 'engHammer' }] },
+  { ic: '🔭', name: 'Научный зонд', desc: 'Телескоп и научный блок под обтекателем. Выведи его на орбиту.', parts: [{ id: 'noseS' }, { id: 'scope' }, { id: 'sciS' }, { id: 'probe' }, { id: 'tankS4' }, { id: 'engSpark' }, { id: 'decS' }, { id: 'tankS4' }, { id: 'tankS4', fins: 'finsGrid' }, { id: 'engHammer' }] },
+  { ic: '🛸', name: 'Космоплан «Буран»', desc: 'Капсула, два бака, большие крылья и аэроспайк. Почти выходит на орбиту одной ступенью.', parts: [{ id: 'chute' }, { id: 'pod' }, { id: 'tankS4' }, { id: 'tankS4', fins: 'finsWing' }, { id: 'engAero' }] },
+  { ic: '☢', name: 'Атомный буксир', desc: 'Сильная первая ступень «Вихрь» и экономный атомный двигатель для космоса.', parts: [{ id: 'noseS' }, { id: 'probe' }, { id: 'antenna' }, { id: 'tankS8' }, { id: 'engNuke' }, { id: 'decS' }, { id: 'tankS4' }, { id: 'tankS4' }, { id: 'tankS4', fins: 'finsBig' }, { id: 'engVortex' }] },
+  { ic: '🦣', name: '«Мамонт» — гигант', desc: 'Трёхместный «Союз-3», ступень 2,5 м и первая ступень 3,75 м с девятью соплами.', parts: [{ id: 'chuteS' }, { id: 'pod3' }, { id: 'heatL' }, { id: 'tankL4' }, { id: 'engSkipper' }, { id: 'decL' }, { id: 'adLX' }, { id: 'tankX8', fins: 'finsBig' }, { id: 'engMammoth' }] },
+  { ic: '🏗', name: 'Станция «Мир»', desc: 'Лаборатория с солнечными панелями и маховиком на тяжёлой ракете.', parts: [{ id: 'noseL' }, { id: 'lab' }, { id: 'solarL' }, { id: 'probeL' }, { id: 'wheelL' }, { id: 'tankL4' }, { id: 'engPoodle' }, { id: 'decL' }, { id: 'tankL8' }, { id: 'tankL4', fins: 'finsDelta' }, { id: 'engTitan' }] },
 ];
 function openModal(html) { const m = $('modal'); m.querySelector('.box').innerHTML = html; m.hidden = false; }
 function closeModal() { $('modal').hidden = true; }
@@ -2540,7 +2960,7 @@ function frame() {
       const alt = flightAlt(), v = Math.hypot(fl.vx, fl.vy);
       fl.maxAlt = Math.max(fl.maxAlt, alt - fl.comY - PAD_H); fl.maxSpd = Math.max(fl.maxSpd, v);
       if (fl.liftedOff) goal('lift');
-      if (alt > 1000) goal('km1'); if (alt > 10000) goal('km10'); if (alt > ATM) goal('space');
+      if (alt > 1000) goal('km1'); if (alt > 10000) goal('km10'); if (alt > ATM) { goal('space'); if (fl.science) goal('science'); }
       if (fl.liftedOff && alt > ATM) { const o = orbitInfo(fl.x, fl.y, fl.vx, fl.vy); if (!o.esc && o.pe > ATM) goal('orbit'); }
       if (fl.done === false && fl.result == null) fl.crashV = v;
       if (fl.stageIdx < fl.actions.length || (fl.chute && fl.chute.state === 0)) renderStageQueueLazy();
@@ -2599,7 +3019,7 @@ function init() {
   loadDesign(saved && saved.length ? saved : TEMPLATES[0].parts);
   applyQuality(); applySound();
   resize();
-  cam.tdist = cam.dist = clamp((hangar.height || 0) * 1.35 + 7, 8, 70); cam.max = 120;
+  cam.tdist = cam.dist = clamp((hangar.height || 0) * 1.35 + 7, 8, 160); cam.max = 260;
   frame();
   setTimeout(() => { $('loading').style.opacity = 0; setTimeout(() => $('loading').remove(), 500); }, 200);
   if (!store.get('seen', false)) setTimeout(showWelcome, 600);
