@@ -72,8 +72,51 @@
   #start .chip { font-size: 17px; padding: 12px 20px; }
   #start .btn-main { font-size: 20px; padding: 18px; border-radius: 16px; }
   #start .count { color: var(--accent); font-weight: 800; }
-  body.on-start .foot { display: none; }
+  #start .btn-ghost { width: 100%; margin-top: 10px; font-size: 18px; padding: 16px; border-radius: 16px; }
+  .summary { color: var(--muted); font-size: 15px; line-height: 1.5; margin: 16px 0 0; }
+  .summary b { color: var(--text); }
+
+  /* Настройки */
+  #settings { max-width: 640px; margin: 0 auto; padding-bottom: 24px; }
+  .set-head { display: flex; align-items: center; gap: 12px; margin: 4px 0 16px; padding-right: 56px; }
+  .set-head h2 { margin: 0; font-size: 28px; }
+  .back { background: var(--card2); color: var(--text); width: 44px; height: 44px; padding: 0; border-radius: 50%; font-size: 20px; flex: none; }
+  .set-block { padding: 18px 0; border-bottom: 1px solid var(--card2); }
+  .set-block:first-child { padding-top: 0; }
+  .set-block:last-of-type { border-bottom: 0; }
+  .set-block .label { margin-bottom: 10px; }
+  .set-hint { color: var(--muted); font-size: 13px; margin: 8px 0 0; }
+  .range-row { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: center; }
+  .range-row label { display: flex; align-items: center; gap: 6px; background: var(--card2); border-radius: 12px; padding: 0 12px; border: 2px solid transparent; }
+  .range-row label:focus-within { border-color: var(--accent); }
+  .range-row span { color: var(--muted); font-weight: 700; font-size: 14px; }
+  .range-row input { width: 100%; min-width: 0; background: none; border: 0; color: var(--text); font: inherit; font-size: 20px; font-weight: 800; padding: 10px 0; outline: none; }
+  .range-row .dash { color: var(--muted); }
+  .dual { position: relative; height: 34px; margin: 10px 0 4px; }
+  .dual .track { position: absolute; left: 0; right: 0; top: 15px; height: 4px; border-radius: 4px; background: var(--card2); }
+  .dual .fill { position: absolute; top: 15px; height: 4px; border-radius: 4px; background: var(--accent); }
+  .dual input[type=range] { position: absolute; left: 0; top: 0; width: 100%; height: 34px; margin: 0; background: none; pointer-events: none; -webkit-appearance: none; appearance: none; }
+  .dual input[type=range]::-webkit-slider-runnable-track { background: none; }
+  .dual input[type=range]::-webkit-slider-thumb { pointer-events: auto; -webkit-appearance: none; width: 24px; height: 24px; border-radius: 50%; background: var(--accent); border: 3px solid var(--bg); cursor: pointer; }
+  .dual input[type=range]::-moz-range-thumb { pointer-events: auto; width: 20px; height: 20px; border-radius: 50%; background: var(--accent); border: 3px solid var(--bg); cursor: pointer; }
+  .dual input[type=range]::-moz-range-track { background: none; }
+  .chips.left { justify-content: flex-start; margin: 12px 0 0; }
+  .chip.shop { display: inline-flex; align-items: center; gap: 8px; }
+  .chip.shop i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .chip.shop small { opacity: .7; font-weight: 600; }
+  .switch-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .switch-row .t { font-weight: 700; font-size: 17px; }
+  .switch { width: 56px; height: 32px; border-radius: 99px; background: var(--card2); position: relative; padding: 0; flex: none; }
+  .switch::after { content: ""; position: absolute; top: 4px; left: 4px; width: 24px; height: 24px; border-radius: 50%; background: var(--muted); transition: left .15s, background .15s; }
+  .switch.on { background: var(--good); }
+  .switch.on::after { left: 28px; background: #fff; }
+  .fits { margin: 18px 0 12px; padding: 12px 14px; border-radius: 12px; background: var(--card2); font-weight: 700; }
+  .fits.bad { background: rgba(255,92,122,.15); color: var(--bad); }
+  .set-actions { display: flex; gap: 8px; }
+  .set-actions .btn-main { flex: 1; }
+  body.on-start .foot, body.on-settings .foot { display: none; }
   body.on-start .wrap { max-width: 720px; }
+  body.on-settings .wrap { max-width: 640px; }
 
   .hud { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-weight: 700; min-height: 44px; padding-right: 56px; }
   .hud .score { color: var(--accent); }
@@ -94,6 +137,8 @@
   }
   .badge.rozetka { background: var(--rozetka); }
   .badge.aliexpress { background: var(--aliexpress); }
+  .badge.comfy { background: #ff6a00; }
+  .badge.allo { background: #7b2cbf; }
   .cat {
     position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,.7); color: #fff;
     font-size: 13px; padding: 6px 10px; border-radius: 8px; font-weight: 600;
@@ -186,20 +231,70 @@
     <h1>Угадай <span>цену</span></h1>
     <p class="sub">Показываем товар с маркетплейса — ты называешь цену. Чем ближе, тем больше очков. Против тебя играет ИИ.<br>В игре <span class="count" id="countAll"></span> товаров.</p>
     <div class="card">
-      <div class="label">Магазины</div>
-      <div class="chips" id="shopChips">
-        <button class="chip on" data-shop="all">Все</button>
-        <button class="chip" data-shop="rozetka">Rozetka</button>
-        <button class="chip" data-shop="aliexpress">AliExpress</button>
-      </div>
-      <div class="label">Раундов</div>
-      <div class="chips" id="roundChips">
-        <button class="chip" data-n="5">5</button>
-        <button class="chip on" data-n="10">10</button>
-        <button class="chip" data-n="15">15</button>
-      </div>
       <button class="btn-main" id="startBtn">Играть</button>
+      <button class="btn-ghost" id="settingsBtn">⚙️ Настройки</button>
+      <p class="summary" id="summary"></p>
       <p class="sub" id="bestLine" style="margin:12px 0 0;text-align:center"></p>
+    </div>
+  </section>
+
+  <!-- Настройки -->
+  <section id="settings" class="hidden">
+    <div class="set-head">
+      <button class="back" id="setBack" aria-label="Назад">←</button>
+      <h2>Настройки</h2>
+    </div>
+    <div class="card">
+      <div class="set-block">
+        <div class="label">Цена товаров</div>
+        <div class="range-row">
+          <label><span>от</span><input id="priceMin" inputmode="numeric" autocomplete="off"><span>₴</span></label>
+          <span class="dash">—</span>
+          <label><span>до</span><input id="priceMax" inputmode="numeric" autocomplete="off"><span>₴</span></label>
+        </div>
+        <div class="dual">
+          <div class="track"></div><div class="fill" id="dualFill"></div>
+          <input type="range" id="rangeMin" min="0" max="1000" aria-label="Цена от">
+          <input type="range" id="rangeMax" min="0" max="1000" aria-label="Цена до">
+        </div>
+        <div class="chips left" id="pricePresets">
+          <button class="chip" data-min="0" data-max="150000">Любая</button>
+          <button class="chip" data-min="0" data-max="500">до 500 ₴</button>
+          <button class="chip" data-min="500" data-max="5000">500 – 5 000 ₴</button>
+          <button class="chip" data-min="5000" data-max="30000">5 000 – 30 000 ₴</button>
+          <button class="chip" data-min="30000" data-max="150000">от 30 000 ₴</button>
+        </div>
+        <p class="set-hint">Можно выбрать любой диапазон от&nbsp;0 до&nbsp;150&nbsp;000&nbsp;₴.</p>
+      </div>
+
+      <div class="set-block">
+        <div class="label">Магазины</div>
+        <div class="chips left" id="shopChips"></div>
+        <p class="set-hint">Можно выбрать несколько. Хотя бы один должен остаться.</p>
+      </div>
+
+      <div class="set-block">
+        <div class="label">Раундов в игре</div>
+        <div class="chips left" id="roundChips">
+          <button class="chip" data-n="5">5</button>
+          <button class="chip" data-n="10">10</button>
+          <button class="chip" data-n="15">15</button>
+          <button class="chip" data-n="20">20</button>
+        </div>
+      </div>
+
+      <div class="set-block">
+        <div class="switch-row">
+          <div><div class="t">Звук и музыка</div><div class="set-hint" style="margin:2px 0 0">Барабанная дробь, фанфары и тромбон</div></div>
+          <button class="switch" id="soundSwitch" role="switch" aria-label="Звук"></button>
+        </div>
+      </div>
+
+      <div class="fits" id="fits"></div>
+      <div class="set-actions">
+        <button class="btn-ghost" id="setReset">Сбросить</button>
+        <button class="btn-main" id="setDone">Готово</button>
+      </div>
     </div>
   </section>
 
@@ -268,7 +363,7 @@
     </div>
   </section>
 
-  <p class="foot">Цены взяты с витрин Rozetka и AliExpress 17.10.2026 и могли измениться.<br>Цены AliExpress переведены в гривны по курсу 1 $ = <span id="rate"></span> ₴.</p>
+  <p class="foot">Цены взяты с витрин Rozetka, Comfy, Allo и AliExpress 17.10.2026 и могли измениться.<br>Цены AliExpress переведены в гривны по курсу 1 $ = <span id="rate"></span> ₴.</p>
 </div>
 
 <script src="products.js"></script>
@@ -276,24 +371,54 @@
 (function () {
   const $ = (id) => document.getElementById(id);
   const RATE = window.USD_RATE;
-  const ALL = window.PRODUCTS.map((p, i) => ({
-    ...p,
-    id: i,
-    price: p.uah != null ? p.uah : Math.round(p.usd * RATE),
-  }));
   const MIN = 10, MAX = 150000;     // диапазон ползунка, ₴
   const MAX_PTS = 1000;
-  const broken = new Set();         // товары, у которых не загрузилась картинка
 
-  let shop = "all", rounds = 10;
+  const SHOPS = {
+    rozetka:    { name: "Rozetka",    color: "#00a046" },
+    comfy:      { name: "Comfy",      color: "#ff6a00" },
+    allo:       { name: "Allo",       color: "#7b2cbf" },
+    aliexpress: { name: "AliExpress", color: "#ff4747" },
+  };
+
+  // Картинки, которые не загрузились, запоминаем — такие товары больше не показываем
+  const BROKEN_KEY = "priceGuessBrokenImages";
+  let brokenImgs = new Set();
+  try { brokenImgs = new Set(JSON.parse(localStorage.getItem(BROKEN_KEY) || "[]")); } catch (e) {}
+  function markBroken(p) {
+    brokenImgs.add(p.img);
+    try { localStorage.setItem(BROKEN_KEY, JSON.stringify([...brokenImgs].slice(-1000))); } catch (e) {}
+  }
+
+  // В игре только товары с картинкой и ценой до 150 000 ₴
+  const ALL = window.PRODUCTS
+    .map((p, i) => ({ ...p, id: i, price: p.uah != null ? p.uah : Math.round(p.usd * RATE) }))
+    .filter((p) => p.img && /^https:\/\//.test(p.img) && SHOPS[p.shop] && p.price > 0 && p.price <= MAX);
+
+  // ---------- настройки ----------
+  const SETTINGS_KEY = "priceGuessSettings";
+  const DEFAULTS = { min: 0, max: MAX, shops: Object.keys(SHOPS), rounds: 10 };
+  let settings = { ...DEFAULTS };
+  try {
+    const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "null");
+    if (saved) settings = { ...DEFAULTS, ...saved };
+  } catch (e) {}
+  sanitizeSettings();
+  function sanitizeSettings() {
+    settings.min = clampPrice(settings.min); settings.max = clampPrice(settings.max);
+    if (settings.min > settings.max) [settings.min, settings.max] = [settings.max, settings.min];
+    settings.shops = (settings.shops || []).filter((s) => SHOPS[s]);
+    if (!settings.shops.length) settings.shops = Object.keys(SHOPS);
+    if (![5, 10, 15, 20].includes(settings.rounds)) settings.rounds = 10;
+  }
+  function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) {} }
+  function clampPrice(v) { v = Math.round(Number(v) || 0); return Math.min(MAX, Math.max(0, v)); }
+
+  let rounds = settings.rounds;
   let deck = [], round = 0, score = 0, aiScore = 0, current = null, hinted = false, history = [];
 
   $("rate").textContent = RATE;
   $("countAll").textContent = fmtCount(ALL.length);
-  document.querySelectorAll("#shopChips .chip").forEach((c) => {
-    const n = c.dataset.shop === "all" ? ALL.length : ALL.filter((p) => p.shop === c.dataset.shop).length;
-    c.textContent += " · " + fmtCount(n);
-  });
   function fmtCount(n) { return n.toLocaleString("ru-RU"); }
 
   // ---------- звук (синтезируется в браузере, без файлов) ----------
@@ -500,33 +625,40 @@
 
   // ---------- экраны ----------
   function show(id) {
-    ["start", "game", "end"].forEach((s) => $(s).classList.toggle("hidden", s !== id));
+    ["start", "settings", "game", "end"].forEach((s) => $(s).classList.toggle("hidden", s !== id));
     document.body.classList.toggle("on-start", id === "start");
+    document.body.classList.toggle("on-settings", id === "settings");
     window.scrollTo(0, 0);
   }
 
-  function pool() {
-    return ALL.filter((p) => !broken.has(p.id) && (shop === "all" || p.shop === shop));
+  function matches(p, st) {
+    return !brokenImgs.has(p.img) && st.shops.includes(p.shop) && p.price >= st.min && p.price <= st.max;
   }
+  function pool() { return ALL.filter((p) => matches(p, settings)); }
 
   function startGame() {
-    const items = shuffle(pool());
-    const ali = items.filter((p) => p.shop === "aliexpress");
-    const roz = items.filter((p) => p.shop !== "aliexpress");
+    rounds = settings.rounds;
+    const items = pool();
+    if (items.length < 1) { openSettings(); return; }
+    // Магазины чередуются по очереди-случайно, чтобы маленькие магазины тоже попадались,
+    // и одна категория не идёт два раза подряд
+    const byShop = {};
+    for (const p of shuffle(items)) (byShop[p.shop] = byShop[p.shop] || []).push(p);
     const deckSize = Math.min(items.length, rounds * 4);   // запас на случай битых картинок
     const out = [];
-    while (out.length < deckSize && (ali.length || roz.length)) {
-      // в режиме «Все» примерно каждый четвёртый товар — с AliExpress
-      let src = (ali.length && (!roz.length || Math.random() < 0.25)) ? ali : roz;
+    while (out.length < deckSize) {
+      const shops = Object.keys(byShop).filter((k) => byShop[k].length);
+      if (!shops.length) break;
       const prev = out.length ? out[out.length - 1].cat : null;
+      let src = byShop[shops[Math.floor(Math.random() * shops.length)]];
       let i = src.findIndex((p) => p.cat !== prev);
-      if (i < 0) { src = src === ali ? roz : ali; i = src.findIndex((p) => p.cat !== prev); }
-      if (i < 0) i = 0;
-      if (!src.length) break;
+      if (i < 0) {
+        const other = shops.map((k) => byShop[k]).find((a) => a.some((p) => p.cat !== prev));
+        if (other) { src = other; i = src.findIndex((p) => p.cat !== prev); } else i = 0;
+      }
       out.push(src.splice(i, 1)[0]);
     }
-    const items2 = out;
-    deck = items2;
+    deck = out;
     round = 0; score = 0; aiScore = 0; history = [];
     show("game");
     nextRound();
@@ -542,12 +674,11 @@
     $("scoreLabel").textContent = fmt(score);
     $("aiLabel").textContent = fmt(aiScore);
     $("progress").style.width = ((round - 1) / rounds * 100) + "%";
-    $("badge").textContent = current.shop === "rozetka" ? "Rozetka" : "AliExpress";
+    $("badge").textContent = SHOPS[current.shop].name;
     $("badge").className = "badge " + current.shop;
     $("cat").textContent = current.cat;
     $("ptitle").textContent = "";
     $("hintBtn").classList.remove("hidden");
-    $("guessForm").classList.remove("hidden");
     $("result").classList.add("hidden");
     $("suspense").classList.add("hidden");
     $("guessInput").value = "";
@@ -556,20 +687,32 @@
     loadImage(current);
   }
 
+  let imgTimer = 0;
   function loadImage(p) {
     const img = $("pimg");
     img.classList.remove("ready");
     $("loading").classList.remove("hidden");
     $("loading").textContent = "Загружаем…";
-    img.onload = () => { if (p !== current) return; img.classList.add("ready"); $("loading").classList.add("hidden"); };
-    img.onerror = () => {
+    $("guessForm").classList.add("hidden");   // отвечать можно только когда видно картинку
+    clearTimeout(imgTimer);
+    const fail = () => {
       if (p !== current) return;
-      // картинка не открылась — берём другой товар в этом же раунде
-      broken.add(p.id);
+      clearTimeout(imgTimer);
+      // картинки нет — товар удаляется из игры насовсем, в раунде показываем другой
+      markBroken(p);
       if (!deck.length) { $("loading").textContent = "Не удалось загрузить картинку"; return; }
       round--;
       nextRound();
     };
+    img.onload = () => {
+      if (p !== current) return;
+      clearTimeout(imgTimer);
+      if (img.naturalWidth < 20 || img.naturalHeight < 20) return fail();   // пустая заглушка вместо фото
+      img.classList.add("ready"); $("loading").classList.add("hidden");
+      $("guessForm").classList.remove("hidden");
+    };
+    img.onerror = fail;
+    imgTimer = setTimeout(fail, 10000);       // слишком долго грузится — тоже пропускаем
     img.referrerPolicy = "no-referrer";
     img.src = p.img;
   }
@@ -710,14 +853,106 @@
       onPick(b);
     });
   }
-  chipGroup("shopChips", (b) => { shop = b.dataset.shop; });
-  chipGroup("roundChips", (b) => { rounds = Number(b.dataset.n); });
+  // ---------- экран настроек ----------
+  let draft = null;   // настройки, которые меняются на экране, пока не нажато «Готово»
+
+  // ползунок цены в логарифмической шкале: 0 … 150 000 ₴
+  function rangeToPrice(v) {
+    if (v <= 0) return 0;
+    if (v >= 1000) return MAX;
+    const x = Math.exp(Math.log(MIN) + (Math.log(MAX) - Math.log(MIN)) * v / 1000);
+    const step = x < 100 ? 10 : x < 1000 ? 50 : x < 10000 ? 100 : 1000;
+    return Math.round(x / step) * step;
+  }
+  function priceToRange(p) {
+    if (p <= 0) return 0;
+    return Math.round(1000 * (Math.log(Math.max(MIN, p)) - Math.log(MIN)) / (Math.log(MAX) - Math.log(MIN)));
+  }
+
+  function shopCount(shopId, st) { return ALL.filter((p) => p.shop === shopId && matches(p, { ...st, shops: [shopId] })).length; }
+
+  function renderSettings() {
+    $("priceMin").value = fmt(draft.min);
+    $("priceMax").value = fmt(draft.max);
+    $("rangeMin").value = priceToRange(draft.min);
+    $("rangeMax").value = priceToRange(draft.max);
+    const a = $("rangeMin").value / 10, b = $("rangeMax").value / 10;
+    $("dualFill").style.left = a + "%"; $("dualFill").style.width = Math.max(0, b - a) + "%";
+    document.querySelectorAll("#pricePresets .chip").forEach((c) =>
+      c.classList.toggle("on", +c.dataset.min === draft.min && +c.dataset.max === draft.max));
+    $("shopChips").innerHTML = Object.entries(SHOPS).map(([id, s]) =>
+      '<button class="chip shop' + (draft.shops.includes(id) ? " on" : "") + '" data-shop="' + id + '">' +
+      '<i style="background:' + s.color + '"></i>' + s.name + " <small>" + fmtCount(shopCount(id, draft)) + "</small></button>").join("");
+    document.querySelectorAll("#roundChips .chip").forEach((c) => c.classList.toggle("on", +c.dataset.n === draft.rounds));
+    $("soundSwitch").classList.toggle("on", Sound.enabled);
+    $("soundSwitch").setAttribute("aria-checked", Sound.enabled ? "true" : "false");
+    const n = ALL.filter((p) => matches(p, draft)).length;
+    const f = $("fits");
+    if (n === 0) { f.textContent = "Под эти настройки не подходит ни одного товара — расширь диапазон цен или выбери другие магазины."; f.className = "fits bad"; }
+    else if (n < draft.rounds) { f.textContent = "Подходит товаров: " + fmtCount(n) + " — меньше, чем раундов. Игра будет короче."; f.className = "fits bad"; }
+    else { f.textContent = "Подходит товаров: " + fmtCount(n); f.className = "fits"; }
+    $("setDone").disabled = n === 0;
+  }
+
+  function openSettings() { draft = JSON.parse(JSON.stringify(settings)); renderSettings(); show("settings"); }
+  function closeSettings(apply) {
+    if (apply) { settings = draft; sanitizeSettings(); saveSettings(); }
+    renderSummary(); showBest(); show("start");
+  }
+
+  function renderSummary() {
+    const all = settings.shops.length === Object.keys(SHOPS).length;
+    const shops = all ? "все" : settings.shops.map((s) => SHOPS[s].name).join(", ");
+    const price = settings.min === 0 && settings.max === MAX ? "любая" : fmt(settings.min) + " – " + fmt(settings.max) + " ₴";
+    const n = pool().length;
+    $("summary").innerHTML = "Магазины: <b>" + escapeHtml(shops) + "</b> · Цена: <b>" + price + "</b><br>Раундов: <b>" +
+      settings.rounds + "</b> · Звук: <b>" + (Sound.enabled ? "вкл" : "выкл") + "</b> · Товаров: <b>" + fmtCount(n) + "</b>";
+    $("startBtn").disabled = n === 0;
+  }
+
+  function setPrice(which, value) {
+    draft[which] = clampPrice(value);
+    if (draft.min > draft.max) { if (which === "min") draft.max = draft.min; else draft.min = draft.max; }
+    renderSettings();
+  }
+  $("rangeMin").addEventListener("input", () => { draft.min = Math.min(rangeToPrice(+$("rangeMin").value), draft.max); renderSettings(); });
+  $("rangeMax").addEventListener("input", () => { draft.max = Math.max(rangeToPrice(+$("rangeMax").value), draft.min); renderSettings(); });
+  // ввод с клавиатуры применяем, когда поле теряет фокус или нажат Enter
+  for (const id of ["priceMin", "priceMax"]) {
+    const which = id === "priceMin" ? "min" : "max";
+    $(id).addEventListener("input", () => { const d = String($(id).value).replace(/[^\d]/g, ""); $(id).value = d ? fmt(+d) : ""; });
+    $(id).addEventListener("change", () => setPrice(which, String($(id).value).replace(/[^\d]/g, "")));
+    $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $(id).blur(); } });
+  }
+  $("pricePresets").addEventListener("click", (e) => {
+    const c = e.target.closest(".chip"); if (!c) return;
+    draft.min = +c.dataset.min; draft.max = +c.dataset.max; renderSettings();
+  });
+  $("shopChips").addEventListener("click", (e) => {
+    const c = e.target.closest(".chip"); if (!c) return;
+    const id = c.dataset.shop, has = draft.shops.includes(id);
+    if (has && draft.shops.length === 1) return;          // хотя бы один магазин
+    draft.shops = has ? draft.shops.filter((s) => s !== id) : [...draft.shops, id];
+    renderSettings();
+  });
+  $("roundChips").addEventListener("click", (e) => {
+    const c = e.target.closest(".chip"); if (!c) return;
+    draft.rounds = +c.dataset.n; renderSettings();
+  });
+  $("soundSwitch").onclick = () => { Sound.toggle(); Sound.unlock(); paintSoundBtn(); renderSettings(); };
+  $("setReset").onclick = () => { draft = JSON.parse(JSON.stringify(DEFAULTS)); renderSettings(); };
+  $("setDone").onclick = () => closeSettings(true);
+  $("setBack").onclick = () => closeSettings(false);
+  $("settingsBtn").onclick = openSettings;
 
   $("startBtn").onclick = () => { Sound.unlock(); startGame(); };
-  $("soundBtn").onclick = () => { Sound.toggle(); Sound.unlock(); paintSoundBtn(); };
+  $("soundBtn").onclick = () => {
+    Sound.toggle(); Sound.unlock(); paintSoundBtn(); renderSummary();
+    if (draft && !$("settings").classList.contains("hidden")) renderSettings();
+  };
   paintSoundBtn();
   $("againBtn").onclick = startGame;
-  $("menuBtn").onclick = () => { stopSuspense(); showBest(); show("start"); };
+  $("menuBtn").onclick = () => { stopSuspense(); renderSummary(); showBest(); show("start"); };
   $("nextBtn").onclick = nextRound;
   $("guessForm").addEventListener("submit", submitGuess);
   $("hintBtn").onclick = () => { hinted = true; $("ptitle").textContent = current.title; $("hintBtn").classList.add("hidden"); };
@@ -734,6 +969,7 @@
     $("guessBtn").disabled = false;
   });
 
+  renderSummary();
   showBest();
 })();
 </script>
