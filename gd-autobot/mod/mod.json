@@ -5,7 +5,7 @@
 	},
 	"id": "tymurius.gd-autobot",
 	"name": "AutoBot",
-	"version": "v1.2.1",
+	"version": "v1.3.0",
 	"developer": "tymurius",
 	"description": "Plays levels for you: finds a route by trial and error, then passes the level",
 	"settings": {

@@ -21,6 +21,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
 #include <fstream>
 
 using namespace geode::prelude;
@@ -43,7 +44,8 @@ struct Session {
     bool held = false;            // button state we sent to the game
     bool botInput = false;        // true while we call handleButton ourselves
     bool resetQueued = false;
-    bool speedChanged = false;
+    float speed = 1.f;     // physics steps per real 1/240 s
+    double stepDebt = 0.0; // steps owed to the game, see the update hook
     int lastCheckpointTick = 0;
     float bestPercent = 0.f;
     CCLabelBMFont* label = nullptr;
@@ -64,7 +66,8 @@ bool planHold(RouteSearch::Plan const& plan, int tick) {
 // ---------- saving routes ----------
 
 std::filesystem::path routePath(std::string const& key) {
-    auto dir = Mod::get()->getSaveDir() / "routes";
+    // "routes2": routes from 1.2.x were found with frame-dependent physics and are not reliable.
+    auto dir = Mod::get()->getSaveDir() / "routes2";
     std::error_code ec;
     std::filesystem::create_directories(dir, ec);
     return dir / (key + ".txt");
@@ -113,11 +116,12 @@ std::string levelKey(GJGameLevel* level) {
 
 // ---------- game helpers ----------
 
+// Speed is applied by the update hook (more fixed steps per frame), not by
+// stretching the frame time: stretched frames pack many physics steps into one
+// frame, and objects/collisions are refreshed only once per frame, so the same
+// inputs would give a different result every try.
 void setSpeed(float speed) {
-    auto scheduler = CCDirector::sharedDirector()->getScheduler();
-    if (speed == 1.f && !s.speedChanged) return;
-    scheduler->setTimeScale(speed);
-    s.speedChanged = speed != 1.f;
+    s.speed = speed;
 }
 
 void applyPhaseSpeed() {
@@ -286,6 +290,7 @@ void onDeath(PlayLayer* pl, PlayerObject* player) {
     }
 
     s.bestPercent = std::max(s.bestPercent, pl->getCurrentPercent());
+    log::info("try {}: died at tick {} ({:.1f}%)", s.search.attempts() + 1, tick, pl->getCurrentPercent());
     int bestBefore = s.search.bestTick();
     if (!s.search.onDeath(tick, holdMode)) {
         log::info("search exhausted after {} deaths", s.search.attempts());
@@ -369,6 +374,30 @@ void stopSession(PlayLayer* pl) {
 // ---------- hooks ----------
 
 class $modify(AutoBotGameLayer, GJBaseGameLayer) {
+    // While the bot plays, the game always advances by exactly one physics step
+    // (1/240 s) per update call. With a fixed step every try is the same as the
+    // last one for the same inputs, which the route search relies on.
+    void update(float dt) {
+        auto pl = PlayLayer::get();
+        if (!pl || static_cast<GJBaseGameLayer*>(pl) != static_cast<GJBaseGameLayer*>(this) || !playing())
+            return GJBaseGameLayer::update(dt);
+
+        constexpr float kStep = 1.f / 240.f;
+        s.stepDebt += static_cast<double>(dt) * 240.0 * s.speed;
+        int steps = static_cast<int>(s.stepDebt);
+        s.stepDebt -= steps;
+
+        auto start = std::chrono::steady_clock::now();
+        for (int i = 0; i < steps; ++i) {
+            GJBaseGameLayer::update(kStep);
+            if (!playing() || s.resetQueued || m_player1->m_isDead) break;
+            // Keep the game responsive: stop after ~25 ms of work in one frame.
+            if (std::chrono::steady_clock::now() - start > std::chrono::milliseconds(25)) break;
+        }
+        // Never carry a backlog over (it would make the next frames stutter).
+        s.stepDebt = std::min(s.stepDebt, 1.0);
+    }
+
     void processCommands(float dt, bool isHalfTick, bool isLastTick) {
         GJBaseGameLayer::processCommands(dt, isHalfTick, isLastTick);
 
@@ -417,6 +446,7 @@ class $modify(AutoBotPlayLayer, PlayLayer) {
         if (!s.active) return;
 
         s.resetQueued = false;
+        s.stepDebt = 0.0;
         if (s.phase == Phase::Done) s.phase = Phase::Final; // replay the route on restart
         s.activePlan = s.plan;
         s.lastCheckpointTick = m_isPracticeMode ? lastCheckpointTick(this) : 0;
