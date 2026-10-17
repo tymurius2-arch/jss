@@ -58,6 +58,23 @@
   .chip.on { background: var(--text); color: var(--bg); }
   .label { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; font-weight: 700; }
 
+  /* Стартовый экран: крупный и по центру экрана */
+  #start {
+    min-height: calc(100vh - 32px); min-height: calc(100dvh - 32px);
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    text-align: center; max-width: 680px; margin: 0 auto;
+  }
+  #start h1 { font-size: clamp(44px, 11vw, 80px); line-height: 1.05; margin: 0 0 12px; letter-spacing: -1.5px; }
+  #start .sub { font-size: clamp(17px, 2.6vw, 21px); max-width: 520px; margin: 0 auto 28px; }
+  #start .card { width: 100%; padding: clamp(20px, 4vw, 32px); border-radius: 24px; }
+  #start .label { font-size: 14px; }
+  #start .chips { justify-content: center; margin: 12px 0 24px; }
+  #start .chip { font-size: 17px; padding: 12px 20px; }
+  #start .btn-main { font-size: 20px; padding: 18px; border-radius: 16px; }
+  #start .count { color: var(--accent); font-weight: 800; }
+  body.on-start .foot { display: none; }
+  body.on-start .wrap { max-width: 720px; }
+
   .hud { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-weight: 700; }
   .hud .score { color: var(--accent); }
   .hud .ai { color: var(--ai); }
@@ -117,13 +134,13 @@
   .foot { color: var(--muted); font-size: 12px; text-align: center; margin: 20px 0 8px; line-height: 1.5; }
 </style>
 </head>
-<body>
+<body class="on-start">
 <div class="wrap">
 
   <!-- Стартовый экран -->
   <section id="start">
     <h1>Угадай <span>цену</span></h1>
-    <p class="sub">Показываем товар с маркетплейса — ты называешь цену. Чем ближе, тем больше очков. Против тебя играет ИИ.</p>
+    <p class="sub">Показываем товар с маркетплейса — ты называешь цену. Чем ближе, тем больше очков. Против тебя играет ИИ.<br>В игре <span class="count" id="countAll"></span> товаров.</p>
     <div class="card">
       <div class="label">Магазины</div>
       <div class="chips" id="shopChips">
@@ -220,6 +237,12 @@
   let deck = [], round = 0, score = 0, aiScore = 0, current = null, hinted = false, history = [];
 
   $("rate").textContent = RATE;
+  $("countAll").textContent = fmtCount(ALL.length);
+  document.querySelectorAll("#shopChips .chip").forEach((c) => {
+    const n = c.dataset.shop === "all" ? ALL.length : ALL.filter((p) => p.shop === c.dataset.shop).length;
+    c.textContent += " · " + fmtCount(n);
+  });
+  function fmtCount(n) { return n.toLocaleString("ru-RU"); }
 
   // ---------- хранилище рекорда ----------
   function getBest() { try { return Number(localStorage.getItem("priceGuessBest")) || 0; } catch (e) { return 0; } }
@@ -274,6 +297,7 @@
   // ---------- экраны ----------
   function show(id) {
     ["start", "game", "end"].forEach((s) => $(s).classList.toggle("hidden", s !== id));
+    document.body.classList.toggle("on-start", id === "start");
     window.scrollTo(0, 0);
   }
 
@@ -282,18 +306,23 @@
   }
 
   function startGame() {
-    // в режиме «Все» чередуем магазины, чтобы не было 8 телефонов подряд
-    let items = shuffle(pool());
-    if (shop === "all") {
-      const r = items.filter((p) => p.shop === "rozetka"), a = items.filter((p) => p.shop === "aliexpress");
-      items = [];
-      while (r.length || a.length) {
-        const first = Math.random() < 0.5 ? r : a, second = first === r ? a : r;
-        if (first.length) items.push(first.pop());
-        if (second.length) items.push(second.pop());
-      }
+    const items = shuffle(pool());
+    const ali = items.filter((p) => p.shop === "aliexpress");
+    const roz = items.filter((p) => p.shop !== "aliexpress");
+    const deckSize = Math.min(items.length, rounds * 4);   // запас на случай битых картинок
+    const out = [];
+    while (out.length < deckSize && (ali.length || roz.length)) {
+      // в режиме «Все» примерно каждый четвёртый товар — с AliExpress
+      let src = (ali.length && (!roz.length || Math.random() < 0.25)) ? ali : roz;
+      const prev = out.length ? out[out.length - 1].cat : null;
+      let i = src.findIndex((p) => p.cat !== prev);
+      if (i < 0) { src = src === ali ? roz : ali; i = src.findIndex((p) => p.cat !== prev); }
+      if (i < 0) i = 0;
+      if (!src.length) break;
+      out.push(src.splice(i, 1)[0]);
     }
-    deck = items;
+    const items2 = out;
+    deck = items2;
     round = 0; score = 0; aiScore = 0; history = [];
     show("game");
     nextRound();
