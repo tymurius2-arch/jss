@@ -52,6 +52,10 @@ struct Session {
     CCLayerColor* curtain = nullptr; // learning screen
     CCLabelBMFont* curtainText = nullptr;
     bool muted = false;
+    // Repeatability check: the very first plan is played twice; both tries
+    // must die at the same tick, or the search cannot work.
+    enum class Check { Pending, Rerun, Ok, Unstable } check = Check::Pending;
+    int checkTick = -1;
 };
 
 Session s;
@@ -218,7 +222,11 @@ SearchConfig searchConfig() {
 
 void updateLabel() {
     if (s.curtainText && s.phase == Phase::Search) {
-        auto text = fmt::format("{:.0f}%   (try {})", s.bestPercent, s.search.attempts() + 1);
+        char const* physics =
+            s.check == Session::Check::Ok ? "physics check: OK" :
+            s.check == Session::Check::Unstable ? "physics check: NOT repeatable, see log" :
+            "physics check...";
+        auto text = fmt::format("{:.0f}%   (try {})\n{}", s.bestPercent, s.search.attempts() + 1, physics);
         s.curtainText->setString(text.c_str());
     }
     if (!s.label) return;
@@ -293,6 +301,21 @@ void onDeath(PlayLayer* pl, PlayerObject* player) {
 
     s.bestPercent = std::max(s.bestPercent, pl->getCurrentPercent());
     log::info("try {}: died at tick {} ({:.1f}%)", s.search.attempts() + 1, tick, pl->getCurrentPercent());
+
+    if (s.phase == Phase::Search && s.check == Session::Check::Pending) {
+        // Play exactly the same inputs once more and compare.
+        s.check = Session::Check::Rerun;
+        s.checkTick = tick;
+        updateLabel();
+        queueReset();
+        return;
+    }
+    if (s.phase == Phase::Search && s.check == Session::Check::Rerun) {
+        bool same = tick == s.checkTick;
+        s.check = same ? Session::Check::Ok : Session::Check::Unstable;
+        if (same) log::info("physics check: repeatable (both tries died at tick {})", tick);
+        else log::warn("physics check: NOT repeatable (died at tick {} and then at tick {})", s.checkTick, tick);
+    }
     int bestBefore = s.search.bestTick();
     if (!s.search.onDeath(tick, holdMode)) {
         log::info("search exhausted after {} deaths", s.search.attempts());
@@ -336,6 +359,8 @@ void startSession(PlayLayer* pl) {
     s.key = levelKey(pl->m_level);
     s.practice = settingBool("use-practice");
     s.bestPercent = 0.f;
+    s.check = s.practice ? Session::Check::Ok : Session::Check::Pending;
+    s.checkTick = -1;
     s.activePlan.clear();
     s.lastCheckpointTick = 0;
     s.held = false;
