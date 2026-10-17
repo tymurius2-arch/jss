@@ -75,7 +75,7 @@
   body.on-start .foot { display: none; }
   body.on-start .wrap { max-width: 720px; }
 
-  .hud { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-weight: 700; }
+  .hud { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-weight: 700; min-height: 44px; padding-right: 56px; }
   .hud .score { color: var(--accent); }
   .hud .ai { color: var(--ai); }
   .bar { height: 6px; background: var(--card2); border-radius: 99px; overflow: hidden; margin-bottom: 14px; }
@@ -132,9 +132,53 @@
   .history li span:last-child { white-space: nowrap; }
   .hidden { display: none !important; }
   .foot { color: var(--muted); font-size: 12px; text-align: center; margin: 20px 0 8px; line-height: 1.5; }
+
+  /* Ожидание ответа: тряска нарастает за 5 секунд */
+  .suspense { margin-top: 14px; text-align: center; }
+  .slot {
+    font-size: 44px; font-weight: 900; color: var(--accent); margin: 6px 0 4px;
+    font-variant-numeric: tabular-nums; filter: blur(1.2px); opacity: .85;
+  }
+  .sus-line { color: var(--muted); font-size: 15px; margin: 6px 0 14px; }
+  .sus-line b { color: var(--text); }
+  .sus-line b.ai { color: var(--ai); }
+  .sus-bar { margin: 0; height: 8px; }
+  .sus-bar > div { transition: none; background: linear-gradient(90deg, var(--accent), var(--bad)); }
+  .shake-1 { animation: shake1 .45s infinite; }
+  .shake-2 { animation: shake2 .22s infinite; }
+  .shake-3 { animation: shake3 .09s infinite; }
+  @keyframes shake1 { 0%,100% { transform: translate(0,0) rotate(0); } 25% { transform: translate(-2px,1px) rotate(-.4deg); } 75% { transform: translate(2px,-1px) rotate(.4deg); } }
+  @keyframes shake2 { 0%,100% { transform: translate(0,0) rotate(0); } 25% { transform: translate(-4px,2px) rotate(-.9deg); } 75% { transform: translate(4px,-2px) rotate(.9deg); } }
+  @keyframes shake3 { 0%,100% { transform: translate(0,0) rotate(0) scale(1.01); } 25% { transform: translate(-7px,3px) rotate(-1.6deg) scale(1.01); } 75% { transform: translate(7px,-3px) rotate(1.6deg) scale(1.01); } }
+
+  /* Открытие ответа */
+  .reveal-pop { animation: pop .55s cubic-bezier(.2,1.6,.4,1); }
+  @keyframes pop { 0% { transform: scale(.4); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+  .card.win  { animation: glowWin 1.2s ease-out; }
+  .card.lose { animation: glowLose 1.2s ease-out; }
+  @keyframes glowWin  { 0% { box-shadow: 0 0 0 0 rgba(61,220,132,.9); } 100% { box-shadow: 0 0 0 28px rgba(61,220,132,0), 0 10px 30px rgba(0,0,0,.35); } }
+  @keyframes glowLose { 0% { box-shadow: 0 0 0 0 rgba(255,92,122,.9); } 100% { box-shadow: 0 0 0 28px rgba(255,92,122,0), 0 10px 30px rgba(0,0,0,.35); } }
+  .verdict { font-size: 22px; font-weight: 900; margin: 0 0 10px; }
+  .verdict.win { color: var(--good); } .verdict.lose { color: var(--bad); } .verdict.tie { color: var(--mid); }
+
+  .confetti { position: fixed; top: -12px; width: 9px; height: 14px; border-radius: 2px; pointer-events: none; z-index: 50;
+    animation: fall linear forwards; }
+  @keyframes fall { to { transform: translate(var(--dx), 110vh) rotate(var(--rot)); } }
+
+  .sound-btn {
+    position: fixed; top: 12px; right: 12px; z-index: 40; width: 44px; height: 44px; padding: 0;
+    border-radius: 50%; background: var(--card2); color: var(--text); font-size: 20px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .shake-1, .shake-2, .shake-3 { animation: none; }
+    .reveal-pop, .card.win, .card.lose { animation: none; }
+    .confetti { display: none; }
+  }
 </style>
 </head>
 <body class="on-start">
+<button class="sound-btn" id="soundBtn" aria-label="Звук"></button>
 <div class="wrap">
 
   <!-- Стартовый экран -->
@@ -166,7 +210,7 @@
       <div><span class="score" id="scoreLabel">0</span> : <span class="ai" id="aiLabel">0</span></div>
     </div>
     <div class="bar"><div id="progress"></div></div>
-    <div class="card">
+    <div class="card" id="gameCard">
       <div class="imgbox">
         <span class="loading" id="loading">Загружаем…</span>
         <img id="pimg" alt="Товар">
@@ -186,7 +230,15 @@
         <button class="btn-main" id="guessBtn" type="submit">Ответить</button>
       </form>
 
+      <div class="suspense hidden" id="suspense" aria-live="polite">
+        <div class="label">Настоящая цена…</div>
+        <div class="slot" id="slotPrice">???</div>
+        <div class="sus-line">Ты: <b id="susYou"></b> · ИИ: <b class="ai" id="susAi">думает…</b></div>
+        <div class="bar sus-bar"><div id="susBar"></div></div>
+      </div>
+
       <div class="result hidden" id="result">
+        <div class="verdict" id="verdictLine"></div>
         <div class="label">Настоящая цена</div>
         <div class="price-big" id="realPrice"></div>
         <div class="price-orig" id="origPrice"></div>
@@ -243,6 +295,158 @@
     c.textContent += " · " + fmtCount(n);
   });
   function fmtCount(n) { return n.toLocaleString("ru-RU"); }
+
+  // ---------- звук (синтезируется в браузере, без файлов) ----------
+  const Sound = (function () {
+    let ctx = null;
+    let enabled = true;
+    try { enabled = localStorage.getItem("priceGuessSound") !== "off"; } catch (e) {}
+
+    function ac() {
+      if (!enabled) return null;
+      if (!ctx) {
+        const C = window.AudioContext || window.webkitAudioContext;
+        if (!C) return null;
+        ctx = new C();
+      }
+      if (ctx.state === "suspended") ctx.resume();
+      return ctx;
+    }
+    function bus(c, vol) { const g = c.createGain(); g.gain.value = vol; g.connect(c.destination); return g; }
+
+    // одна нота с мягкой атакой и затуханием
+    function note(c, out, freq, t, dur, type, vol, slideTo) {
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = type || "square";
+      o.frequency.setValueAtTime(freq, t);
+      if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol || 0.2, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(out);
+      o.start(t); o.stop(t + dur + 0.05);
+      return o;
+    }
+    let noiseBuf = null;
+    function noise(c, out, t, dur, vol, filterType, freq) {
+      if (!noiseBuf) {
+        noiseBuf = c.createBuffer(1, c.sampleRate, c.sampleRate);
+        const d = noiseBuf.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      }
+      const src = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
+      src.buffer = noiseBuf; f.type = filterType || "bandpass"; f.frequency.value = freq || 1800;
+      g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      src.connect(f); f.connect(g); g.connect(out);
+      src.start(t); src.stop(t + dur + 0.02);
+    }
+    const N = { C4: 261.6, D4: 293.7, E4: 329.6, F4: 349.2, G4: 392, A4: 440, B4: 493.9, C5: 523.3, D5: 587.3, E5: 659.3, F5: 698.5, G5: 784, A5: 880, C6: 1046.5,
+                G3: 196, Ab3: 207.7, A3: 220, Bb3: 233.1 };
+
+    let current = null; // текущая барабанная дробь, чтобы её можно было оборвать
+
+    return {
+      get enabled() { return enabled; },
+      toggle() {
+        enabled = !enabled;
+        try { localStorage.setItem("priceGuessSound", enabled ? "on" : "off"); } catch (e) {}
+        if (!enabled) this.stop();
+      },
+      unlock() { ac(); },
+      stop() { if (current) { try { current.disconnect(); } catch (e) {} current = null; } },
+
+      // барабанная дробь, которая ускоряется и громчает, плюс нарастающий гул
+      drumroll(sec) {
+        const c = ac(); if (!c) return;
+        this.stop();
+        const out = bus(c, 0.9); current = out;
+        const t0 = c.currentTime + 0.02;
+        let t = t0;
+        while (t < t0 + sec) {
+          const k = (t - t0) / sec;                // 0 → 1
+          noise(c, out, t, 0.07, 0.12 + 0.35 * k, "bandpass", 1500 + 1500 * k);
+          t += 0.13 - 0.1 * k;                     // удары всё чаще
+        }
+        const o = c.createOscillator(), g = c.createGain();
+        o.type = "sawtooth"; o.frequency.setValueAtTime(70, t0); o.frequency.exponentialRampToValueAtTime(180, t0 + sec);
+        g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(0.06, t0 + sec); g.gain.exponentialRampToValueAtTime(0.0001, t0 + sec + 0.1);
+        o.connect(g); g.connect(out); o.start(t0); o.stop(t0 + sec + 0.15);
+      },
+
+      // финальный удар тарелки в момент открытия
+      crash() {
+        const c = ac(); if (!c) return;
+        const out = bus(c, 0.8);
+        noise(c, out, c.currentTime, 1.2, 0.45, "highpass", 5000);
+        noise(c, out, c.currentTime, 0.25, 0.6, "lowpass", 180);
+      },
+
+      // победа в раунде: бодрые фанфары
+      win(perfect) {
+        const c = ac(); if (!c) return;
+        const out = bus(c, 0.7), t = c.currentTime + 0.12;
+        const seq = perfect
+          ? [["C5", 0, .12], ["E5", .12, .12], ["G5", .24, .12], ["C6", .36, .3], ["G5", .7, .12], ["C6", .84, .7]]
+          : [["G4", 0, .11], ["C5", .11, .11], ["E5", .22, .11], ["G5", .33, .5]];
+        for (const [n, at, d] of seq) { note(c, out, N[n], t + at, d + .08, "square", .16); note(c, out, N[n] / 2, t + at, d + .08, "triangle", .2); }
+        const end = t + seq[seq.length - 1][1];
+        for (const n of ["C5", "E5", "G5"]) note(c, out, N[n], end, perfect ? 1.1 : .8, "triangle", .12);
+      },
+
+      // проигрыш в раунде: грустный тромбон «вау-вау-вау-ваааа»
+      lose() {
+        const c = ac(); if (!c) return;
+        const out = bus(c, 0.8), t = c.currentTime + 0.12;
+        const lp = c.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 1200; lp.connect(out);
+        const seq = [["Bb3", 0, .38], ["A3", .42, .38], ["Ab3", .84, .38]];
+        for (const [n, at, d] of seq) note(c, lp, N[n], t + at, d, "sawtooth", .22);
+        const o = note(c, lp, N.G3, t + 1.26, 1.2, "sawtooth", .22, N.G3 * 0.94);
+        const lfo = c.createOscillator(), lg = c.createGain();
+        lfo.frequency.value = 6; lg.gain.value = 5; lfo.connect(lg); lg.connect(o.frequency);
+        lfo.start(t + 1.4); lfo.stop(t + 2.5);
+      },
+
+      // ничья: два ровных звука
+      tie() {
+        const c = ac(); if (!c) return;
+        const out = bus(c, 0.6), t = c.currentTime + 0.12;
+        note(c, out, N.E5, t, .2, "triangle", .2);
+        note(c, out, N.E5, t + .25, .4, "triangle", .2);
+      },
+
+      // итог игры
+      gameWin() {
+        const c = ac(); if (!c) return;
+        const out = bus(c, 0.6), t = c.currentTime + 0.05;
+        const seq = ["C5", "E5", "G5", "C6", "G5", "E5", "G5", "C6"];
+        seq.forEach((n, i) => note(c, out, N[n], t + i * .13, .16, "square", .13));
+        for (const n of ["C5", "E5", "G5", "C6"]) note(c, out, N[n], t + seq.length * .13, 1.2, "triangle", .1);
+      },
+      gameLose() {
+        const c = ac(); if (!c) return;
+        const out = bus(c, 0.6), t = c.currentTime + 0.05;
+        ["G4", "F4", "E4", "D4", "C4"].forEach((n, i) => note(c, out, N[n], t + i * .22, i === 4 ? 1 : .24, "triangle", .2));
+      },
+    };
+  })();
+
+  function paintSoundBtn() { $("soundBtn").textContent = Sound.enabled ? "🔊" : "🔇"; $("soundBtn").title = Sound.enabled ? "Выключить звук" : "Включить звук"; }
+
+  function confetti() {
+    const colors = ["#ffcc33", "#3ddc84", "#7aa8ff", "#ff5c7a", "#ffffff"];
+    for (let i = 0; i < 70; i++) {
+      const el = document.createElement("div");
+      el.className = "confetti";
+      el.style.left = Math.random() * 100 + "vw";
+      el.style.background = colors[i % colors.length];
+      el.style.setProperty("--dx", (Math.random() * 160 - 80) + "px");
+      el.style.setProperty("--rot", (Math.random() * 1080 - 540) + "deg");
+      el.style.animationDuration = (1.6 + Math.random() * 1.6) + "s";
+      el.style.animationDelay = Math.random() * 0.3 + "s";
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 4000);
+    }
+  }
 
   // ---------- хранилище рекорда ----------
   function getBest() { try { return Number(localStorage.getItem("priceGuessBest")) || 0; } catch (e) { return 0; } }
@@ -329,6 +533,7 @@
   }
 
   function nextRound() {
+    stopSuspense();
     if (round >= rounds || !deck.length) return finish();
     round++;
     current = deck.shift();
@@ -344,6 +549,7 @@
     $("hintBtn").classList.remove("hidden");
     $("guessForm").classList.remove("hidden");
     $("result").classList.add("hidden");
+    $("suspense").classList.add("hidden");
     $("guessInput").value = "";
     $("slider").value = 500;
     $("guessBtn").disabled = true;
@@ -373,8 +579,12 @@
     return n > 0 ? n : 0;
   }
 
+  const SUSPENSE_MS = 5000;
+  let suspenseRaf = 0, suspenseTimer = 0;
+
   function submitGuess(e) {
     e.preventDefault();
+    if (suspenseTimer) return;          // ответ уже отправлен, ждём
     const guess = readGuess();
     if (!guess) return;
     const price = current.price;
@@ -382,14 +592,58 @@
     let youPts = points(guess, price);
     if (hinted) youPts = Math.round(youPts * 0.7);
     const aiPts = points(ai, price);
+    const r = { guess, ai, price, youPts, aiPts };
+
+    // 5 секунд ожидания: тряска, мелькающие цены, барабанная дробь
+    $("hintBtn").classList.add("hidden");
+    $("guessForm").classList.add("hidden");
+    $("suspense").classList.remove("hidden");
+    $("susYou").textContent = fmt(guess) + " ₴";
+    $("susAi").textContent = "думает…";
+    Sound.drumroll(SUSPENSE_MS / 1000);
+
+    const card = $("gameCard");
+    const t0 = performance.now();
+    let lastFlip = 0, aiShown = false;
+    const lo = Math.log(Math.max(MIN, price / 4)), hi = Math.log(Math.min(MAX * 2, price * 4));
+    function frame(now) {
+      const k = Math.min(1, (now - t0) / SUSPENSE_MS);
+      $("susBar").style.width = (k * 100) + "%";
+      const level = k < 0.4 ? 1 : k < 0.8 ? 2 : 3;
+      card.classList.toggle("shake-1", level === 1);
+      card.classList.toggle("shake-2", level === 2);
+      card.classList.toggle("shake-3", level === 3);
+      // цены мелькают всё быстрее
+      if (now - lastFlip > 140 - 100 * k) {
+        lastFlip = now;
+        $("slotPrice").textContent = fmt(Math.exp(lo + Math.random() * (hi - lo))) + " ₴";
+      }
+      if (!aiShown && k > 0.5) { aiShown = true; $("susAi").textContent = fmt(ai) + " ₴"; }
+      if (k < 1) suspenseRaf = requestAnimationFrame(frame);
+    }
+    suspenseRaf = requestAnimationFrame(frame);
+    suspenseTimer = setTimeout(() => reveal(r), SUSPENSE_MS);
+  }
+
+  function stopSuspense() {
+    cancelAnimationFrame(suspenseRaf);
+    clearTimeout(suspenseTimer);
+    suspenseRaf = 0; suspenseTimer = 0;
+    $("gameCard").classList.remove("shake-1", "shake-2", "shake-3", "win", "lose");
+    Sound.stop();
+  }
+
+  function reveal(r) {
+    stopSuspense();
+    const { guess, ai, price, youPts, aiPts } = r;
     score += youPts; aiScore += aiPts;
     history.push({ title: current.title, price, guess, youPts, aiPts });
 
+    $("suspense").classList.add("hidden");
     $("ptitle").textContent = current.title;
-    $("hintBtn").classList.add("hidden");
-    $("guessForm").classList.add("hidden");
     $("result").classList.remove("hidden");
     $("realPrice").textContent = fmt(price) + " ₴";
+    $("realPrice").classList.remove("reveal-pop"); void $("realPrice").offsetWidth; $("realPrice").classList.add("reveal-pop");
     $("origPrice").textContent = current.usd != null ? "На AliExpress: $" + current.usd.toFixed(2) : "";
     $("youVal").textContent = fmt(guess) + " ₴";
     $("aiVal").textContent = fmt(ai) + " ₴";
@@ -401,6 +655,25 @@
     $("aiLabel").textContent = fmt(aiScore);
     $("progress").style.width = (round / rounds * 100) + "%";
     $("nextBtn").textContent = round >= rounds ? "Итоги" : "Дальше";
+
+    // кто выиграл раунд — та и музыка
+    const card = $("gameCard"), v = $("verdictLine");
+    void card.offsetWidth;
+    Sound.crash();
+    if (youPts > aiPts) {
+      const perfect = youPts === MAX_PTS;
+      v.textContent = perfect ? "🎯 В точку! Раунд твой!" : "🏆 Раунд твой!";
+      v.className = "verdict win"; card.classList.add("win");
+      Sound.win(perfect); confetti();
+    } else if (youPts < aiPts) {
+      v.textContent = "😢 ИИ оказался ближе";
+      v.className = "verdict lose"; card.classList.add("lose");
+      Sound.lose();
+    } else {
+      v.textContent = "🤝 Ничья";
+      v.className = "verdict tie";
+      Sound.tie();
+    }
     $("nextBtn").focus();
   }
 
@@ -420,6 +693,7 @@
     const best = getBest();
     if (score > best) { setBest(score); v += " Новый рекорд!"; }
     $("verdict").textContent = v;
+    if (score > aiScore) { Sound.gameWin(); confetti(); } else if (score < aiScore) Sound.gameLose(); else Sound.tie();
     $("history").innerHTML = history.map((h) =>
       "<li><span>" + escapeHtml(h.title) + "</span><span>" + fmt(h.price) + " ₴ · <b>+" + fmt(h.youPts) + "</b></span></li>"
     ).join("");
@@ -439,9 +713,11 @@
   chipGroup("shopChips", (b) => { shop = b.dataset.shop; });
   chipGroup("roundChips", (b) => { rounds = Number(b.dataset.n); });
 
-  $("startBtn").onclick = startGame;
+  $("startBtn").onclick = () => { Sound.unlock(); startGame(); };
+  $("soundBtn").onclick = () => { Sound.toggle(); Sound.unlock(); paintSoundBtn(); };
+  paintSoundBtn();
   $("againBtn").onclick = startGame;
-  $("menuBtn").onclick = () => { showBest(); show("start"); };
+  $("menuBtn").onclick = () => { stopSuspense(); showBest(); show("start"); };
   $("nextBtn").onclick = nextRound;
   $("guessForm").addEventListener("submit", submitGuess);
   $("hintBtn").onclick = () => { hinted = true; $("ptitle").textContent = current.title; $("hintBtn").classList.add("hidden"); };
