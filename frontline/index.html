@@ -1,0 +1,1330 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Линия фронта</title>
+<meta name="description" content="Стратегия на реальной карте фронта DeepState: двигай линию фронта между Украиной и Россией — наступай, укрепляйся, окружай.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&family=Russo+One&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0d1117;
+    --panel: rgba(16, 21, 29, 0.94);
+    --panel-2: #1a222e;
+    --line: #2a3546;
+    --ink: #e8edf4;
+    --muted: #93a1b5;
+    --ua: #3b82f6;
+    --ua-2: #facc15;
+    --ru: #e0352b;
+    --grey: #8b8178;
+    --ok: #34d399;
+    --warn: #fbbf24;
+    --head: "Russo One", "Rubik", system-ui, sans-serif;
+    --body: "Rubik", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; margin: 0; overflow: hidden; }
+  body { background: var(--bg); color: var(--ink); font: 14px/1.4 var(--body); -webkit-tap-highlight-color: transparent; }
+  canvas#map { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+  canvas#map.paint { cursor: crosshair; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  a { color: #93c5fd; }
+
+  #top { position: fixed; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 10px;
+    padding: calc(8px + env(safe-area-inset-top)) 12px 8px; background: linear-gradient(var(--panel), rgba(16,21,29,.75));
+    border-bottom: 1px solid var(--line); z-index: 5; }
+  .brand { font-family: var(--head); letter-spacing: .06em; font-size: 16px; white-space: nowrap; }
+  .brand i { font-style: normal; color: var(--ru); }
+  #clock { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #clock b { color: var(--ink); font-weight: 500; }
+  .chip { display: inline-block; padding: 1px 8px; border-radius: 99px; background: var(--panel-2); border: 1px solid var(--line); font-size: 12px; margin-left: 6px; }
+  .spacer { flex: 1; }
+  .tbtn { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; }
+  .tbtn:hover { border-color: #46566d; }
+
+  #layers { position: fixed; top: 52px; right: 12px; z-index: 6; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
+  #layers label { display: flex; gap: 8px; align-items: center; padding: 3px 0; cursor: pointer; }
+
+  #side { position: fixed; top: 58px; right: 12px; bottom: 34px; width: 350px; z-index: 4; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 14px; display: flex; flex-direction: column; overflow: hidden; }
+  #grab { display: none; }
+  #sideBody { overflow-y: auto; padding: 14px; flex: 1; }
+  #sideBody h2 { font-family: var(--head); font-size: 15px; margin: 0 0 10px; letter-spacing: .03em; font-weight: 400; }
+  #sideBody h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 16px 0 8px; font-weight: 500; }
+  .flag { display: inline-block; width: 18px; height: 12px; border-radius: 2px; vertical-align: -1px; margin-right: 6px; }
+  .flag.ua { background: linear-gradient(#0057b7 50%, #ffd700 50%); }
+  .flag.ru { background: linear-gradient(#fff 33%, #0039a6 33% 66%, #d52b1e 66%); }
+  .res { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .res div { background: var(--panel-2); border-radius: 8px; padding: 6px 9px; }
+  .res small { display: block; color: var(--muted); font-size: 11px; }
+  .res b { font-weight: 500; font-size: 15px; }
+  .stat { background: var(--panel-2); border-radius: 8px; padding: 8px 10px; margin-top: 6px; }
+  .stat .big { font-size: 18px; font-weight: 500; }
+  .up { color: var(--ok); } .down { color: #f87171; }
+  .obj { display: flex; flex-wrap: wrap; gap: 6px; }
+  .obj span { padding: 2px 8px; border-radius: 99px; background: var(--panel-2); border: 1px solid var(--line); font-size: 12px; }
+  .obj span.done { border-color: var(--ok); color: var(--ok); }
+  .obj span.lost { border-color: #f87171; color: #f87171; text-decoration: line-through; }
+  .op { border: 1px solid #3d4c63; border-radius: 10px; padding: 10px; background: #141b25; }
+  .tabs { display: flex; gap: 6px; margin: 8px 0; }
+  .tabs button { flex: 1; padding: 6px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel-2); }
+  .tabs button.on { background: #24324a; border-color: #4b6a9b; }
+  .sl { display: grid; grid-template-columns: 92px 1fr 64px; align-items: center; gap: 8px; margin: 6px 0; font-size: 13px; }
+  .sl output { text-align: right; font-variant-numeric: tabular-nums; }
+  input[type=range] { width: 100%; accent-color: #60a5fa; }
+  .est { margin: 8px 0; padding: 8px; border-radius: 8px; background: var(--panel-2); font-size: 13px; }
+  .row { display: flex; gap: 8px; }
+  .btn { flex: 1; padding: 9px 12px; border-radius: 9px; border: 1px solid var(--line); background: var(--panel-2); font-weight: 500; }
+  .btn.primary { background: #1d4ed8; border-color: #3b82f6; }
+  .btn.red { background: #9f1d17; border-color: var(--ru); }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .orders { list-style: none; padding: 0; margin: 0; }
+  .orders li { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: var(--panel-2); border-radius: 8px; margin-bottom: 5px; font-size: 13px; }
+  .orders li span { flex: 1; }
+  .orders li button { background: none; border: 0; color: var(--muted); font-size: 16px; padding: 0 4px; }
+  .log { font-size: 12.5px; color: #c3cddb; }
+  .log p { margin: 0 0 5px; padding-left: 8px; border-left: 3px solid var(--line); }
+  .log p.s1 { border-color: var(--ua); } .log p.s2 { border-color: var(--ru); } .log p.ev { border-color: var(--warn); }
+  .muted { color: var(--muted); }
+  .hint { font-size: 12.5px; color: var(--muted); margin: 6px 0; }
+  .tools { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .tools button { padding: 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel-2); }
+  .tools button.on { outline: 2px solid #93c5fd; }
+  .sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+
+  #credit { position: fixed; left: 8px; bottom: calc(6px + env(safe-area-inset-bottom)); z-index: 3; font-size: 11px; color: #3b4452;
+    background: rgba(255,255,255,.75); padding: 2px 7px; border-radius: 5px; }
+  #credit a { color: #1e40af; }
+  #legend { position: fixed; left: 8px; bottom: 30px; z-index: 3; font-size: 11.5px; color: #1f2937; background: rgba(255,255,255,.82);
+    padding: 6px 9px; border-radius: 8px; line-height: 1.6; }
+
+  #modal { position: fixed; inset: 0; z-index: 20; background: rgba(5,8,12,.62); display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; width: min(560px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; padding: 22px; }
+  .card h1 { font-family: var(--head); font-weight: 400; font-size: 28px; margin: 0; letter-spacing: .04em; }
+  .card h1 i { font-style: normal; color: var(--ru); }
+  .card .sub { color: var(--muted); margin: 4px 0 16px; }
+  .src { background: var(--panel-2); border-radius: 10px; padding: 10px 12px; font-size: 13px; margin-bottom: 14px; }
+  .src .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: var(--warn); }
+  .src .dot.ok { background: var(--ok); }
+  .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .modes button { text-align: left; padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel-2); }
+  .modes button:hover { border-color: #4b6a9b; }
+  .modes button b { display: block; font-size: 15px; margin-bottom: 2px; }
+  .modes button small { color: var(--muted); }
+  .card details { margin-top: 14px; font-size: 13px; color: #c3cddb; }
+  .card summary { cursor: pointer; color: var(--ink); }
+  .card select { background: var(--panel-2); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; font: inherit; }
+  .rep p { margin: 0 0 6px; }
+
+  #toast { position: fixed; left: 50%; top: 64px; transform: translateX(-50%); z-index: 30; background: #111827; border: 1px solid var(--line);
+    padding: 8px 14px; border-radius: 10px; font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 90vw; }
+  #toast.on { opacity: 1; }
+  #tip { position: fixed; z-index: 8; pointer-events: none; background: rgba(17,24,39,.92); border: 1px solid var(--line); border-radius: 8px;
+    padding: 5px 8px; font-size: 12px; display: none; white-space: nowrap; }
+
+  @media (max-width: 760px) {
+    .brand { font-size: 13px; }
+    #clock { font-size: 11.5px; }
+    .tbtn { padding: 5px 9px; font-size: 13px; }
+    #side { left: 0; right: 0; bottom: 0; top: auto; width: auto; height: 46vh; border-radius: 16px 16px 0 0; padding-bottom: env(safe-area-inset-bottom); transition: height .2s; }
+    #side.min { height: 92px; }
+    #grab { display: block; height: 22px; border: 0; background: none; width: 100%; flex: none; }
+    #grab::before { content: ""; display: block; margin: 0 auto; width: 44px; height: 4px; border-radius: 4px; background: #4b5563; }
+    #sideBody { padding-top: 0; }
+    #credit { bottom: auto; top: calc(48px + env(safe-area-inset-top)); left: 6px; font-size: 10px; }
+    #legend { display: none; }
+    .modes { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<canvas id="map"></canvas>
+
+<div id="top">
+  <div class="brand">ЛИНИЯ <i>ФРОНТА</i></div>
+  <div id="clock"></div>
+  <div class="spacer"></div>
+  <button class="tbtn" id="bLayers">Слои</button>
+  <button class="tbtn" id="bMenu">Меню</button>
+</div>
+
+<div id="layers" hidden>
+  <label><input type="checkbox" data-l="forts" checked> Укрепления</label>
+  <label><input type="checkbox" data-l="cities" checked> Города</label>
+  <label><input type="checkbox" data-l="rivers" checked> Реки</label>
+  <label><input type="checkbox" data-l="admin" checked> Границы областей</label>
+  <label><input type="checkbox" data-l="changes" checked> Изменения за игру</label>
+</div>
+
+<aside id="side"><button id="grab" aria-label="Свернуть панель"></button><div id="sideBody"></div></aside>
+
+<div id="legend">
+  <span class="sw" style="background:rgba(214,48,39,.55)"></span>Под контролем РФ<br>
+  <span class="sw" style="background:rgba(120,110,100,.6)"></span>Серая зона<br>
+  <span class="sw" style="background:rgba(37,99,235,.45)"></span>Отбито ВСУ за игру<br>
+  <span class="sw" style="background:rgba(160,20,20,.75)"></span>Занято РФ за игру
+</div>
+<div id="credit">Линия фронта: <a href="https://deepstatemap.live" target="_blank" rel="noopener">DeepStateMAP.live</a> <span id="credDate"></span> · Карта: Natural Earth</div>
+
+<div id="modal" hidden><div class="card" id="modalCard"></div></div>
+<div id="toast"></div>
+<div id="tip"></div>
+
+<script src="geo.js"></script>
+<script>
+'use strict';
+const GEO = window.GEO;
+
+/* ================= Сетка =================
+   Поле — сетка ~2,2 × 2,2 км в проекции Меркатора. Каждая клетка: страна, владелец,
+   город, река, укрепления. Все расчёты (бои, окружения, линия фронта) идут по клеткам. */
+const BB = { w: 29.4, e: 41.2, s: 44.2, n: 52.6 };
+const CD = 0.03, RAD = Math.PI / 180;
+const CM = CD * RAD, X0 = BB.w * RAD, Y0 = Math.log(Math.tan(Math.PI / 4 + BB.n * RAD / 2));
+const COLS = Math.round((BB.e - BB.w) / CD);
+const ROWS = Math.ceil((Y0 - Math.log(Math.tan(Math.PI / 4 + BB.s * RAD / 2))) / CM);
+const N = COLS * ROWS;
+const U = lon => (lon * RAD - X0) / CM;
+const V = lat => (Y0 - Math.log(Math.tan(Math.PI / 4 + lat * RAD / 2))) / CM;
+const LON = u => (X0 + u * CM) / RAD;
+const LAT = v => (2 * Math.atan(Math.exp(Y0 - v * CM)) - Math.PI / 2) / RAD;
+const rowKm2 = new Float32Array(ROWS);
+for (let j = 0; j < ROWS; j++) { const c = Math.cos(LAT(j + .5) * RAD) * CD * 111.32; rowKm2[j] = c * c; }
+
+const UA = 1, RU = 2, GREY = 3;
+const UKR_AREA = 603628;
+const country = new Uint8Array(N);   // 0 вода/вне поля, 1 Украина, 2 Россия, 3 нейтральные
+const owner = new Uint8Array(N);     // 0 нет, 1 ВСУ, 2 ВС РФ, 3 серая зона
+const owner0 = new Uint8Array(N);    // владелец на начало игры
+const urban = new Uint8Array(N), river = new Uint8Array(N), fort = new Uint8Array(N);
+const changed = new Uint16Array(N), cut = new Uint8Array(N), distF = new Uint16Array(N);
+const isFront = new Uint8Array(N);
+const land = k => country[k] === 1 || country[k] === 2;
+const cellAt = (u, v) => { const i = Math.floor(u), j = Math.floor(v); return (i < 0 || j < 0 || i >= COLS || j >= ROWS) ? -1 : j * COLS + i; };
+const R = 9; // радиус операции в клетках (~20 км)
+const DISK = [];
+for (let dj = -R; dj <= R; dj++) for (let di = -R; di <= R; di++) if (di * di + dj * dj <= R * R) DISK.push([di, dj]);
+
+const SIDE = {
+  1: { short: 'ВСУ', name: 'Украина', gen: 'Украину', flag: 'ua', color: '#2563eb' },
+  2: { short: 'ВС РФ', name: 'Россия', gen: 'Россию', flag: 'ru', color: '#d62f27' },
+};
+const fmt = n => Math.round(n).toLocaleString('ru-RU');
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const rnd = (a, b) => a + Math.random() * (b - a);
+
+/* ================= Города ================= */
+const CITIES = [
+  ['Киев', 50.45, 30.52, 3], ['Харьков', 49.99, 36.23, 3], ['Днепр', 48.46, 35.05, 3], ['Запорожье', 47.84, 35.14, 3],
+  ['Одесса', 46.48, 30.73, 3], ['Донецк', 48.0, 37.8, 3], ['Луганск', 48.57, 39.31, 2], ['Мариуполь', 47.1, 37.55, 2],
+  ['Николаев', 46.97, 31.99, 2], ['Херсон', 46.64, 32.62, 2], ['Кривой Рог', 47.91, 33.39, 2], ['Полтава', 49.59, 34.55, 2],
+  ['Сумы', 50.91, 34.8, 2], ['Чернигов', 51.49, 31.29, 2], ['Черкассы', 49.44, 32.06, 2], ['Кропивницкий', 48.51, 32.26, 2],
+  ['Кременчуг', 49.07, 33.42, 2], ['Симферополь', 44.95, 34.1, 2], ['Севастополь', 44.62, 33.53, 2], ['Керчь', 45.36, 36.47, 1],
+  ['Феодосия', 45.03, 35.38, 1], ['Евпатория', 45.19, 33.37, 1], ['Джанкой', 45.71, 34.39, 1], ['Армянск', 46.11, 33.69, 1],
+  ['Мелитополь', 46.85, 35.37, 2], ['Бердянск', 46.76, 36.79, 1], ['Токмак', 47.25, 35.71, 1], ['Энергодар', 47.5, 34.66, 1],
+  ['Васильевка', 47.44, 35.28, 1], ['Орехов', 47.57, 35.78, 1], ['Гуляйполе', 47.66, 36.26, 1], ['Пологи', 47.48, 36.25, 1],
+  ['Новая Каховка', 46.75, 33.37, 1], ['Алешки', 46.62, 32.72, 1], ['Скадовск', 46.11, 32.91, 1], ['Геническ', 46.17, 34.81, 1],
+  ['Никополь', 47.57, 34.4, 1], ['Павлоград', 48.53, 35.87, 1], ['Синельниково', 48.32, 35.52, 1],
+  ['Краматорск', 48.72, 37.56, 2], ['Славянск', 48.85, 37.61, 2], ['Константиновка', 48.53, 37.71, 1], ['Дружковка', 48.63, 37.53, 1],
+  ['Покровск', 48.28, 37.18, 1], ['Мирноград', 48.3, 37.26, 1], ['Доброполье', 48.47, 37.08, 1], ['Селидово', 48.15, 37.3, 1],
+  ['Курахово', 47.98, 37.28, 1], ['Угледар', 47.78, 37.25, 1], ['Великая Новоселка', 47.84, 36.83, 1], ['Авдеевка', 48.14, 37.75, 1],
+  ['Горловка', 48.33, 38.05, 2], ['Макеевка', 48.05, 37.97, 2], ['Енакиево', 48.23, 38.21, 1], ['Бахмут', 48.59, 38.0, 1],
+  ['Часов Яр', 48.59, 37.84, 1], ['Торецк', 48.4, 37.85, 1], ['Северск', 48.87, 38.1, 1], ['Лиман', 48.99, 37.8, 1],
+  ['Северодонецк', 48.95, 38.49, 1], ['Лисичанск', 48.9, 38.43, 1], ['Кременная', 49.05, 38.22, 1], ['Сватово', 49.41, 38.15, 1],
+  ['Старобельск', 49.27, 38.91, 1], ['Алчевск', 48.47, 38.8, 1], ['Дебальцево', 48.34, 38.4, 1], ['Волноваха', 47.6, 37.5, 1],
+  ['Купянск', 49.71, 37.62, 1], ['Изюм', 49.21, 37.26, 1], ['Балаклея', 49.46, 36.86, 1], ['Чугуев', 49.84, 36.69, 1],
+  ['Волчанск', 50.29, 36.94, 1], ['Лозовая', 48.89, 36.32, 1], ['Барвенково', 48.91, 37.02, 1], ['Ахтырка', 50.31, 34.9, 1],
+  ['Шостка', 51.86, 33.48, 1], ['Конотоп', 51.24, 33.2, 1], ['Белая Церковь', 49.8, 30.11, 1], ['Умань', 48.75, 30.22, 1],
+  ['Первомайск', 48.05, 30.85, 1], ['Вознесенск', 47.57, 31.33, 1], ['Белгород-Днестровский', 46.19, 30.35, 1], ['Очаков', 46.61, 31.55, 1],
+  ['Белгород', 50.6, 36.59, 2], ['Курск', 51.73, 36.19, 2], ['Суджа', 51.19, 35.27, 1], ['Воронеж', 51.67, 39.18, 2],
+  ['Ростов-на-Дону', 47.23, 39.72, 2], ['Таганрог', 47.21, 38.94, 1], ['Валуйки', 50.21, 38.1, 1], ['Старый Оскол', 51.3, 37.84, 1],
+  ['Шебекино', 50.41, 36.89, 1], ['Рыльск', 51.57, 34.68, 1], ['Миллерово', 48.92, 40.4, 1], ['Краснодар', 45.04, 38.98, 2],
+  ['Новороссийск', 44.72, 37.77, 1], ['Гомель', 52.43, 30.98, 1],
+].map(([name, lat, lon, size]) => ({ name, lat, lon, size, u: U(lon), v: V(lat), k: cellAt(U(lon), V(lat)) }));
+
+/* ================= Растеризация ================= */
+function rasterPolys(polys, cb) {
+  for (const poly of polys) {
+    const rowsX = new Map();
+    for (const ring of poly) {
+      const n = ring.length;
+      for (let a = 0; a < n; a++) {
+        const p = ring[a], q = ring[(a + 1) % n];
+        const u0 = U(p[0]), v0 = V(p[1]), u1 = U(q[0]), v1 = V(q[1]);
+        if (v0 === v1) continue;
+        const j0 = Math.max(0, Math.ceil(Math.min(v0, v1) - .5)), j1 = Math.min(ROWS - 1, Math.ceil(Math.max(v0, v1) - .5) - 1);
+        for (let j = j0; j <= j1; j++) {
+          const uc = u0 + (j + .5 - v0) / (v1 - v0) * (u1 - u0);
+          let arr = rowsX.get(j); if (!arr) rowsX.set(j, arr = []); arr.push(uc);
+        }
+      }
+    }
+    for (const [j, arr] of rowsX) {
+      arr.sort((a, b) => a - b);
+      for (let t = 0; t + 1 < arr.length; t += 2) {
+        const i0 = Math.max(0, Math.ceil(arr[t] - .5)), i1 = Math.min(COLS - 1, Math.ceil(arr[t + 1] - .5) - 1);
+        for (let i = i0; i <= i1; i++) cb(j * COLS + i);
+      }
+    }
+  }
+}
+function rasterLine(line, w, cb) {
+  for (let a = 0; a + 1 < line.length; a++) {
+    const u0 = U(line[a][0]), v0 = V(line[a][1]), u1 = U(line[a + 1][0]), v1 = V(line[a + 1][1]);
+    const steps = Math.ceil(Math.hypot(u1 - u0, v1 - v0) / .3) + 1;
+    for (let s = 0; s <= steps; s++) {
+      const u = u0 + (u1 - u0) * s / steps, v = v0 + (v1 - v0) * s / steps;
+      for (let dj = -w; dj <= w; dj++) for (let di = -w; di <= w; di++) { const k = cellAt(u + di, v + dj); if (k >= 0) cb(k); }
+    }
+  }
+}
+
+const BIG_RIVER = /^(Dnipro|Dnieper|Днепр)$/;
+const MID_RIVER = /^(Donets|Северский Донец|Оскол|Desna|Десна|Southern Bug|Seym|Don|Dniester|Psel|Vorskla|Ворскла|Псёл)$/;
+function buildBase() {
+  for (const [a, code] of [['MDA', 3], ['ROU', 3], ['BLR', 3], ['GEO', 3], ['TUR', 3], ['RUS', 2], ['UKR', 1]])
+    if (GEO.countries[a]) rasterPolys(GEO.countries[a], k => { country[k] = code; });
+  for (const l of GEO.lakes) {
+    if (/Kakhovka/.test(l.n)) rasterPolys(l.p, k => { if (land(k)) river[k] = Math.max(river[k], 1); }); // осушенное водохранилище — пойма
+    else rasterPolys(l.p, k => { country[k] = 0; });
+  }
+  for (const r of GEO.rivers) {
+    const lvl = BIG_RIVER.test(r.n) ? 2 : MID_RIVER.test(r.n) ? 1 : 0;
+    if (!lvl) continue;
+    for (const ln of r.l) rasterLine(ln, lvl === 2 ? 1 : 0, k => { if (land(k)) river[k] = Math.max(river[k], lvl); });
+  }
+  CITIES.forEach(c => {
+    if (c.k >= 0 && !land(c.k)) { // точка города попала в реку/море — сдвигаем на ближайшую сушу
+      let best = -1, bd = 1e9;
+      for (let dj = -4; dj <= 4; dj++) for (let di = -4; di <= 4; di++) { const k = cellAt(c.u + di, c.v + dj); if (k >= 0 && land(k) && di * di + dj * dj < bd) { bd = di * di + dj * dj; best = k; } }
+      c.k = best;
+    }
+    const rr = [0, 1.3, 2.3, 3.6][c.size];
+    for (let dj = -4; dj <= 4; dj++) for (let di = -4; di <= 4; di++) {
+      if (di * di + dj * dj > rr * rr) continue;
+      const k = cellAt(c.u + di, c.v + dj); if (k >= 0 && land(k)) urban[k] = Math.max(urban[k], c.size);
+    }
+  });
+}
+
+/* ================= Линия фронта DeepState ================= */
+const OCC = /status\.occupied|territories\.(crimea|ordlo|tuzla)/, UNK = /status\.unknown/;
+function parseDeepState(js) {
+  const fc = js && js.map && js.map.features ? js.map : js;
+  if (!fc || !Array.isArray(fc.features)) throw new Error('Не похоже на карту DeepState');
+  const out = { occ: [], unk: [], id: js.id };
+  for (const f of fc.features) {
+    const g = f.geometry; if (!g) continue;
+    const name = (f.properties && f.properties.name) || '';
+    const kind = OCC.test(name) ? 'occ' : UNK.test(name) ? 'unk' : null;
+    if (!kind) continue;
+    if (g.type === 'Polygon') out[kind].push(g.coordinates);
+    else if (g.type === 'MultiPolygon') out[kind].push(...g.coordinates);
+  }
+  if (!out.occ.length) throw new Error('В файле нет оккупированных территорий');
+  const t = Number(js.id);
+  out.date = t > 1.5e9 && t < 4e9 ? new Date(t * 1000) : new Date();
+  return out;
+}
+function applyFront(fd) {
+  for (let k = 0; k < N; k++) owner[k] = country[k] === 1 ? UA : country[k] === 2 ? RU : 0;
+  rasterPolys(fd.occ, k => { if (land(k)) owner[k] = RU; });
+  rasterPolys(fd.unk, k => { if (land(k)) owner[k] = GREY; });
+  normalizeMap();
+}
+function initForts() {
+  fort.fill(0);
+  computeFront(); computeDist();
+  for (let k = 0; k < N; k++) {
+    if (!land(k) || owner[k] === GREY) continue;
+    const d = distF[k], j = (k / COLS) | 0, lat = LAT(j + .5), lon = LON(k % COLS + .5);
+    if (d <= 2) fort[k] = 1;                                                         // окопы вдоль всего фронта
+    if (owner[k] === RU && lat < 47.75 && lon > 33.6 && lon < 37.6 && d >= 3 && d <= 12) fort[k] = 2; // «линия Суровикина»
+  }
+  // «пояс крепостей» Славянск — Краматорск — Дружковка — Константиновка
+  for (const name of ['Славянск', 'Краматорск', 'Дружковка', 'Константиновка']) {
+    const c = CITIES.find(c => c.name === name);
+    for (const [di, dj] of DISK) {
+      if (di * di + dj * dj > 30) continue;
+      const k = cellAt(c.u + di, c.v + dj); if (k >= 0 && owner[k] === UA) fort[k] = Math.max(fort[k], 2);
+    }
+  }
+}
+
+/* ================= Расчёт состояния ================= */
+const frontList = { 1: [], 2: [] };
+function computeFront() {
+  frontList[1] = []; frontList[2] = [];
+  isFront.fill(0);
+  for (let k = 0; k < N; k++) {
+    const o = owner[k]; if (o !== UA && o !== RU) continue;
+    const i = k % COLS;
+    const t = (n) => { const m = owner[n]; return m !== 0 && m !== o; };
+    if ((i > 0 && t(k - 1)) || (i < COLS - 1 && t(k + 1)) || (k >= COLS && t(k - COLS)) || (k < N - COLS && t(k + COLS))) { isFront[k] = 1; frontList[o].push(k); }
+  }
+}
+const Q = new Int32Array(N);
+function computeDist() {
+  distF.fill(65535);
+  let h = 0, t = 0;
+  for (let k = 0; k < N; k++) if (isFront[k]) { distF[k] = 0; Q[t++] = k; }
+  while (h < t) {
+    const k = Q[h++], d = distF[k] + 1, i = k % COLS;
+    const go = n => { if (land(n) && distF[n] > d) { distF[n] = d; Q[t++] = n; } };
+    if (i > 0) go(k - 1); if (i < COLS - 1) go(k + 1); if (k >= COLS) go(k - COLS); if (k < N - COLS) go(k + COLS);
+  }
+}
+
+// поле «не под контролем ВСУ» (1) / «под контролем ВСУ» (0) → изолиния 0.5 = линия фронта
+const field = new Int8Array(N);
+let frontPath = new Path2D(), fortPath = { 1: new Path2D(), 2: new Path2D() };
+function buildContour() {
+  let h = 0, t = 0;
+  for (let k = 0; k < N; k++) {
+    const o = land(k) ? owner[k] : 0;
+    field[k] = o === UA ? 0 : (o === RU || o === GREY) ? 1 : -1;
+    if (field[k] >= 0) Q[t++] = k;
+  }
+  while (h < t) { // вода и нейтральные клетки берут значение ближайшей суши — чтобы линия не шла по побережью
+    const k = Q[h++], f = field[k], i = k % COLS;
+    const go = n => { if (field[n] < 0) { field[n] = f; Q[t++] = n; } };
+    if (i > 0) go(k - 1); if (i < COLS - 1) go(k + 1); if (k >= COLS) go(k - COLS); if (k < N - COLS) go(k + COLS);
+  }
+  const p = new Path2D();
+  const seg = (x1, y1, x2, y2) => { p.moveTo(x1, y1); p.lineTo(x2, y2); };
+  for (let j = 0; j < ROWS - 1; j++) for (let i = 0; i < COLS - 1; i++) {
+    const k = j * COLS + i;
+    const c = field[k] * 8 + field[k + 1] * 4 + field[k + COLS + 1] * 2 + field[k + COLS];
+    if (c === 0 || c === 15) continue;
+    let l0 = false, l1 = false; // рисуем только там, где на суше встречаются обе стороны (иначе линии уходят в море)
+    for (const n of [k, k + 1, k + COLS, k + COLS + 1]) if (land(n)) { if (owner[n] === UA) l0 = true; else l1 = true; }
+    if (!l0 || !l1) continue;
+    const T = [i + 1, j + .5], Rr = [i + 1.5, j + 1], B = [i + 1, j + 1.5], L = [i + .5, j + 1];
+    switch (c) {
+      case 1: case 14: seg(...L, ...B); break;
+      case 2: case 13: seg(...B, ...Rr); break;
+      case 3: case 12: seg(...L, ...Rr); break;
+      case 4: case 11: seg(...T, ...Rr); break;
+      case 6: case 9: seg(...T, ...B); break;
+      case 7: case 8: seg(...L, ...T); break;
+      case 5: seg(...L, ...T); seg(...B, ...Rr); break;
+      case 10: seg(...L, ...B); seg(...T, ...Rr); break;
+    }
+  }
+  frontPath = p;
+  const fp = { 1: new Path2D(), 2: new Path2D() };
+  for (let k = 0; k < N; k++) {
+    const f = fort[k], o = owner[k]; if (!f || (o !== UA && o !== RU)) continue;
+    const u = k % COLS + .5, v = ((k / COLS) | 0) + .5, w = .16 + .12 * f;
+    fp[o].moveTo(u - w, v); fp[o].lineTo(u + w, v);
+    if (f >= 2) { fp[o].moveTo(u, v - w); fp[o].lineTo(u, v + w); }
+  }
+  fortPath = fp;
+}
+
+const off = document.createElement('canvas'); off.width = COLS; off.height = ROWS;
+const offCtx = off.getContext('2d');
+const img = offCtx.createImageData(COLS, ROWS);
+function buildImage() {
+  const d = img.data, cur = S ? S.turn : 0, showCh = layers.changes;
+  for (let k = 0; k < N; k++) {
+    const c = country[k], o = owner[k], o0 = owner0[k], p = k * 4;
+    let r = 0, g = 0, b = 0, a = 0;
+    const recent = cur > 0 && changed[k] === cur;
+    if (c === 1 || c === 2) {
+      if (o === GREY) { r = 120; g = 110; b = 100; a = recent ? 170 : 125; }
+      else if (o === RU && c === 1) {
+        if (recent) { r = 200; g = 0; b = 0; a = 185; }
+        else if (showCh && o0 !== RU) { r = 165; g = 22; b = 22; a = 160; }
+        else { r = 214; g = 48; b = 39; a = 100; }
+      } else if (o === RU && c === 2) {
+        if (recent) { r = 200; g = 0; b = 0; a = 150; } else if (showCh && o0 !== RU) { r = 214; g = 48; b = 39; a = 70; }
+      } else if (o === UA && (c === 2 || o0 !== UA)) {
+        if (recent) { r = 0; g = 110; b = 255; a = 180; } else if (showCh || c === 2) { r = 37; g = 99; b = 235; a = c === 2 ? 110 : 85; }
+      }
+    }
+    d[p] = r; d[p + 1] = g; d[p + 2] = b; d[p + 3] = a;
+  }
+  offCtx.putImageData(img, 0, 0);
+}
+
+let STATS = null, STATS0 = null;
+function computeStats() {
+  let occ = 0, grey = 0, uaRus = 0;
+  for (let k = 0; k < N; k++) {
+    const c = country[k], o = owner[k]; if (!c) continue;
+    const a = rowKm2[(k / COLS) | 0];
+    if (c === 1 && o === RU) occ += a; else if (c === 1 && o === GREY) grey += a; else if (c === 2 && o === UA) uaRus += a;
+  }
+  return { occ, grey, uaRus };
+}
+function recompute(full = true) {
+  computeFront();
+  if (full) computeDist();
+  buildContour(); buildImage();
+  STATS = computeStats();
+  requestDraw();
+}
+
+/* ================= Состояние игры ================= */
+let S = null;
+let FRONT = null; // { occ, unk, date, src }
+const DIFF = { easy: { p: 1.15, ai: .78, name: 'Лёгкая' }, normal: { p: 1, ai: 1, name: 'Обычная' }, hard: { p: .92, ai: 1.3, name: 'Тяжёлая' } };
+const INCOME = { 1: { p: 4500, arm: 20, sh: 42000, dr: 16000 }, 2: { p: 7000, arm: 45, sh: 65000, dr: 12000 } };
+function newSide(s) {
+  return s === UA
+    ? { gar: 300000, res: 26000, arm: 140, sh: 140000, dr: 50000, morale: 1, lossP: 0, lossA: 0, km: 0 }
+    : { gar: 420000, res: 42000, arm: 280, sh: 260000, dr: 36000, morale: 1, lossP: 0, lossA: 0, km: 0 };
+}
+function startGame(mode, player, keepMap) {
+  stopAuto();
+  if (!keepMap) applyFront(FRONT);
+  owner0.set(owner); changed.fill(0); cut.fill(0);
+  initForts();
+  S = {
+    mode, player, diff: (document.getElementById('diff') || {}).value || (S && S.diff) || 'normal',
+    turn: 0, date: +FRONT.date, sides: { 1: newSide(1), 2: newSide(2) },
+    orders: [], aiOrders: [], log: [], sel: null, draft: null, over: false, threat: { 1: [], 2: [] }, obj: null,
+  };
+  pickObjectives();
+  recompute();
+  STATS0 = STATS;
+  addLog(0, mode === 'editor' ? 'Редактор: рисуй линию фронта кистью.' :
+    `Старт: линия фронта DeepState на ${dateStr(FRONT.date)}. ${mode === 'sim' ? 'ИИ против ИИ.' : 'Вы командуете: ' + SIDE[player].short + '.'}`, 'ev');
+  closeModal(); renderAll();
+  if (mode === 'editor') { ED.undo = []; }
+  save();
+}
+function pickObjectives() {
+  const obj = { 1: { attack: [], hold: [] }, 2: { attack: [], hold: [] } };
+  for (const side of [UA, RU]) {
+    const near = (o) => CITIES.map((c, i) => ({ c, i })).filter(({ c }) => c.k >= 0 && country[c.k] === 1 && owner[c.k] === o && distF[c.k] < 32)
+      .sort((a, b) => (distF[a.c.k] - a.c.size * 4) - (distF[b.c.k] - b.c.size * 4)).slice(0, 4).map(x => x.i);
+    obj[side].attack = near(3 - side);
+    obj[side].hold = near(side);
+  }
+  S.obj = obj;
+}
+
+/* ================= Бой ================= */
+function season(ts) {
+  const m = new Date(ts).getMonth() + 1;
+  if (m === 3 || m === 4) return { k: .6, name: 'Весенняя распутица' };
+  if (m === 11) return { k: .7, name: 'Осенняя распутица' };
+  if (m === 12 || m <= 2) return { k: .85, name: 'Зима' };
+  if (m >= 5 && m <= 8) return { k: 1.05, name: 'Лето' };
+  return { k: 1, name: 'Осень' };
+}
+function localInfo(k, A) {
+  const E = 3 - A, ci = k % COLS, cj = (k / COLS) | 0;
+  const cand = []; let fs = 0, us = 0, en = 0, gr = 0, own = 0, ou = 0, ov = 0, eu = 0, ev = 0;
+  for (const [di, dj] of DISK) {
+    const i = ci + di, j = cj + dj; if (i < 0 || j < 0 || i >= COLS || j >= ROWS) continue;
+    const n = j * COLS + i; if (!land(n)) continue;
+    const o = owner[n];
+    if (o === A) { own++; ou += i; ov += j; continue; }
+    if (o === E) { en++; fs += fort[n]; us += urban[n] ? 1 : 0; eu += i; ev += j; }
+    else if (o === GREY) { gr++; eu += i; ev += j; }
+    else continue;
+    if (nbOwner(n, A)) cand.push(n);
+  }
+  const ne = en + gr;
+  const dir = own && ne ? [eu / ne - ou / own, ev / ne - ov / own] : [0, -1];
+  return { cand, en, gr, own, fAvg: en ? fs / en : 0, uAvg: en ? us / en : 0, dir };
+}
+function nbOwner(n, A) {
+  const i = n % COLS;
+  return (i > 0 && owner[n - 1] === A) || (i < COLS - 1 && owner[n + 1] === A) || (n >= COLS && owner[n - COLS] === A) || (n < N - COLS && owner[n + COLS] === A);
+}
+function attackPower(op) {
+  return (op.inf + op.arm * 20 + op.sh * .04 + op.dr * .12) * season(S.date).k * S.sides[op.side].morale;
+}
+function defensePower(op, info, consume) {
+  const E = 3 - op.side, se = S.sides[E];
+  const dsh = Math.min(se.sh, 6000 + op.sh * .3), ddr = Math.min(se.dr, 2000 + op.dr * .35);
+  if (consume) { se.sh -= dsh; se.dr -= ddr; }
+  const density = se.gar / Math.max(150, frontList[E].length);
+  const greyOnly = info.en === 0;
+  return (density * 14 + dsh * .04 + ddr * .18) * se.morale * (1 + .12 * info.fAvg + .25 * info.uAvg) * (greyOnly ? .3 : 1);
+}
+const budgetOf = r => r < .6 ? 0 : Math.min(80, 7 * Math.pow(r - .55, 1.25));
+function cellCost(k) {
+  return (owner[k] === GREY ? .5 : 1) * (1 + urban[k] * .7) * (1 + fort[k] * .4) * (river[k] === 2 ? 4 : river[k] === 1 ? 1.7 : 1);
+}
+function avgCellKm2(k) { return rowKm2[(k / COLS) | 0]; }
+function estimate(op) {
+  const info = localInfo(op.k, op.side);
+  if (!info.cand.length) return { ok: false, info };
+  const P = attackPower(op), D = defensePower(op, info, false), r = P / D;
+  let cost = 0, n = 0;
+  for (const k of info.cand) { cost += cellCost(k); n++; }
+  const km = budgetOf(r) / Math.max(.5, cost / n) * avgCellKm2(op.k);
+  return { ok: true, info, r, km };
+}
+function resolveAttack(op, rep) {
+  const A = op.side, E = 3 - A, sa = S.sides[A], se = S.sides[E];
+  const info = localInfo(op.k, A);
+  const where = placeName(op.k);
+  if (!info.cand.length) {
+    sa.res += op.inf; sa.arm += op.arm; sa.sh += op.sh; sa.dr += op.dr;
+    addLog(A, `${SIDE[A].short} · ${where}: нет соприкосновения с противником, приказ отменён.`); return;
+  }
+  const P = attackPower(op) * rnd(.82, 1.18), D = defensePower(op, info, true), r = P / D;
+  let budget = budgetOf(r);
+  const ci = op.k % COLS, cj = (op.k / COLS) | 0;
+  const inDisk = n => { const di = n % COLS - ci, dj = ((n / COLS) | 0) - cj; return di * di + dj * dj <= R * R; };
+  const cand = info.cand.slice(), seen = new Set(cand);
+  let taken = 0, km = 0;
+  while (budget > 0 && cand.length) {
+    let bi = 0, bp = Infinity;
+    for (let t = 0; t < cand.length; t++) {
+      const n = cand[t]; if (owner[n] === A) continue;
+      const di = n % COLS - ci, dj = ((n / COLS) | 0) - cj;
+      let na = 0; const i = n % COLS;
+      if (i > 0 && owner[n - 1] === A) na++; if (i < COLS - 1 && owner[n + 1] === A) na++;
+      if (n >= COLS && owner[n - COLS] === A) na++; if (n < N - COLS && owner[n + COLS] === A) na++;
+      const pr = Math.sqrt(di * di + dj * dj) / R * 3 + cellCost(n) * .8 - na * .8 + Math.random() * 1.6;
+      if (pr < bp) { bp = pr; bi = t; }
+    }
+    const n = cand[bi]; cand.splice(bi, 1);
+    if (owner[n] === A || !nbAny(n, A)) continue;
+    const cost = cellCost(n);
+    if (cost > budget && Math.random() > budget / cost) break;
+    budget -= cost;
+    owner[n] = (r < 1 && owner[n] === E) ? GREY : A;
+    fort[n] = Math.max(0, fort[n] - 1);
+    changed[n] = S.turn + 1; taken++; km += rowKm2[(n / COLS) | 0];
+    const i = n % COLS;
+    for (const m of [i > 0 ? n - 1 : -1, i < COLS - 1 ? n + 1 : -1, n >= COLS ? n - COLS : -1, n < N - COLS ? n + COLS : -1]) {
+      if (m < 0 || seen.has(m) || !land(m) || !inDisk(m)) continue;
+      if (owner[m] === E || owner[m] === GREY) { cand.push(m); seen.add(m); }
+    }
+  }
+  const infLoss = Math.round(op.inf * clamp(.16 / Math.pow(r, .7), .03, .5));
+  const armLoss = Math.round(op.arm * clamp(.22 / Math.pow(r, .6), .04, .6));
+  const defLoss = Math.round(infLoss * clamp(.45 * r, .2, 1.4) + taken * 8);
+  sa.res += op.inf - infLoss; sa.arm += op.arm - armLoss; sa.lossP += infLoss; sa.lossA += armLoss;
+  se.gar = Math.max(20000, se.gar - defLoss); se.lossP += defLoss;
+  sa.km += km; rep.gained[A] += km;
+  if (taken) S.threat[E].push(op.k);
+  const txt = taken
+    ? `${SIDE[A].short} · ${where}: ${r < 1 ? 'просочились в оборону' : r < 1.6 ? 'продвижение' : 'прорыв'} ${fmt(km)} км² (соотношение сил ${r.toFixed(2)}). Потери: ${fmt(infLoss)} чел., ${armLoss} ед. техники; противник — ${fmt(defLoss)} чел.`
+    : `${SIDE[A].short} · ${where}: атака отбита (соотношение сил ${r.toFixed(2)}). Потери: ${fmt(infLoss)} чел., ${armLoss} ед. техники.`;
+  addLog(A, txt); rep.lines.push({ s: A, t: txt });
+}
+function nbAny(n, A) { // соседство через серую зону: можно занимать серые клетки, примыкающие к уже занятым
+  const i = n % COLS;
+  const t = m => owner[m] === A || owner[m] === GREY;
+  return (i > 0 && t(n - 1)) || (i < COLS - 1 && t(n + 1)) || (n >= COLS && t(n - COLS)) || (n < N - COLS && t(n + COLS));
+}
+function resolveFort(op, rep) {
+  const A = op.side, ci = op.k % COLS, cj = (op.k / COLS) | 0; let n = 0;
+  for (const [di, dj] of DISK) {
+    const i = ci + di, j = cj + dj; if (i < 0 || j < 0 || i >= COLS || j >= ROWS) continue;
+    const k = j * COLS + i;
+    if (owner[k] === A && distF[k] <= 8 && fort[k] < 3) { fort[k]++; n++; }
+  }
+  S.sides[A].gar += op.inf;
+  const txt = `${SIDE[A].short} · ${placeName(op.k)}: построены укрепления (${n} участков), ${fmt(op.inf)} чел. переведены в оборону.`;
+  addLog(A, txt); rep.lines.push({ s: A, t: txt });
+}
+function greyCleanup() {
+  for (let k = 0; k < N; k++) {
+    if (owner[k] !== GREY) continue;
+    let a = 0, b = 0; const i = k % COLS;
+    for (const m of [i > 0 ? k - 1 : -1, i < COLS - 1 ? k + 1 : -1, k >= COLS ? k - COLS : -1, k < N - COLS ? k + COLS : -1]) {
+      if (m < 0) continue; if (owner[m] === UA) a++; else if (owner[m] === RU) b++; else if (owner[m] === GREY) { a += .01; b += .01; }
+    }
+    if (a >= 1 && b === 0) { owner[k] = UA; changed[k] = S.turn + 1; }
+    else if (b >= 1 && a === 0) { owner[k] = RU; changed[k] = S.turn + 1; }
+  }
+}
+// Снабжение: клетки, отрезанные от тыла, после нескольких ходов сдаются (котёл)
+const KERCH = [U(36.5), V(45.3)];
+const reach = new Uint8Array(N), seenP = new Uint8Array(N);
+// Ищет группировки стороны side, отрезанные от тыла (ВСУ — запад, ВС РФ — Россия и Керченский мост)
+function findPockets(side) {
+  reach.fill(0); seenP.fill(0);
+  let h = 0, t = 0;
+  for (let k = 0; k < N; k++) {
+    if (owner[k] !== side) continue;
+    if (side === UA ? LON(k % COLS + .5) < 31.8 : country[k] === 2) { reach[k] = 1; Q[t++] = k; }
+  }
+  if (side === RU) for (let dj = -3; dj <= 3; dj++) for (let di = -3; di <= 3; di++) {
+    const k = cellAt(KERCH[0] + di, KERCH[1] + dj); if (k >= 0 && owner[k] === RU && !reach[k]) { reach[k] = 1; Q[t++] = k; }
+  }
+  while (h < t) {
+    const k = Q[h++], i = k % COLS;
+    const go = n => { if (!reach[n] && (owner[n] === side || owner[n] === GREY)) { reach[n] = 1; Q[t++] = n; } };
+    if (i > 0) go(k - 1); if (i < COLS - 1) go(k + 1); if (k >= COLS) go(k - COLS); if (k < N - COLS) go(k + COLS);
+  }
+  const comps = [];
+  for (let s0 = 0; s0 < N; s0++) {
+    if (owner[s0] !== side || reach[s0] || seenP[s0]) continue;
+    const cells = []; let touch = false, minCut = 255; h = 0; t = 0; Q[t++] = s0; seenP[s0] = 1;
+    while (h < t) {
+      const k = Q[h++]; cells.push(k); minCut = Math.min(minCut, cut[k]); const i = k % COLS;
+      const go = n => { if (owner[n] === 3 - side) touch = true; if (!seenP[n] && owner[n] === side) { seenP[n] = 1; Q[t++] = n; } };
+      if (i > 0) go(k - 1); if (i < COLS - 1) go(k + 1); if (k >= COLS) go(k - COLS); if (k < N - COLS) go(k + COLS);
+    }
+    comps.push({ cells, touch, minCut });
+  }
+  for (let k = 0; k < N; k++) if (reach[k] && owner[k] === side) cut[k] = 0;
+  return comps;
+}
+// При загрузке карты: клочки, оторванные из-за разной детализации берегов, отходят окружающей стороне
+function normalizeMap() {
+  for (const side of [UA, RU]) for (const c of findPockets(side)) if (c.touch && c.cells.length < 400) for (const k of c.cells) owner[k] = 3 - side;
+  cut.fill(0);
+}
+// Снабжение: группировка в окружении через 1–3 хода сдаётся (котёл)
+function supplyCheck(rep) {
+  for (const side of [UA, RU]) {
+    for (const { cells: comp, touch, minCut } of findPockets(side)) {
+      if (!touch) continue;
+      const need = 1 + Math.floor(comp.length / 150);
+      const mid = comp[comp.length >> 1];
+      if (minCut + 1 >= need) {
+        let km = 0;
+        for (const k of comp) { owner[k] = 3 - side; changed[k] = S.turn + 1; cut[k] = 0; km += rowKm2[(k / COLS) | 0]; }
+        const pris = Math.round(comp.length * rnd(25, 60));
+        S.sides[side].gar = Math.max(20000, S.sides[side].gar - pris); S.sides[side].lossP += pris;
+        S.sides[3 - side].km += km; rep.gained[3 - side] += km;
+        const txt = `Котёл · ${placeName(mid)}: окружённая группировка ${SIDE[side].short} сдалась. ${fmt(km)} км² перешли к ${SIDE[3 - side].short}, ~${fmt(pris)} пленных.`;
+        addLog(3 - side, txt); rep.lines.push({ s: 3 - side, t: txt });
+      } else {
+        for (const k of comp) cut[k] = Math.min(250, cut[k] + 1);
+        const txt = `${SIDE[side].short} · ${placeName(mid)}: группировка в окружении (${fmt(comp.length * rowKm2[(mid / COLS) | 0])} км²). Без деблокады сдастся через ${need - minCut - 1} ход(а).`;
+        addLog(side, txt, 'ev'); rep.lines.push({ s: side, t: txt });
+      }
+    }
+  }
+}
+const EVENTS = {
+  1: [['Пакет военной помощи от союзников: +60 000 снарядов, +25 ед. техники', s => { s.sh += 60000; s.arm += 25; }],
+      ['Рекордное производство дронов: +25 000 FPV', s => { s.dr += 25000; }],
+      ['Новые бригады завершили подготовку: +8 000 чел. в резерв', s => { s.res += 8000; }],
+      ['Задержка поставок: −30 000 снарядов', s => { s.sh = Math.max(0, s.sh - 30000); }]],
+  2: [['Поставки снарядов из КНДР: +80 000 снарядов', s => { s.sh += 80000; }],
+      ['Волна контрактников: +10 000 чел. в резерв', s => { s.res += 10000; }],
+      ['Удары по НПЗ и складам: падение снабжения, мораль −5%', s => { s.morale = Math.max(.8, s.morale - .05); s.sh = Math.max(0, s.sh - 20000); }],
+      ['Новая партия «Гераней» и FPV: +20 000 дронов', s => { s.dr += 20000; }]],
+};
+function weekly(rep) {
+  for (const side of [UA, RU]) {
+    const s = S.sides[side], inc = INCOME[side];
+    const m = S.mode === 'campaign' ? (side === S.player ? DIFF[S.diff].p : DIFF[S.diff].ai) : 1;
+    s.gar += inc.p * m * .5; s.res += inc.p * m * .5; s.arm += inc.arm * m; s.sh += inc.sh * m; s.dr += inc.dr * m;
+    s.gar = Math.round(s.gar * .997);
+    const net = rep.gained[side] - rep.gained[3 - side];
+    s.morale = clamp(s.morale + clamp(net / 1500, -.015, .015) + (1 - s.morale) * .05, .85, 1.15);
+    if (Math.random() < .22) {
+      const ev = EVENTS[side][(Math.random() * EVENTS[side].length) | 0];
+      ev[1](s); const txt = `${SIDE[side].short}: ${ev[0]}`; addLog(side, txt, 'ev'); rep.lines.push({ s: side, t: txt, ev: 1 });
+    }
+  }
+  S.date += 7 * 864e5;
+}
+
+/* ================= ИИ ================= */
+function aiPlan(side) {
+  const sd = S.sides[side], fl = frontList[side];
+  if (!fl.length) return;
+  const th = S.threat[side];
+  if (sd.res > 6000 && th.length) {
+    const k = th[(Math.random() * th.length) | 0];
+    if (owner[k] === side || nearOwn(k, side) >= 0) { const kk = owner[k] === side ? k : nearOwn(k, side); sd.res -= 1500; S.aiOrders.push({ side, k: kk, type: 'fort', inf: 1500, arm: 0, sh: 0, dr: 0 }); }
+  }
+  const n = sd.res > 30000 ? 4 : sd.res > 14000 ? 3 : sd.res > 5000 ? 2 : sd.res > 1500 ? 1 : 0;
+  if (!n) return;
+  const scored = [];
+  const tries = Math.min(450, fl.length * 2);
+  for (let t = 0; t < tries; t++) { const k = fl[(Math.random() * fl.length) | 0]; scored.push([aiScore(side, k), k]); }
+  scored.sort((a, b) => b[0] - a[0]);
+  const picks = [];
+  for (const [sc, k] of scored) {
+    if (sc < -50 || picks.length >= n) break;
+    const i = k % COLS, j = (k / COLS) | 0;
+    if (picks.some(p => Math.hypot(p % COLS - i, ((p / COLS) | 0) - j) < R * 2.6)) continue;
+    picks.push(k);
+  }
+  // каждой операции — доля сил; если шансов мало, силы не тратим, а копим (или собираем в один удар)
+  let left = picks.slice();
+  while (left.length) {
+    const share = 1 / left.length;
+    const ops = left.map(k => ({ side, k, type: 'attack', inf: Math.floor(sd.res * .85 * share), arm: Math.floor(sd.arm * .5 * share), sh: Math.floor(sd.sh * .45 * share), dr: Math.floor(sd.dr * .45 * share) }));
+    const est = ops.map(op => estimate(op));
+    const worst = est.reduce((w, e, i) => (!e.ok || e.r < est[w].r) ? i : w, 0);
+    if (est[worst].ok && est[worst].r >= .95) {
+      for (const op of ops) { sd.res -= op.inf; sd.arm -= op.arm; sd.sh -= op.sh; sd.dr -= op.dr; S.aiOrders.push(op); }
+      break;
+    }
+    left.splice(worst, 1);
+  }
+}
+function nearOwn(k, side) {
+  const ci = k % COLS, cj = (k / COLS) | 0;
+  for (const [di, dj] of DISK) { const i = ci + di, j = cj + dj; if (i < 0 || j < 0 || i >= COLS || j >= ROWS) continue; const n = j * COLS + i; if (owner[n] === side) return n; }
+  return -1;
+}
+function aiScore(side, k) {
+  const E = 3 - side, ci = k % COLS, cj = (k / COLS) | 0;
+  let e = 0, g = 0, o = 0, fs = 0, us = 0, rv = 0;
+  for (const [di, dj] of DISK) {
+    const i = ci + di, j = cj + dj; if (i < 0 || j < 0 || i >= COLS || j >= ROWS) continue;
+    const n = j * COLS + i; if (!land(n)) continue;
+    const w = owner[n];
+    if (w === side) o++; else if (w === E) { e++; fs += fort[n]; us += urban[n] ? 1 : 0; rv += river[n] === 2 ? 1 : 0; } else if (w === GREY) g++;
+  }
+  if (e + g === 0) return -99;
+  const frac = (e + g) / (e + g + o);
+  let v = (1 - Math.abs(frac - .42) * 2) * 2 - fs / (e + 1) * 1.2 - us / (e + 1) * 1.0 - rv / (e + 1) * 6 + g * .02 + Math.random() * 1.2;
+  if (side === UA && country[k] === 2) v -= 1.5;                    // ВСУ реже идут вглубь России
+  const objs = S.obj[side].attack;
+  for (let t = 0; t < CITIES.length; t++) {
+    const c = CITIES[t]; if (c.k < 0 || owner[c.k] === side || owner[c.k] === 0) continue;
+    const d = Math.hypot(c.u - ci, c.v - cj); if (d > 24) continue;
+    v += Math.pow(c.size, 1.5) * (objs.includes(t) ? 3 : 1) / (1 + d / 5);
+  }
+  return v;
+}
+
+/* ================= Ход ================= */
+function endTurn() {
+  if (!S || S.over || S.mode === 'editor') return;
+  for (const side of [UA, RU]) if (S.mode === 'sim' || side !== S.player) aiPlan(side);
+  S.threat = { 1: [], 2: [] };
+  const ops = S.orders.concat(S.aiOrders).sort(() => Math.random() - .5);
+  S.orders = []; S.aiOrders = []; S.sel = null;
+  const rep = { lines: [], gained: { 1: 0, 2: 0 } };
+  ops.filter(o => o.type === 'fort').forEach(o => resolveFort(o, rep));
+  computeFront();
+  ops.filter(o => o.type === 'attack').forEach(o => { resolveAttack(o, rep); });
+  greyCleanup();
+  computeFront();
+  supplyCheck(rep);
+  weekly(rep);
+  S.turn++;
+  recompute();
+  checkEnd(rep);
+  renderAll(); save();
+  if (S.mode === 'campaign' && !S.over) showReport(rep);
+}
+function checkEnd(rep) {
+  if (S.mode !== 'campaign') return;
+  const p = S.player, o = S.obj[p];
+  const won = o.attack.length && o.attack.every(i => owner[CITIES[i].k] === p);
+  const lost = o.hold.length && o.hold.every(i => owner[CITIES[i].k] !== p);
+  if (won || lost || S.turn >= 52) {
+    S.over = true;
+    const diff = (STATS.occ - STATS0.occ) * (p === UA ? -1 : 1);
+    const title = won ? 'Победа!' : lost ? 'Поражение' : diff > 0 ? 'Год войны: перевес за вами' : 'Год войны: перевес за противником';
+    const why = won ? 'Все цели наступления взяты.' : lost ? 'Противник взял все ключевые города, которые нужно было удержать.' : `Прошло 52 недели. Изменение территории в вашу пользу: ${fmt(diff)} км².`;
+    showEnd(title, why);
+  }
+}
+
+/* ================= Отрисовка ================= */
+const cv = document.getElementById('map'), ctx = cv.getContext('2d');
+let W = 0, H = 0, DPR = 1;
+const view = { u: U(36), v: V(48.6), z: 2.4 };
+const layers = { forts: true, cities: true, rivers: true, admin: true, changes: true };
+let drawQueued = false;
+function requestDraw() { if (!drawQueued) { drawQueued = true; requestAnimationFrame(draw); } }
+function resize() {
+  DPR = Math.min(2, window.devicePixelRatio || 1); W = innerWidth; H = innerHeight;
+  cv.width = W * DPR; cv.height = H * DPR; requestDraw();
+}
+function ringsPath(path, polys) {
+  for (const poly of polys) for (const ring of poly) {
+    ring.forEach((p, i) => i ? path.lineTo(U(p[0]), V(p[1])) : path.moveTo(U(p[0]), V(p[1]))); path.closePath();
+  }
+}
+const P = {};
+function buildPaths() {
+  P.ukr = new Path2D(); ringsPath(P.ukr, GEO.countries.UKR);
+  P.rus = new Path2D(); ringsPath(P.rus, GEO.countries.RUS);
+  P.neu = new Path2D(); for (const a of ['BLR', 'MDA', 'ROU', 'GEO', 'TUR']) if (GEO.countries[a]) ringsPath(P.neu, GEO.countries[a]);
+  P.land = new Path2D(); P.land.addPath(P.ukr); P.land.addPath(P.rus);
+  P.lakes = new Path2D(); for (const l of GEO.lakes) if (!/Kakhovka/.test(l.n)) ringsPath(P.lakes, l.p);
+  P.kakh = new Path2D(); for (const l of GEO.lakes) if (/Kakhovka/.test(l.n)) ringsPath(P.kakh, l.p);
+  P.riv1 = new Path2D(); P.riv2 = new Path2D();
+  for (const r of GEO.rivers) {
+    const big = BIG_RIVER.test(r.n) || MID_RIVER.test(r.n) || r.r <= 7;
+    for (const ln of r.l) ln.forEach((p, i) => (big ? P.riv1 : P.riv2)[i ? 'lineTo' : 'moveTo'](U(p[0]), V(p[1])));
+  }
+  P.adm = new Path2D(); for (const ln of GEO.admin1) ln.forEach((p, i) => P.adm[i ? 'lineTo' : 'moveTo'](U(p[0]), V(p[1])));
+}
+const sx = u => (u - view.u) * view.z + W / 2, sy = v => (v - view.v) * view.z + H / 2;
+const toU = x => (x - W / 2) / view.z + view.u, toV = y => (y - H / 2) / view.z + view.v;
+function draw() {
+  drawQueued = false;
+  const z = view.z;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = '#d3d0c9'; ctx.fillRect(0, 0, W, H);
+  ctx.setTransform(z * DPR, 0, 0, z * DPR, (W / 2 - view.u * z) * DPR, (H / 2 - view.v * z) * DPR);
+  ctx.fillStyle = '#a9c4d4'; ctx.fillRect(U(29), V(52.9), U(41.6) - U(29), V(43.9) - V(52.9));
+  ctx.fillStyle = '#e4e1da'; ctx.fill(P.neu);
+  ctx.fillStyle = '#ebe5d9'; ctx.fill(P.rus);
+  ctx.fillStyle = '#f4f1e8'; ctx.fill(P.ukr);
+  ctx.fillStyle = 'rgba(169,196,212,.45)'; ctx.fill(P.kakh);
+  ctx.fillStyle = '#a9c4d4'; ctx.fill(P.lakes);
+  // слой контроля территорий
+  ctx.save(); ctx.clip(P.land);
+  ctx.imageSmoothingEnabled = z < 14; ctx.drawImage(off, 0, 0);
+  ctx.restore();
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  if (layers.admin) { ctx.strokeStyle = 'rgba(90,90,100,.45)'; ctx.lineWidth = .9 / z; ctx.setLineDash([4 / z, 3 / z]); ctx.stroke(P.adm); ctx.setLineDash([]); }
+  if (layers.rivers) {
+    ctx.strokeStyle = '#6f9fc0'; ctx.lineWidth = Math.max(1.2, z * .35) / z; ctx.stroke(P.riv1);
+    if (z > 2.5) { ctx.lineWidth = .8 / z; ctx.stroke(P.riv2); }
+  }
+  ctx.strokeStyle = '#555'; ctx.lineWidth = 1.3 / z; ctx.stroke(P.ukr); ctx.stroke(P.neu);
+  ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 4.2 / z; ctx.stroke(frontPath);
+  ctx.strokeStyle = '#7a0f0f'; ctx.lineWidth = 2.2 / z; ctx.stroke(frontPath);
+  if (layers.forts && z > 5.5) {
+    ctx.lineWidth = 1.1 / z;
+    ctx.strokeStyle = 'rgba(30,64,175,.45)'; ctx.stroke(fortPath[1]);
+    ctx.strokeStyle = 'rgba(110,10,10,.45)'; ctx.stroke(fortPath[2]);
+  }
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  if (S) drawOrders();
+  if (layers.cities) drawCities();
+  if (S && S.mode === 'editor' && hoverPt) {
+    ctx.strokeStyle = '#111'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(hoverPt.x, hoverPt.y, ED.size * z, 0, 7); ctx.stroke();
+  }
+}
+function drawOrders() {
+  const z = view.z;
+  const all = S.orders.map(o => [o, false]);
+  if (S.sel) all.push([{ side: S.player, k: S.sel.k, type: (S.draft || {}).type || 'attack', dir: S.sel.dir }, true]);
+  for (const [o, sel] of all) {
+    const u = o.k % COLS + .5, v = ((o.k / COLS) | 0) + .5, x = sx(u), y = sy(v), r = R * z;
+    ctx.strokeStyle = SIDE[o.side].color; ctx.lineWidth = sel ? 2.5 : 2; ctx.setLineDash(sel ? [6, 4] : []);
+    ctx.fillStyle = o.type === 'fort' ? 'rgba(250,204,21,.18)' : sel ? 'rgba(255,255,255,.18)' : 'rgba(255,255,255,.1)';
+    ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); ctx.stroke(); ctx.setLineDash([]);
+    if (o.type === 'attack' && o.dir) {
+      const L = Math.hypot(o.dir[0], o.dir[1]) || 1, dx = o.dir[0] / L, dy = o.dir[1] / L, len = Math.max(18, r * .9);
+      const x0 = x - dx * len * .5, y0 = y - dy * len * .5, x1 = x + dx * len * .6, y1 = y + dy * len * .6;
+      ctx.strokeStyle = SIDE[o.side].color; ctx.lineWidth = Math.max(4, z * .9); ctx.lineCap = 'butt';
+      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - dx * 8, y1 - dy * 8); ctx.stroke();
+      ctx.fillStyle = SIDE[o.side].color; ctx.beginPath();
+      const hw = Math.max(9, z * 1.6);
+      ctx.moveTo(x1 + dx * 4, y1 + dy * 4); ctx.lineTo(x1 - dx * hw - dy * hw * .7, y1 - dy * hw + dx * hw * .7); ctx.lineTo(x1 - dx * hw + dy * hw * .7, y1 - dy * hw - dx * hw * .7);
+      ctx.closePath(); ctx.fill(); ctx.lineCap = 'round';
+    }
+    if (o.type === 'fort') { ctx.fillStyle = '#111'; ctx.font = '600 13px Rubik, sans-serif'; ctx.textAlign = 'center'; ctx.fillText('⛨', x, y + 5); }
+  }
+}
+function drawCities() {
+  const z = view.z;
+  const obj = S && S.mode === 'campaign' ? S.obj[S.player] : null;
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  CITIES.forEach((c, i) => {
+    const isObj = obj && (obj.attack.includes(i) || obj.hold.includes(i));
+    if (!isObj && !(c.size >= 3 || (c.size === 2 && z > 1.5) || (c.size === 1 && z > 3.4))) return;
+    const x = sx(c.u), y = sy(c.v); if (x < -60 || y < -20 || x > W + 60 || y > H + 20) return;
+    const o = c.k >= 0 ? owner[c.k] : 0;
+    ctx.fillStyle = o === RU ? '#b91c1c' : o === UA ? '#1d4ed8' : o === GREY ? '#6b625a' : '#444';
+    const rr = c.size === 3 ? 4.5 : c.size === 2 ? 3.6 : 2.8;
+    ctx.beginPath(); ctx.arc(x, y, rr, 0, 7); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.2; ctx.stroke();
+    ctx.font = `${c.size >= 2 ? 600 : 500} ${c.size === 3 ? 13 : c.size === 2 ? 12 : 11}px Rubik, sans-serif`;
+    let label = c.name;
+    if (isObj) label = (obj.attack.includes(i) ? '★ ' : '⛨ ') + label;
+    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.strokeText(label, x + rr + 3, y);
+    ctx.fillStyle = isObj ? (obj.attack.includes(i) ? '#9a3412' : '#1e3a8a') : '#1f2937'; ctx.fillText(label, x + rr + 3, y);
+  });
+}
+function zoomAt(x, y, f) {
+  const u = toU(x), v = toV(y);
+  view.z = clamp(view.z * f, .9, 60);
+  view.u = u - (x - W / 2) / view.z; view.v = v - (y - H / 2) / view.z;
+  clampView(); requestDraw();
+}
+function clampView() { view.u = clamp(view.u, 0, COLS); view.v = clamp(view.v, 0, ROWS); }
+
+/* ================= Ввод ================= */
+const ptrs = new Map(); let drag = null, pinch = null, hoverPt = null;
+const tip = document.getElementById('tip');
+cv.addEventListener('contextmenu', e => e.preventDefault());
+cv.addEventListener('pointerdown', e => {
+  cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  closeLayers();
+  if (ptrs.size === 1) {
+    const paint = S && S.mode === 'editor' && ED.tool !== 'hand' && e.button === 0;
+    drag = { x: e.clientX, y: e.clientY, u: view.u, v: view.v, moved: 0, paint };
+    if (paint) { pushUndo(); paintAt(e.clientX, e.clientY); }
+  } else if (ptrs.size === 2) {
+    if (drag && drag.paint) recompute();
+    drag = null;
+    const [a, b] = [...ptrs.values()];
+    pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2, z: view.z, u: view.u, v: view.v };
+  }
+});
+cv.addEventListener('pointermove', e => {
+  if (ptrs.has(e.pointerId)) ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  hoverPt = { x: e.clientX, y: e.clientY };
+  if (pinch && ptrs.size >= 2) {
+    const [a, b] = [...ptrs.values()];
+    const d = Math.hypot(a.x - b.x, a.y - b.y), cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2;
+    const wu = (pinch.cx - W / 2) / pinch.z + pinch.u, wv = (pinch.cy - H / 2) / pinch.z + pinch.v;
+    view.z = clamp(pinch.z * d / pinch.d, .9, 60);
+    view.u = wu - (cx - W / 2) / view.z; view.v = wv - (cy - H / 2) / view.z; clampView(); requestDraw(); return;
+  }
+  if (drag) {
+    drag.moved = Math.max(drag.moved, Math.hypot(e.clientX - drag.x, e.clientY - drag.y));
+    if (drag.paint) { paintAt(e.clientX, e.clientY); return; }
+    view.u = drag.u - (e.clientX - drag.x) / view.z; view.v = drag.v - (e.clientY - drag.y) / view.z; clampView(); requestDraw();
+    tip.style.display = 'none'; return;
+  }
+  if (e.pointerType === 'mouse') showTip(e.clientX, e.clientY);
+  if (S && S.mode === 'editor') requestDraw();
+});
+const endPtr = e => {
+  if (!ptrs.has(e.pointerId)) return;
+  ptrs.delete(e.pointerId);
+  if (drag && ptrs.size === 0) {
+    if (drag.paint) recompute();
+    else if (drag.moved < 7) onTap(e.clientX, e.clientY);
+    drag = null;
+  }
+  if (ptrs.size < 2) pinch = null;
+};
+cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr);
+cv.addEventListener('pointerleave', () => { tip.style.display = 'none'; hoverPt = null; if (S && S.mode === 'editor') requestDraw(); });
+cv.addEventListener('wheel', e => { e.preventDefault(); zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * .0016)); }, { passive: false });
+addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if (e.key === 'Enter' && S && S.mode !== 'editor' && document.getElementById('modal').hidden) endTurn();
+  if (e.key === 'Escape' && S && S.sel) { S.sel = null; renderSide(); requestDraw(); }
+  if ((e.key === 'z' || e.key === 'я') && (e.ctrlKey || e.metaKey) && S && S.mode === 'editor') undo();
+});
+function showTip(x, y) {
+  const k = cellAt(toU(x), toV(y));
+  if (k < 0 || !land(k)) { tip.style.display = 'none'; return; }
+  const o = owner[k];
+  const who = o === UA ? 'под контролем ВСУ' : o === RU ? 'под контролем ВС РФ' : 'серая зона';
+  const extra = [urban[k] ? 'город' : '', river[k] ? 'река' : '', fort[k] ? `укрепления ${'▮'.repeat(fort[k])}` : ''].filter(Boolean).join(' · ');
+  tip.innerHTML = `<b>${placeName(k)}</b> — ${who}${extra ? '<br><span class="muted">' + extra + '</span>' : ''}`;
+  tip.style.display = 'block';
+  tip.style.left = Math.min(x + 14, W - tip.offsetWidth - 8) + 'px'; tip.style.top = (y + 14) + 'px';
+}
+function placeName(k) {
+  const u = k % COLS + .5, v = ((k / COLS) | 0) + .5;
+  let best = null, bd = 1e9;
+  for (const c of CITIES) { const d = Math.hypot(c.u - u, c.v - v) / (c.size === 3 ? 1.2 : c.size === 2 ? 1.08 : 1); if (d < bd) { bd = d; best = c; } }
+  return bd < 30 ? best.name : `${LAT(v).toFixed(2)}°, ${LON(u).toFixed(2)}°`;
+}
+function onTap(x, y) {
+  if (!S || S.mode !== 'campaign' || S.over) return;
+  const k = cellAt(toU(x), toV(y));
+  if (k < 0 || !land(k)) return;
+  const info = localInfo(k, S.player);
+  if (!info.cand.length || info.own === 0) {
+    S.sel = null; renderSide(); requestDraw();
+    toast('Выберите место у линии фронта — в круге должны быть и ваши позиции, и противник.'); return;
+  }
+  if (S.orders.some(o => Math.hypot(o.k % COLS - k % COLS, ((o.k / COLS) | 0) - ((k / COLS) | 0)) < R * 1.2)) { toast('Здесь уже есть приказ. Выберите другой участок.'); return; }
+  const sd = S.sides[S.player];
+  S.sel = { k, dir: info.dir };
+  if (!S.draft) S.draft = { type: 'attack' };
+  Object.assign(S.draft, { inf: Math.floor(Math.min(sd.res, Math.max(2000, sd.res * .25)) / 100) * 100, arm: Math.floor(sd.arm * .2), sh: Math.floor(sd.sh * .15 / 1000) * 1000, dr: Math.floor(sd.dr * .15 / 500) * 500 });
+  document.getElementById('side').classList.remove('min');
+  renderSide(); requestDraw();
+  const opEl = document.querySelector('#sideBody .op'); if (opEl) opEl.scrollIntoView({ block: 'nearest' });
+}
+
+/* ================= Редактор ================= */
+const ED = { tool: RU, size: 3, undo: [] };
+function pushUndo() { ED.undo.push(owner.slice()); if (ED.undo.length > 25) ED.undo.shift(); }
+function undo() { const s = ED.undo.pop(); if (s) { owner.set(s); recompute(); renderSide(); } }
+let paintQueued = false;
+function paintAt(x, y) {
+  const u = toU(x), v = toV(y), r = ED.size;
+  for (let dj = -r; dj <= r; dj++) for (let di = -r; di <= r; di++) {
+    if (di * di + dj * dj > r * r) continue;
+    const k = cellAt(u + di, v + dj); if (k >= 0 && land(k)) owner[k] = ED.tool;
+  }
+  if (!paintQueued) { paintQueued = true; requestAnimationFrame(() => { paintQueued = false; recompute(false); }); }
+}
+
+/* ================= Интерфейс ================= */
+const $ = id => document.getElementById(id);
+function dateStr(ts) { return new Date(ts).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }); }
+function toast(t) { const el = $('toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove('on'), 2600); }
+function addLog(s, t, cls) { if (!S) return; S.log.unshift({ s, t, cls, turn: S.mode === 'editor' ? 0 : S.turn + (t.startsWith('Старт') ? 0 : 1) }); if (S.log.length > 80) S.log.length = 80; }
+function renderClock() {
+  if (!S) { $('clock').innerHTML = ''; return; }
+  const se = season(S.date);
+  $('clock').innerHTML = S.mode === 'editor' ? '<b>Редактор фронта</b>' :
+    `<b>${dateStr(S.date)}</b> · неделя ${S.turn + 1}<span class="chip">${se.name}${se.k !== 1 ? ' ×' + se.k : ''}</span>`;
+}
+function renderAll() { renderClock(); renderSide(); requestDraw(); }
+function statBlock() {
+  const d = STATS.occ - STATS0.occ;
+  const pct = (STATS.occ / UKR_AREA * 100).toFixed(1).replace('.', ',');
+  return `<div class="stat"><small class="muted">Под контролем РФ (территория Украины)</small>
+    <div class="big">${fmt(STATS.occ)} км² <small class="muted">· ${pct}%</small></div>
+    <small>За игру: <span class="${d > 0 ? 'down' : d < 0 ? 'up' : ''}">${d > 0 ? '+' : ''}${fmt(d)} км²</span>
+    · серая зона ${fmt(STATS.grey)} км²${STATS.uaRus > 1 ? ` · ВСУ в РФ: ${fmt(STATS.uaRus)} км²` : ''}</small></div>`;
+}
+function renderSide() {
+  const body = $('sideBody');
+  if (!S) { body.innerHTML = ''; return; }
+  if (S.mode === 'editor') return renderEditor(body);
+  const p = S.player, sim = S.mode === 'sim';
+  let h = '';
+  if (sim) {
+    h += `<h2>Симуляция: ИИ против ИИ</h2>
+      <div class="row"><button class="btn primary" id="bAuto">${autoTimer ? '⏸ Пауза' : '▶ Авто'}</button><button class="btn" id="bStep">Ход ▶</button></div>`;
+    h += statBlock();
+    for (const s of [UA, RU]) h += sideRes(s, true);
+  } else {
+    h += `<h2><span class="flag ${SIDE[p].flag}"></span>Вы командуете: ${SIDE[p].short}</h2>`;
+    h += sideRes(p, false);
+    h += statBlock();
+    const o = S.obj[p];
+    const chip = (i, att) => { const c = CITIES[i], have = owner[c.k] === p; return `<span class="${att ? (have ? 'done' : '') : (have ? '' : 'lost')}">${att ? '★' : '⛨'} ${c.name}</span>`; };
+    h += `<h3>Цели</h3><div class="hint">★ взять все — победа · ⛨ потерять все — поражение · лимит 52 недели</div>
+      <div class="obj">${o.attack.map(i => chip(i, true)).join('')}${o.hold.map(i => chip(i, false)).join('')}</div>`;
+    if (S.over) h += `<div class="est">Игра окончена. Начните новую через «Меню».</div>`;
+    else if (S.sel) h += opPanel();
+    else h += `<div class="hint" style="margin-top:12px">Нажмите на карту у линии фронта, чтобы отдать приказ: наступление или укрепление обороны.</div>`;
+    h += `<h3>Приказы на эту неделю (${S.orders.length})</h3><ul class="orders">${S.orders.map((o, i) =>
+      `<li><span>${o.type === 'fort' ? '⛨ Укрепить' : '➜ Наступление'} · ${placeName(o.k)}<br><small class="muted">${o.type === 'fort' ? fmt(o.inf) + ' чел.' : `${fmt(o.inf)} чел., ${o.arm} техн., ${fmt(o.sh)} снар., ${fmt(o.dr)} дронов`}</small></span><button data-cancel="${i}" title="Отменить">✕</button></li>`).join('') || '<li class="muted">Пока нет приказов</li>'}</ul>
+      <button class="btn primary" id="bEnd" style="width:100%;margin-top:6px" ${S.over ? 'disabled' : ''}>Завершить ход ▶</button>`;
+  }
+  h += `<h3>Сводка</h3><div class="log">${S.log.slice(0, 30).map(l => `<p class="${l.cls || 's' + l.s}">${l.turn ? '<small class="muted">нед. ' + l.turn + '</small> ' : ''}${l.t}</p>`).join('')}</div>`;
+  body.innerHTML = h;
+  bindSide();
+}
+function sideRes(s, compact) {
+  const d = S.sides[s];
+  return `${compact ? `<h3><span class="flag ${SIDE[s].flag}"></span>${SIDE[s].short}</h3>` : ''}<div class="res">
+    <div><small>Резерв для наступлений</small><b>${fmt(d.res)}</b></div><div><small>Гарнизон на фронте</small><b>${fmt(d.gar)}</b></div>
+    <div><small>Бронетехника</small><b>${fmt(d.arm)}</b></div><div><small>Снаряды</small><b>${fmt(d.sh)}</b></div>
+    <div><small>Дроны (FPV)</small><b>${fmt(d.dr)}</b></div><div><small>Потери: люди / техника</small><b>${fmt(d.lossP)} / ${fmt(d.lossA)}</b></div></div>`;
+}
+const SLIDERS = [['inf', 'Пехота', 'res', 100], ['arm', 'Техника', 'arm', 1], ['sh', 'Снаряды', 'sh', 1000], ['dr', 'Дроны', 'dr', 500]];
+function opPanel() {
+  const sd = S.sides[S.player], d = S.draft;
+  let h = `<h3>Новый приказ</h3><div class="op"><b>Участок: ${placeName(S.sel.k)}</b>
+    <div class="tabs"><button data-type="attack" class="${d.type === 'attack' ? 'on' : ''}">➜ Наступление</button><button data-type="fort" class="${d.type === 'fort' ? 'on' : ''}">⛨ Укрепить</button></div>`;
+  if (d.type === 'attack') {
+    for (const [key, label, src, step] of SLIDERS) {
+      const max = Math.floor(sd[src] / step) * step; d[key] = Math.min(d[key], max);
+      h += `<div class="sl"><span>${label}</span><input type="range" min="0" max="${max}" step="${step}" value="${d[key]}" data-k="${key}"><output id="o_${key}">${fmt(d[key])}</output></div>`;
+    }
+    h += `<div class="est" id="est"></div>`;
+  } else {
+    h += `<div class="hint">Строит окопы и опорные пункты в круге (до 3 уровней) и переводит 1 500 бойцов из резерва в гарнизон. Наступать на укреплённые участки намного дороже.</div>`;
+  }
+  h += `<div class="row"><button class="btn primary" id="bAdd">Отдать приказ</button><button class="btn" id="bSelX">Отмена</button></div></div>`;
+  return h;
+}
+function updateEstimate() {
+  const el = $('est'); if (!el) return;
+  const d = S.draft, op = { side: S.player, k: S.sel.k, inf: d.inf, arm: d.arm, sh: d.sh, dr: d.dr };
+  const e = estimate(op);
+  if (!e.ok) { el.textContent = 'Нет соприкосновения с противником.'; return; }
+  const r = e.r, verdict = r < .6 ? ['down', 'атака захлебнётся'] : r < 1 ? ['', 'медленное просачивание, участки станут серой зоной'] : r < 1.6 ? ['up', 'продвижение'] : ['up', 'прорыв'];
+  el.innerHTML = `Соотношение сил ≈ <b>${r.toFixed(2)}</b> — <span class="${verdict[0]}">${verdict[1]}</span><br>
+    <small class="muted">Ожидаемо: ~${fmt(e.km)} км² · у противника в круге укрепления ${e.info.fAvg.toFixed(1)}, ${Math.round(e.info.uAvg * 100)}% застройки.
+    Снаряды и дроны, оставленные на складе, работают на оборону.</small>`;
+}
+function bindSide() {
+  const b = $('sideBody');
+  b.querySelectorAll('[data-cancel]').forEach(el => el.onclick = () => {
+    const o = S.orders.splice(+el.dataset.cancel, 1)[0], sd = S.sides[o.side];
+    sd.res += o.inf; sd.arm += o.arm; sd.sh += o.sh; sd.dr += o.dr; renderSide(); requestDraw();
+  });
+  b.querySelectorAll('[data-type]').forEach(el => el.onclick = () => { S.draft.type = el.dataset.type; renderSide(); requestDraw(); });
+  b.querySelectorAll('input[type=range]').forEach(el => el.oninput = () => { S.draft[el.dataset.k] = +el.value; $('o_' + el.dataset.k).textContent = fmt(+el.value); updateEstimate(); });
+  if ($('est')) updateEstimate();
+  if ($('bAdd')) $('bAdd').onclick = addOrder;
+  if ($('bSelX')) $('bSelX').onclick = () => { S.sel = null; renderSide(); requestDraw(); };
+  if ($('bEnd')) $('bEnd').onclick = endTurn;
+  if ($('bAuto')) $('bAuto').onclick = () => { autoTimer ? stopAuto() : startAuto(); renderSide(); };
+  if ($('bStep')) $('bStep').onclick = endTurn;
+}
+function addOrder() {
+  const sd = S.sides[S.player], d = S.draft;
+  let op;
+  if (d.type === 'fort') {
+    if (sd.res < 1500) return toast('Не хватает резерва: нужно 1 500 человек.');
+    op = { side: S.player, k: S.sel.k, type: 'fort', inf: 1500, arm: 0, sh: 0, dr: 0 };
+  } else {
+    if (d.inf < 300) return toast('Для наступления нужно хотя бы 300 бойцов.');
+    op = { side: S.player, k: S.sel.k, type: 'attack', inf: d.inf, arm: d.arm, sh: d.sh, dr: d.dr, dir: S.sel.dir };
+  }
+  sd.res -= op.inf; sd.arm -= op.arm; sd.sh -= op.sh; sd.dr -= op.dr;
+  S.orders.push(op); S.sel = null; renderSide(); requestDraw();
+}
+function renderEditor(body) {
+  const t = ED.tool;
+  body.innerHTML = `<h2>Редактор линии фронта</h2>
+    <div class="hint">Рисуйте по карте. Колесо / щипок — масштаб. Правая кнопка мыши (или инструмент «Рука») — перемещение.</div>
+    <div class="tools">
+      <button data-tool="2" class="${t === 2 ? 'on' : ''}"><span class="sw" style="background:#d6302780"></span>Контроль РФ</button>
+      <button data-tool="1" class="${t === 1 ? 'on' : ''}"><span class="sw" style="background:#f4f1e8;border:1px solid #999"></span>Контроль ВСУ</button>
+      <button data-tool="3" class="${t === 3 ? 'on' : ''}"><span class="sw" style="background:#786e64"></span>Серая зона</button>
+      <button data-tool="hand" class="${t === 'hand' ? 'on' : ''}">✋ Рука</button>
+    </div>
+    <div class="sl"><span>Кисть</span><input type="range" min="1" max="14" value="${ED.size}" id="brush"><output id="brushO">${Math.round(ED.size * 2.2)} км</output></div>
+    ${statBlock()}
+    <div class="row" style="margin-top:10px"><button class="btn" id="bUndo">↶ Отменить</button><button class="btn" id="bReset">Сброс к DeepState</button></div>
+    <h3>Играть с этой линии</h3>
+    <div class="row"><button class="btn primary" id="bPlayUA">За ВСУ</button><button class="btn red" id="bPlayRU">За ВС РФ</button></div>
+    <div class="row" style="margin-top:6px"><button class="btn" id="bPlaySim">Симуляция ИИ</button></div>`;
+  body.querySelectorAll('[data-tool]').forEach(el => el.onclick = () => { ED.tool = el.dataset.tool === 'hand' ? 'hand' : +el.dataset.tool; cv.classList.toggle('paint', ED.tool !== 'hand'); renderSide(); });
+  $('brush').oninput = e => { ED.size = +e.target.value; $('brushO').textContent = Math.round(ED.size * 2.2) + ' км'; };
+  $('bUndo').onclick = undo;
+  $('bReset').onclick = () => { pushUndo(); applyFront(FRONT); recompute(); renderSide(); };
+  $('bPlayUA').onclick = () => startGame('campaign', UA, true);
+  $('bPlayRU').onclick = () => startGame('campaign', RU, true);
+  $('bPlaySim').onclick = () => startGame('sim', 0, true);
+  cv.classList.toggle('paint', ED.tool !== 'hand');
+}
+let autoTimer = null;
+function startAuto() { stopAuto(); autoTimer = setInterval(() => { if (S && S.mode === 'sim') endTurn(); else stopAuto(); }, 900); }
+function stopAuto() { if (autoTimer) { clearInterval(autoTimer); autoTimer = null; } }
+
+/* ================= Окна ================= */
+function openModal(html) { $('modalCard').innerHTML = html; $('modal').hidden = false; }
+function closeModal() { $('modal').hidden = true; }
+function srcLine() {
+  if (!FRONT) return `<span class="dot"></span>Загружаем актуальную линию фронта DeepState…`;
+  const live = FRONT.src === 'live' || FRONT.src === 'file';
+  return `<span class="dot ${live ? 'ok' : ''}"></span>${FRONT.src === 'live' ? 'Актуальная карта DeepState загружена' : FRONT.src === 'file' ? 'Карта DeepState загружена из файла' : 'Встроенная карта DeepState (упрощённая)'} — <b>${dateStr(FRONT.date)}</b>
+    ${live ? '' : `<div class="hint">Браузер не дал загрузить свежую карту напрямую. Чтобы взять самую новую: откройте
+      <a href="https://deepstatemap.live/api/history/last" target="_blank" rel="noopener">deepstatemap.live/api/history/last</a>, сохраните страницу (Ctrl+S) и выберите файл:</div>`}
+    <label class="tbtn" style="display:inline-block;margin-top:6px">Загрузить файл DeepState (.json)<input type="file" id="fileIn" accept=".json,application/json" hidden></label>`;
+}
+function showMenu() {
+  stopAuto();
+  const hasSave = (() => { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } })();
+  openModal(`<h1>ЛИНИЯ <i>ФРОНТА</i></h1>
+    <div class="sub">Стратегия на реальной карте: линия фронта DeepState, как она есть сегодня. Наступайте, укрепляйтесь, окружайте — и смотрите, как меняется карта.</div>
+    <div class="src" id="srcBox">${srcLine()}</div>
+    <div class="modes">
+      <button data-go="ua" ${FRONT ? '' : 'disabled'}><b><span class="flag ua"></span>Кампания за ВСУ</b><small>Удержать города и отбить территорию</small></button>
+      <button data-go="ru" ${FRONT ? '' : 'disabled'}><b><span class="flag ru"></span>Кампания за ВС РФ</b><small>Наступление на ключевые города</small></button>
+      <button data-go="sim" ${FRONT ? '' : 'disabled'}><b>⚙ Симуляция</b><small>ИИ против ИИ — смотрите, как движется фронт</small></button>
+      <button data-go="ed" ${FRONT ? '' : 'disabled'}><b>✎ Редактор фронта</b><small>Рисуйте линию фронта кистью</small></button>
+    </div>
+    <div class="row" style="margin-top:12px;align-items:center">
+      <span class="muted">Сложность:</span>
+      <select id="diff">${Object.entries(DIFF).map(([k, v]) => `<option value="${k}" ${(S ? S.diff : 'normal') === k ? 'selected' : ''}>${v.name}</option>`).join('')}</select>
+      <span class="spacer" style="flex:1"></span>
+      ${S && S.mode !== 'editor' && !S.over ? '<button class="btn" id="bResume" style="flex:none">Вернуться</button>' : hasSave ? '<button class="btn" id="bLoad" style="flex:none">Продолжить</button>' : ''}
+    </div>
+    <details><summary>Как играть</summary>
+      <p>Карта — сетка участков ~2×2 км. Стартовая линия фронта берётся из DeepStateMAP: красное — под контролем РФ, серое — серая зона.</p>
+      <p><b>Ход = 1 неделя.</b> Нажмите на карту у линии фронта и отдайте приказ. <b>Наступление</b>: выделите пехоту, технику, снаряды и дроны. Сила атаки сравнивается с обороной: плотность гарнизона, укрепления, застройка, реки (Днепр почти непроходим) и снаряды с дронами, которые остались у противника на складе.</p>
+      <p>Если соотношение сил меньше 1 — бойцы только просачиваются, участки становятся серой зоной. Больше 1,6 — прорыв.
+      <b>Окружение</b>: группировка, отрезанная от тыла, через 1–3 хода сдаётся.</p>
+      <p><b>Укрепить</b> — окопы и опорные пункты в круге (до 3 уровней) плюс 1 500 бойцов в оборону.</p>
+      <p>Погода важна: в распутицу наступления в 1,5 раза слабее. Каждую неделю приходят пополнения, иногда — события (помощь союзников, поставки снарядов, удары по складам).</p>
+      <p>Это игра, а не прогноз: цифры условные и упрощённые.</p>
+    </details>`);
+  bindMenu();
+}
+function bindMenu() {
+  const card = $('modalCard');
+  card.querySelectorAll('[data-go]').forEach(el => el.onclick = () => {
+    const g = el.dataset.go;
+    if (g === 'ed') { startGame('editor', 0, false); }
+    else startGame(g === 'sim' ? 'sim' : 'campaign', g === 'ua' ? UA : g === 'ru' ? RU : 0, false);
+  });
+  const fi = $('fileIn');
+  if (fi) fi.onchange = async () => {
+    const f = fi.files[0]; if (!f) return;
+    try {
+      let txt = await f.text();
+      const m = txt.match(/<pre[^>]*>([\s\S]*)<\/pre>/i); if (m) txt = m[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+      const fd = parseDeepState(JSON.parse(txt)); fd.src = 'file'; setFront(fd); toast('Карта DeepState загружена');
+    } catch (e) { toast('Не удалось прочитать файл: ' + e.message); }
+    showMenu();
+  };
+  if ($('bResume')) $('bResume').onclick = closeModal;
+  if ($('bLoad')) $('bLoad').onclick = () => { if (load()) closeModal(); else toast('Сохранение повреждено'); };
+}
+function showReport(rep) {
+  const p = S.player, net = rep.gained[p] - rep.gained[3 - p];
+  const lines = rep.lines.slice().sort((a, b) => (a.s === p ? 0 : 1) - (b.s === p ? 0 : 1));
+  openModal(`<h1 style="font-size:22px">Итоги недели ${S.turn}</h1>
+    <div class="sub">${dateStr(S.date)} · ${season(S.date).name}</div>
+    <div class="stat"><div class="big ${net >= 0 ? 'up' : 'down'}">${net >= 0 ? '+' : ''}${fmt(net)} км²</div><small class="muted">Ваши продвижения: ${fmt(rep.gained[p])} км² · противника: ${fmt(rep.gained[3 - p])} км²</small></div>
+    <div class="log rep" style="margin-top:12px">${lines.map(l => `<p class="${l.ev ? 'ev' : 's' + l.s}">${l.t}</p>`).join('') || '<p>Тихая неделя: активных действий не было.</p>'}</div>
+    <button class="btn primary" style="width:100%;margin-top:12px" id="bOk">Продолжить</button>`);
+  $('bOk').onclick = closeModal;
+}
+function showEnd(title, why) {
+  const p = S.player, s = S.sides[p];
+  openModal(`<h1>${title}</h1><div class="sub">${why}</div>${statBlock()}
+    <div class="stat">Недель: ${S.turn} · потери ${SIDE[p].short}: ${fmt(s.lossP)} чел., ${fmt(s.lossA)} ед. техники · противник: ${fmt(S.sides[3 - p].lossP)} чел.</div>
+    <div class="row" style="margin-top:12px"><button class="btn primary" id="bNew">Новая игра</button><button class="btn" id="bLook">Смотреть карту</button></div>`);
+  $('bNew').onclick = showMenu; $('bLook').onclick = closeModal;
+}
+
+/* ================= Сохранение ================= */
+const SAVE_KEY = 'frontline-save-v1';
+const toB64 = a => { const u = new Uint8Array(a.buffer, a.byteOffset, a.byteLength); let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); };
+const fromB64 = (s, T) => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return new T(u.buffer); };
+function save() {
+  if (!S || S.mode === 'editor') return;
+  try {
+    const st = Object.assign({}, S, { sel: null, draft: null });
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ N, S: st, stats0: STATS0, frontDate: +FRONT.date,
+      owner: toB64(owner), owner0: toB64(owner0), fort: toB64(fort), changed: toB64(changed), cut: toB64(cut) }));
+  } catch (e) { /* хранилище недоступно — игра просто не сохранится */ }
+}
+function load() {
+  try {
+    const d = JSON.parse(localStorage.getItem(SAVE_KEY));
+    if (!d || d.N !== N) return false;
+    owner.set(fromB64(d.owner, Uint8Array)); owner0.set(fromB64(d.owner0, Uint8Array)); fort.set(fromB64(d.fort, Uint8Array));
+    changed.set(fromB64(d.changed, Uint16Array)); cut.set(fromB64(d.cut, Uint8Array));
+    S = d.S; STATS0 = d.stats0; recompute(); renderAll(); return true;
+  } catch (e) { return false; }
+}
+
+/* ================= Запуск ================= */
+function setFront(fd) {
+  FRONT = fd;
+  $('credDate').textContent = '· ' + new Date(fd.date).toLocaleDateString('ru-RU');
+  if (!S) { applyFront(fd); owner0.set(owner); initForts(); recompute(); }
+}
+async function boot() {
+  buildBase(); buildPaths(); resize();
+  addEventListener('resize', resize);
+  $('bMenu').onclick = showMenu;
+  $('bLayers').onclick = () => { $('layers').hidden = !$('layers').hidden; };
+  document.querySelectorAll('#layers input').forEach(el => el.onchange = () => { layers[el.dataset.l] = el.checked; if (el.dataset.l === 'changes') buildImage(); requestDraw(); });
+  $('grab').onclick = () => $('side').classList.toggle('min');
+  // встроенный снимок сразу, чтобы карта не была пустой
+  const emb = GEO.front;
+  setFront({ occ: emb.occ, unk: emb.unk, date: new Date(emb.date + 'T12:00:00'), src: 'demo' });
+  if (innerWidth < 760) { view.z = Math.min(innerWidth / 230, 2); view.u = U(36.4); view.v = V(47.5); }
+  showMenu();
+  try {
+    const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 8000);
+    const r = await fetch('https://deepstatemap.live/api/history/last', { signal: ctl.signal, cache: 'no-store' });
+    clearTimeout(t);
+    if (!r.ok) throw new Error(r.status);
+    const fd = parseDeepState(await r.json()); fd.src = 'live';
+    setFront(fd);
+  } catch (e) { /* CORS или нет сети — остаёмся на встроенной карте */ }
+  if (!$('modal').hidden && $('srcBox')) { $('srcBox').innerHTML = srcLine(); bindMenu(); }
+}
+function closeLayers() { $('layers').hidden = true; }
+window.__game = { get S() { return S; }, owner, country, fort, endTurn, startGame, computeStats, CITIES, cellAt, U, V, COLS, ROWS, localInfo, view, requestDraw, get STATS() { return STATS; } };
+boot();
+</script>
+</body>
+</html>
