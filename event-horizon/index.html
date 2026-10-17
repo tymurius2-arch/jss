@@ -1,0 +1,1548 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- ARTIFACT-START -->
+<title>Горизонт событий</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Игра у чёрной дыры: свет каждого пикселя просчитан по уравнениям Шварцшильда. Лови кванты у горизонта, где твоё время замедляется.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;800&family=Onest:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+  /* Layout: живая чёрная дыра на весь экран, текст прижат к нижнему левому углу (как подпись к астрофото), HUD — по углам. */
+  :root {
+    color-scheme: dark;
+    --void: #03040a;
+    --ink: #f4ede3;
+    --muted: #a99f94;
+    --amber: #ffb35c;
+    --hot: #fff1d6;
+    --cyan: #8fe3ff;
+    --danger: #ff5a6e;
+    --panel: rgba(7, 8, 15, 0.74);
+    --line: rgba(255, 196, 130, 0.2);
+    --display: "Unbounded", "Arial Black", system-ui, sans-serif;
+    --body: "Onest", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; margin: 0; overflow: hidden; }
+  body {
+    background: var(--void); color: var(--ink);
+    font-family: var(--body); font-size: 15px; line-height: 1.5;
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  #gl { background: var(--void); }
+  #hud { touch-action: none; }
+
+  button { font: inherit; color: inherit; }
+  button:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+
+  .overlay {
+    position: fixed; inset: 0; z-index: 10;
+    display: flex; flex-direction: column; justify-content: flex-end;
+    padding-block: calc(24px + env(safe-area-inset-top, 0px)) calc(28px + env(safe-area-inset-bottom, 0px));
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    background: linear-gradient(to top right, rgba(3,4,10,.92) 0%, rgba(3,4,10,.55) 38%, rgba(3,4,10,0) 70%);
+    overflow-y: auto;
+  }
+  .block { max-width: 600px; display: flex; flex-direction: column; gap: 18px; padding-left: clamp(0px, 3vw, 40px); }
+  .eyebrow {
+    font-family: var(--mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--amber);
+  }
+  h1 {
+    margin: 0; font-family: var(--display); font-weight: 800;
+    font-size: clamp(40px, 8.4vw, 104px); line-height: .92; letter-spacing: -.02em;
+    text-wrap: balance;
+  }
+  h1 .ghost { display: block; color: transparent; -webkit-text-stroke: 1.5px var(--hot); }
+  h2 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(28px, 5vw, 48px); line-height: 1; text-wrap: balance; }
+  .lede { margin: 0; color: var(--muted); max-width: 52ch; }
+  .lede b { color: var(--ink); font-weight: 500; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; }
+  .btn {
+    border: 1px solid var(--line); background: var(--panel); border-radius: 999px;
+    padding: 12px 22px; font-weight: 500; cursor: pointer; letter-spacing: .01em;
+    transition: background .2s, border-color .2s, transform .1s;
+  }
+  .btn:hover { border-color: var(--amber); }
+  .btn:active { transform: scale(.97); }
+  .btn.primary { background: var(--amber); color: #1a0f03; border-color: var(--amber); font-weight: 700; padding-inline: 30px; }
+  .btn.primary:hover { background: var(--hot); }
+  .how {
+    margin: 0; padding: 16px 18px 16px 34px; border-radius: 14px; border: 1px solid var(--line);
+    background: var(--panel); color: var(--muted); display: grid; gap: 6px; max-width: 60ch;
+    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  }
+  .how b { color: var(--ink); font-weight: 500; }
+  kbd {
+    font-family: var(--mono); font-size: 12px; padding: 1px 6px; border-radius: 5px;
+    border: 1px solid var(--line); color: var(--ink);
+  }
+  .foot { font-size: 13px; color: var(--muted); max-width: 56ch; margin: 0; }
+  .best { font-family: var(--mono); font-size: 13px; color: var(--muted); }
+  .best b { color: var(--amber); }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; max-width: 600px; }
+  .stat { border-top: 1px solid var(--line); padding-top: 8px; min-width: 0; }
+  .stat span { display: block; font-size: 12px; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; font-family: var(--mono); }
+  .stat b { font-family: var(--mono); font-size: 20px; font-variant-numeric: tabular-nums; }
+  .stat.big b { color: var(--amber); font-size: 30px; }
+
+  .hudbtns {
+    position: fixed; z-index: 6; display: flex; gap: 8px;
+    top: calc(12px + env(safe-area-inset-top, 0px));
+    right: max(12px, env(safe-area-inset-right, 0px));
+  }
+  .icon {
+    width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center;
+    border: 1px solid var(--line); background: var(--panel); cursor: pointer; padding: 0;
+  }
+  .icon svg { width: 18px; height: 18px; stroke: var(--ink); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .icon.off svg { stroke: var(--muted); }
+
+  .hold {
+    position: fixed; z-index: 6; left: 50%; transform: translateX(-50%);
+    bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+    border: 1px solid var(--cyan); color: var(--cyan); background: var(--panel);
+    border-radius: 999px; padding: 10px 20px; font-weight: 500; cursor: pointer; touch-action: none;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .hold.on { background: var(--cyan); color: #04121a; }
+  .hold kbd { border-color: currentColor; color: inherit; }
+  @media (pointer: coarse) { .hold kbd { display: none; } }
+
+  .obspanel {
+    position: fixed; z-index: 6;
+    left: max(12px, env(safe-area-inset-left, 0px));
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    max-width: min(380px, calc(100% - 24px));
+    background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+    padding: 14px 16px; display: grid; gap: 10px;
+    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  }
+  .obspanel h3 { margin: 0; font-family: var(--display); font-size: 16px; font-weight: 500; }
+  .obspanel p { margin: 0; font-size: 13px; color: var(--muted); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    border: 1px solid var(--line); background: transparent; border-radius: 999px;
+    padding: 6px 12px; font-size: 13px; cursor: pointer; color: var(--muted);
+  }
+  .chip[aria-pressed="true"] { border-color: var(--amber); color: var(--hot); background: rgba(255,179,92,.14); }
+
+  .nogl { position: fixed; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; z-index: 50; background: var(--void); }
+
+  @media (max-width: 560px) {
+    .overlay { background: linear-gradient(to top, rgba(3,4,10,.95) 0%, rgba(3,4,10,.7) 45%, rgba(3,4,10,0) 75%); }
+    .block { gap: 14px; }
+    .how { font-size: 14px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .btn { transition: none; } }
+</style>
+
+<canvas id="gl" aria-hidden="true"></canvas>
+<canvas id="hud" aria-label="Игровое поле: чёрная дыра и твой зонд"></canvas>
+
+<div class="hudbtns">
+  <button class="icon" id="bCam" type="button" title="Сменить камеру (V)" aria-label="Сменить камеру" hidden>
+    <svg viewBox="0 0 24 24"><path d="M3 8h3l2-3h8l2 3h3v11H3z"/><circle cx="12" cy="13" r="3.5"/></svg>
+  </button>
+  <button class="icon" id="bSound" type="button" title="Звук (M)" aria-label="Звук">
+    <svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path class="w" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>
+  </button>
+  <button class="icon" id="bPause" type="button" title="Пауза (P)" aria-label="Пауза" hidden>
+    <svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg>
+  </button>
+</div>
+
+<button class="hold" id="bHold" type="button" hidden>
+  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>
+  Удержать орбиту <kbd>Пробел</kbd>
+</button>
+
+<!-- Главное меню -->
+<section class="overlay" id="menu">
+  <div class="block">
+    <div class="eyebrow">Стрелец A* · 4,3 млн масс Солнца · rₛ ≈ 12,7 млн км</div>
+    <h1>Горизонт<span class="ghost">событий</span></h1>
+    <p class="lede">Ты ведёшь зонд у сверхмассивной чёрной дыры и ловишь золотые кванты. <b>Чем ближе к горизонту, тем медленнее идёт твоё время</b> и тем дороже каждый квант. Перейдёшь черту — назад дороги нет.</p>
+    <div class="row">
+      <button class="btn primary" id="bPlay" type="button">Полёт</button>
+      <button class="btn" id="bObs" type="button">Обсерватория</button>
+      <button class="btn" id="bHow" type="button" aria-expanded="false" aria-controls="how">Как играть</button>
+    </div>
+    <ul class="how" id="how" hidden>
+      <li><b>Зажми и тяни</b> пальцем или мышью в сторону, куда толкнуть зонд. Или стрелки / <kbd>WASD</kbd>.</li>
+      <li><kbd>Пробел</kbd> или кнопка «Удержать орбиту» — автопилот выравнивает круговую орбиту.</li>
+      <li><b>Пунктир</b> показывает, куда ты летишь. Красный конец значит падение в дыру.</li>
+      <li>Множитель очков равен замедлению твоего времени. У самого горизонта он доходит до ×10 и выше.</li>
+      <li>Топливо восполняется у светящегося диска. Тёмные обломки бьют по корпусу.</li>
+      <li><kbd>V</kbd> — камера, <kbd>P</kbd> — пауза, <kbd>M</kbd> — звук.</li>
+    </ul>
+    <div class="best" id="bestLine"></div>
+    <p class="foot">Каждый пиксель — луч света, просчитанный на видеокарте по метрике Шварцшильда. Тень, тонкое кольцо и «арка» диска над дырой — это настоящее гравитационное линзирование, а не нарисованная картинка.</p>
+  </div>
+</section>
+
+<!-- Пауза -->
+<section class="overlay" id="pause" hidden>
+  <div class="block">
+    <div class="eyebrow">Время остановлено. Даже здесь.</div>
+    <h2>Пауза</h2>
+    <div class="row">
+      <button class="btn primary" id="bResume" type="button">Продолжить</button>
+      <button class="btn" id="bQuit" type="button">В меню</button>
+    </div>
+  </div>
+</section>
+
+<!-- Конец игры -->
+<section class="overlay" id="over" hidden>
+  <div class="block">
+    <div class="eyebrow" id="overEyebrow">Связь потеряна</div>
+    <h2 id="overTitle">Горизонт пересечён</h2>
+    <p class="lede" id="overText"></p>
+    <div class="stats">
+      <div class="stat big"><span>Очки</span><b id="oScore">0</b></div>
+      <div class="stat"><span>Рекорд</span><b id="oBest">0</b></div>
+      <div class="stat"><span>Квантов</span><b id="oOrbs">0</b></div>
+      <div class="stat"><span>Макс. замедление</span><b id="oMult">×1.0</b></div>
+      <div class="stat"><span>Твоё время</span><b id="oTau">0</b></div>
+      <div class="stat"><span>Время Земли</span><b id="oT">0</b></div>
+    </div>
+    <div class="row">
+      <button class="btn primary" id="bAgain" type="button">Ещё раз</button>
+      <button class="btn" id="bMenu" type="button">В меню</button>
+    </div>
+  </div>
+</section>
+
+<!-- Обсерватория -->
+<div class="obspanel" id="obspanel" hidden>
+  <h3>Обсерватория</h3>
+  <p>Тяни, чтобы облететь дыру. Колесо или щипок — ближе или дальше. Подлети к самой тени: свет там обходит дыру по кругу.</p>
+  <div class="chips">
+    <button class="chip" id="tDoppler" type="button" aria-pressed="true">Доплер</button>
+    <button class="chip" id="tDisk" type="button" aria-pressed="true">Диск</button>
+    <button class="chip" id="tLabels" type="button" aria-pressed="true">Подписи</button>
+    <button class="chip" id="tPlanet" type="button" aria-pressed="true">Планета</button>
+  </div>
+  <div class="row"><button class="btn" id="bObsBack" type="button">В меню</button></div>
+</div>
+
+<div class="nogl" id="nogl" hidden>
+  <div>
+    <h2>Нужен WebGL</h2>
+    <p class="lede">Этот браузер не дал доступ к видеокарте. Открой страницу в свежем Chrome, Safari или Firefox.</p>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* =====================================================================
+   ГОРИЗОНТ СОБЫТИЙ
+   Единицы: радиус Шварцшильда rₛ = 1, скорость света c = 1, GM = 0.5.
+   Свет: интегрируем нулевые геодезические Шварцшильда в декартовых
+   координатах (x'' = -1.5·h²·x / r⁵) прямо во фрагментном шейдере.
+   Зонд и объекты: потенциал Пачинского–Вииты Φ = -GM/(r - rₛ),
+   который даёт честную последнюю устойчивую орбиту (ISCO) на 3 rₛ.
+   ===================================================================== */
+
+const $ = (s) => document.querySelector(s);
+const glc = $('#gl'), hud = $('#hud'), hx = hud.getContext('2d');
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const coarse = matchMedia('(pointer: coarse)').matches;
+
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+};
+
+/* ---------------------------- WebGL ---------------------------- */
+const gl = glc.getContext('webgl2', { antialias: false, alpha: false, depth: false, powerPreference: 'high-performance' })
+  || glc.getContext('webgl', { antialias: false, alpha: false, depth: false });
+if (!gl) { $('#nogl').hidden = false; throw new Error('no webgl'); }
+glc.addEventListener('webglcontextlost', (e) => e.preventDefault());
+glc.addEventListener('webglcontextrestored', () => location.reload());
+
+const VS = `
+attribute vec2 aPos; varying vec2 vUv;
+void main(){ vUv = aPos*.5+.5; gl_Position = vec4(aPos,0.,1.); }`;
+
+const SCENE_FS = `
+precision highp float;
+varying vec2 vUv;
+uniform vec2 uRes;
+uniform vec3 uCam, uRight, uUp, uFwd;
+uniform float uTan, uPix, uDiskT, uSteps, uDoppler, uDiskOn, uN;
+uniform vec4 uObj[16];
+uniform vec4 uObjC[16];
+
+const float RIN = 3.0;
+const float ROUT = 15.0;
+
+float h13(vec3 p){ p = fract(p*.1031); p += dot(p, p.zyx+31.32); return fract((p.x+p.y)*p.z); }
+vec3 h33(vec3 p){ p = fract(p*vec3(.1031,.1030,.0973)); p += dot(p, p.yxz+33.33); return fract((p.xxy+p.yxx)*p.zyx); }
+float vnoise(vec3 p){
+  vec3 i = floor(p), f = fract(p); f = f*f*(3.-2.*f);
+  return mix(mix(mix(h13(i), h13(i+vec3(1,0,0)), f.x), mix(h13(i+vec3(0,1,0)), h13(i+vec3(1,1,0)), f.x), f.y),
+             mix(mix(h13(i+vec3(0,0,1)), h13(i+vec3(1,0,1)), f.x), mix(h13(i+vec3(0,1,1)), h13(i+vec3(1,1,1)), f.x), f.y), f.z);
+}
+float fbm(vec3 p){ float s = 0., a = .5; for (int i = 0; i < 4; i++){ s += a*vnoise(p); p = p*2.03 + vec3(1.7,9.2,3.1); a *= .5; } return s; }
+
+/* Цвет абсолютно чёрного тела (аппроксимация Таннера Хелланда), T в кельвинах */
+vec3 blackbody(float T){
+  T = clamp(T, 1000., 40000.) / 100.;
+  vec3 c;
+  c.r = T <= 66. ? 1. : clamp(1.292936*pow(T-60., -.1332047), 0., 1.);
+  c.g = T <= 66. ? clamp(.3900816*log(T) - .6318414, 0., 1.) : clamp(1.129891*pow(T-60., -.0755148), 0., 1.);
+  c.b = T >= 66. ? 1. : (T <= 19. ? 0. : clamp(.5432068*log(T-10.) - 1.1962541, 0., 1.));
+  return c*c; /* в линейное пространство */
+}
+
+/* Тонкий аккреционный диск: профиль Новикова–Торна, доплер и гравитационное красное смещение */
+vec4 disk(vec3 q, vec3 rd){
+  float r = length(q.xz);
+  if (r < RIN || r > ROUT) return vec4(0.);
+  float x = RIN / r;
+  float prof = pow(x, .75) * pow(max(1. - sqrt(x), 0.), .25) / .488;
+  float beta = sqrt(.5 / (r - 1.));
+  float om = beta / r;
+  float ph = atan(q.z, q.x) + uDiskT*om;
+  vec3 sp = vec3(r*2.4, cos(ph)*r*.55, sin(ph)*r*.55);
+  float n = fbm(sp);
+  float n2 = vnoise(vec3(r*9., cos(ph)*r*1.6, sin(ph)*r*1.6));
+  float dens = smoothstep(RIN, RIN + .5, r) * (1. - smoothstep(ROUT - 6., ROUT, r));
+  dens *= clamp(.15 + 1.25*n*n + .35*n2, 0., 1.5);
+  vec3 u = normalize(vec3(q.z, 0., -q.x)) * beta;
+  float gam = inversesqrt(1. - beta*beta);
+  float g = 1. / (gam * (1. + dot(u, rd)));
+  g *= sqrt(1. - 1./r);
+  g = mix(sqrt(1. - 1./r), g, uDoppler);
+  float T = 7200. * prof * g;
+  vec3 c = blackbody(T) * prof * prof * pow(g, 3.) * 1.35;
+  float a = clamp(dens*.8, 0., .95);
+  return vec4(c * (.35 + dens), a);
+}
+
+vec3 starLayer(vec3 d, float sc, float gain){
+  vec3 q = d*sc; vec3 id = floor(q); vec3 f = q - id;
+  vec3 h = h33(id);
+  vec3 sp = .15 + .7*h;
+  float dist = length(f - sp);
+  float w0 = uPix*sc*1.1;
+  float fade = 1. - smoothstep(.12, .3, w0);   /* слой мельче пикселя — гасим, иначе «снег» */
+  float w = clamp(w0, .015, .12);
+  float b = pow(h13(id + 17.31), 14.) * gain * fade;
+  return blackbody(2600. + 9000.*h.y) * b * exp(-dist*dist/(w*w)) * 3.;
+}
+
+vec3 background(vec3 d){
+  vec3 c = vec3(0.);
+  vec3 gpole = normalize(vec3(.35, 1., -.25));
+  float lat = dot(d, gpole);
+  float band = exp(-lat*lat*9.);
+  float n = fbm(d*3.1 + 4.);
+  float n2 = fbm(d*7.3 - 2.);
+  c += vec3(.030, .022, .050) * n * n * 1.6;
+  c += vec3(.22, .15, .10) * band * pow(n2, 2.2) * .9;
+  c += vec3(.05, .07, .12) * band * n * .5;
+  float dust = smoothstep(.35, .75, fbm(d*11. + 9.));
+  c *= 1. - band*dust*.75;
+  c += starLayer(d, 70., 1.6);
+  c += starLayer(d, 170., .9) * (1. + band*2.);
+  c += starLayer(d, 320., .6) * (.4 + band*3.);
+  return c;
+}
+
+vec3 shade(vec4 oc, vec3 hp, vec3 hc, float hr, vec3 n, vec3 rd){
+  vec3 L = normalize(-hp + vec3(0., -sign(hp.y)*2., 0.));
+  float dif = max(dot(n, L), 0.);
+  float ring = max(dot(n, normalize(-hp)), 0.);
+  float fr = pow(1. - max(dot(n, -rd), 0.), 3.);
+  vec3 lightC = vec3(1., .74, .46);
+  float t = oc.w;
+  if (t < .5) {                         /* зонд */
+    return oc.rgb * (.10 + dif*lightC*1.3 + ring*.25) + fr*vec3(.35,.85,1.)*1.3;
+  } else if (t < 1.5) {                 /* квант */
+    return oc.rgb * (1.7 + 1.4*fr);
+  } else if (t < 2.5) {                 /* обломок */
+    float k = vnoise((hp-hc)*14./hr) * .7 + .3;
+    return oc.rgb * k * (.05 + dif*lightC*1.25) + fr*vec3(1.,.45,.2)*.25;
+  }
+  vec3 lp = (hp - hc) / hr;             /* планета */
+  float bands = .5 + .5*sin(lp.y*13. + fbm(lp*3.)*4.);
+  vec3 alb = mix(oc.rgb, oc.rgb*vec3(1.4,1.2,.9), bands);
+  return alb * (.03 + dif*lightC*1.4) + fr*vec3(.4,.6,1.)*.35;
+}
+
+void main(){
+  vec2 uv = (gl_FragCoord.xy - .5*uRes) / (.5*uRes.y);
+  vec3 rd = normalize(uFwd + (uv.x*uRight + uv.y*uUp)*uTan);
+  vec3 p = uCam, v = rd;
+  vec3 hv = cross(p, v); float h2 = dot(hv, hv);
+  vec3 col = vec3(0.); float A = 0.;
+  bool cap = false, hit = false;
+
+  for (int i = 0; i < 420; i++) {
+    if (float(i) >= uSteps) break;
+    float r2 = dot(p, p); float r = sqrt(r2);
+    if (r < 1.) { cap = true; break; }
+    if (r > 70. && dot(p, v) > 0.) break;
+    float dt = r < 4. ? .07*r : .0175*r2;
+    dt = min(dt, 7.);
+    vec3 acc = -1.5 * h2 * p / (r2*r2*r);
+    vec3 v2 = v + acc*dt;
+    vec3 p2 = p + v2*dt;
+    vec3 ab = p2 - p; float L2 = dot(ab, ab); float L = sqrt(L2);
+
+    float tObj = 2.; vec4 hcol = vec4(0.); vec3 hc = vec3(0.); float hr = 1.;
+    for (int j = 0; j < 16; j++) {
+      if (float(j) >= uN) break;
+      vec4 o = uObj[j]; vec4 oc = uObjC[j];
+      vec3 pc = o.xyz - p;
+      float pr = dot(pc, ab) / L;
+      float tt = clamp(pr / L, 0., 1.);
+      vec3 dd = pc - ab*tt; float d2 = dot(dd, dd);
+      float rr = o.w*o.w;
+      if ((oc.w > .5 && oc.w < 1.5) || (oc.w > 2.5 && oc.w < 3.5)) {
+        float gk = oc.w > 2.5 ? .9 : .5;
+        col += (1. - A) * oc.rgb * L * rr * gk * .1 / (d2 + rr*.06);
+      }
+      if (oc.w < 2.5 || oc.w > 3.5) {
+        if (d2 < rr) {
+          float disc = pr*pr - (dot(pc, pc) - rr);
+          float te = max((pr - sqrt(max(disc, 0.))) / L, 0.);
+          if (te < tObj) { tObj = te; hcol = oc; hc = o.xyz; hr = o.w; }
+        }
+      }
+    }
+
+    if (uDiskOn > .5 && p.y*p2.y < 0.) {
+      float tc = p.y / (p.y - p2.y);
+      if (tc < tObj) {
+        vec4 dc = disk(mix(p, p2, tc), normalize(v2));
+        col += (1. - A) * dc.rgb * dc.a;
+        A += (1. - A) * dc.a;
+      }
+    }
+    if (tObj <= 1.) {
+      vec3 hp = mix(p, p2, tObj);
+      col += (1. - A) * shade(hcol, hp, hc, hr, normalize(hp - hc), ab/L);
+      A = 1.; hit = true; break;
+    }
+    p = p2; v = v2;
+    if (A > .985) break;
+  }
+  if (!hit && !cap) col += (1. - A) * background(normalize(v));
+
+  col = (col*(2.51*col + .03)) / (col*(2.43*col + .59) + .14);   /* ACES */
+  gl_FragColor = vec4(pow(clamp(col, 0., 1.), vec3(1./2.2)), 1.);
+}`;
+
+const BRIGHT_FS = `
+precision mediump float;
+varying vec2 vUv; uniform sampler2D uTex; uniform vec2 uTexel;
+void main(){
+  vec3 c = texture2D(uTex, vUv + uTexel*vec2(-1.,-1.)).rgb + texture2D(uTex, vUv + uTexel*vec2(1.,-1.)).rgb
+         + texture2D(uTex, vUv + uTexel*vec2(-1.,1.)).rgb + texture2D(uTex, vUv + uTexel*vec2(1.,1.)).rgb;
+  c *= .25;
+  float l = max(c.r, max(c.g, c.b));
+  gl_FragColor = vec4(c * smoothstep(.5, 1., l), 1.);
+}`;
+
+const BLUR_FS = `
+precision mediump float;
+varying vec2 vUv; uniform sampler2D uTex; uniform vec2 uDir;
+void main(){
+  vec3 c = texture2D(uTex, vUv).rgb * .227027;
+  c += texture2D(uTex, vUv + uDir*1.384615).rgb * .316216;
+  c += texture2D(uTex, vUv - uDir*1.384615).rgb * .316216;
+  c += texture2D(uTex, vUv + uDir*3.230769).rgb * .070270;
+  c += texture2D(uTex, vUv - uDir*3.230769).rgb * .070270;
+  gl_FragColor = vec4(c, 1.);
+}`;
+
+const COMP_FS = `
+precision mediump float;
+varying vec2 vUv;
+uniform sampler2D uScene, uBloom;
+uniform float uBloomK, uFade, uFlash, uTime, uGrain;
+float h12(vec2 p){ vec3 p3 = fract(vec3(p.xyx)*.1031); p3 += dot(p3, p3.yzx+33.33); return fract((p3.x+p3.y)*p3.z); }
+void main(){
+  vec2 cc = vUv - .5;
+  vec3 c = texture2D(uScene, vUv).rgb;
+  c += texture2D(uBloom, vUv).rgb * uBloomK;
+  c *= 1. - dot(cc, cc)*.6;
+  c = mix(c, vec3(1., .2, .25), uFlash*.38);
+  c += (h12(gl_FragCoord.xy + fract(uTime)*317.) - .5) * uGrain;
+  c *= 1. - uFade;
+  gl_FragColor = vec4(c, 1.);
+}`;
+
+function compile(type, src) {
+  const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+  return s;
+}
+function program(fs, names) {
+  const p = gl.createProgram();
+  gl.attachShader(p, compile(gl.VERTEX_SHADER, VS));
+  gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fs));
+  gl.bindAttribLocation(p, 0, 'aPos');
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+  const u = {};
+  for (const n of names) u[n] = gl.getUniformLocation(p, n);
+  return { p, u };
+}
+const P = {
+  scene: program(SCENE_FS, ['uRes','uCam','uRight','uUp','uFwd','uTan','uPix','uDiskT','uSteps','uDoppler','uDiskOn','uN','uObj','uObjC']),
+  bright: program(BRIGHT_FS, ['uTex','uTexel']),
+  blur: program(BLUR_FS, ['uTex','uDir']),
+  comp: program(COMP_FS, ['uScene','uBloom','uBloomK','uFade','uFlash','uTime','uGrain']),
+};
+const quad = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+gl.enableVertexAttribArray(0);
+gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+function target(w, h) {
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  const fb = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  return { tex, fb, w, h };
+}
+function freeTarget(t) { if (t) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fb); } }
+
+/* ------------------------ Размеры и качество ------------------------ */
+let W = 1, H = 1, DPR = 1, quality = coarse ? 0.55 : 0.8;
+let RT = { scene: null, b1: null, b2: null };
+function resize() {
+  W = innerWidth; H = innerHeight;
+  DPR = Math.min(devicePixelRatio || 1, 2);
+  const gs = Math.min(DPR, 1.5) * quality;
+  const gw = Math.max(64, Math.round(W * gs)), gh = Math.max(64, Math.round(H * gs));
+  if (glc.width !== gw || glc.height !== gh || !RT.scene) {
+    glc.width = gw; glc.height = gh;
+    freeTarget(RT.scene); freeTarget(RT.b1); freeTarget(RT.b2);
+    RT.scene = target(gw, gh);
+    const bw = Math.max(16, gw >> 2), bh = Math.max(16, gh >> 2);
+    RT.b1 = target(bw, bh); RT.b2 = target(bw, bh);
+  }
+  hud.width = Math.round(W * DPR); hud.height = Math.round(H * DPR);
+  needsRender = true;
+}
+addEventListener('resize', resize);
+
+const perf = { ema: 16, t: 0 };
+function adaptQuality(dt) {
+  perf.ema += (dt * 1000 - perf.ema) * 0.05;
+  perf.t += dt;
+  if (perf.t < 1.5) return;
+  perf.t = 0;
+  let q = quality;
+  if (perf.ema > 26 && q > 0.34) q = Math.max(0.34, q * 0.85);
+  else if (perf.ema < 15 && q < 1) q = Math.min(1, q * 1.08);
+  if (Math.abs(q - quality) > 0.01) { quality = q; resize(); }
+}
+
+/* ---------------------------- Камера ---------------------------- */
+const V = {
+  add: (a, b) => [a[0]+b[0], a[1]+b[1], a[2]+b[2]],
+  sub: (a, b) => [a[0]-b[0], a[1]-b[1], a[2]-b[2]],
+  mul: (a, k) => [a[0]*k, a[1]*k, a[2]*k],
+  dot: (a, b) => a[0]*b[0] + a[1]*b[1] + a[2]*b[2],
+  cross: (a, b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]],
+  len: (a) => Math.hypot(a[0], a[1], a[2]),
+  norm: (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0]/l, a[1]/l, a[2]/l]; },
+  lerp: (a, b, t) => [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t],
+};
+const cam = { eye: [0, 3, 24], tgt: [0, 0, 0], fov: 60, right: [1,0,0], up: [0,1,0], fwd: [0,0,-1], tan: 0.577 };
+function setCamBasis() {
+  cam.fwd = V.norm(V.sub(cam.tgt, cam.eye));
+  cam.right = V.norm(V.cross(cam.fwd, [0, 1, 0]));
+  cam.up = V.cross(cam.right, cam.fwd);
+  cam.tan = Math.tan(cam.fov * Math.PI / 360);
+}
+function project(p) {
+  const d = V.sub(p, cam.eye);
+  const z = V.dot(d, cam.fwd);
+  if (z < 0.05) return null;
+  const sx = V.dot(d, cam.right) / z / cam.tan, sy = V.dot(d, cam.up) / z / cam.tan;
+  return [W / 2 + sx * H / 2, H / 2 - sy * H / 2, z];
+}
+/* Направления «вверх по экрану» и «вправо по экрану», спроецированные на плоскость диска */
+function planeBasis() {
+  let R = [cam.right[0], cam.right[2]];
+  let F = Math.abs(cam.fwd[1]) > 0.97 ? [cam.up[0], cam.up[2]] : [cam.fwd[0], cam.fwd[2]];
+  const lr = Math.hypot(R[0], R[1]) || 1, lf = Math.hypot(F[0], F[1]) || 1;
+  return { R: [R[0]/lr, R[1]/lr], F: [F[0]/lf, F[1]/lf] };
+}
+
+/* ---------------------------- Физика ---------------------------- */
+const GM = 0.5, TS = 9, GY = 0.32;           // TS — единиц rₛ/c за реальную секунду
+const SEC_PER_UNIT = 42.4;                   // rₛ/c для Стрельца A* в секундах
+const vCirc = (r) => Math.sqrt(GM * r) / (r - 1);
+const omega = (r) => vCirc(r) / r;
+function gravity(x, z) {
+  const r = Math.hypot(x, z), k = -GM / ((r - 1) * (r - 1)) / r;
+  return [k * x, k * z];
+}
+/* Скорость собственного времени dτ/dt: гравитационное замедление × лоренцево */
+function clockRate(r, v) {
+  const g = Math.sqrt(Math.max(1 - 1 / r, 1e-4));
+  const l = Math.sqrt(Math.max(1 - Math.min(v * v, 0.995), 1e-4));
+  return g * l;
+}
+const multAt = (r, v) => Math.min(25, 1 / clockRate(r, v));
+const diskGlow = (r) => r < 3 || r > 15 ? 0 : Math.pow(3 / r, .75) * Math.pow(1 - Math.sqrt(3 / r), .25) / .488;
+
+/* ---------------------------- Игра ---------------------------- */
+const S = {
+  mode: 'menu', prevMode: 'menu', paused: false,
+  t: 0, tau: 0, real: 0, diskT: 0,
+  score: 0, best: store.get('eh.best', 0), collected: 0, level: 1,
+  combo: 1, comboT: 0, maxMult: 1, fuel: 100, hull: 3, inv: 0,
+  flash: 0, shake: 0, fade: 0, dyingT: 0, cause: '', camMode: 'chase',
+  zones: {}, lostT: 0,
+};
+const ship = { x: 10, z: 0, vx: 0, vz: 0, hx: 0, hz: -1, thrust: 0, auto: false };
+let orbs = [], debris = [], toasts = [], sparks = [];
+const input = { keys: new Set(), ptr: null, holdBtn: false };
+const obs = { az: 0.6, el: 0.12, dist: 22, doppler: true, disk: true, labels: true, planet: true, drag: null, pinch: null, auto: true };
+
+function resetGame() {
+  Object.assign(S, { t: 0, tau: 0, real: 0, score: 0, collected: 0, level: 1, combo: 1, comboT: 0,
+    maxMult: 1, fuel: 100, hull: 3, inv: 0, flash: 0, shake: 0, fade: 0, dyingT: 0, cause: '', zones: {}, lostT: 0 });
+  const r0 = 11;
+  Object.assign(ship, { x: r0, z: 0, vx: 0, vz: -vCirc(r0), hx: 0, hz: -1, thrust: 0, auto: false });
+  orbs = []; debris = []; toasts = []; sparks = [];
+  for (let i = 0; i < 6; i++) orbs.push(spawnOrb(true));
+  snapChase();
+  toast('Зажми и тяни туда, куда толкнуть зонд', 'Пробел удерживает круговую орбиту', 4.5);
+}
+
+function spawnOrb(initial) {
+  const minR = Math.max(2.05, 6 - S.level * 0.5), maxR = 17;
+  for (let tries = 0; tries < 20; tries++) {
+    const R = minR + (maxR - minR) * Math.pow(Math.random(), 1.5);
+    const th = Math.random() * Math.PI * 2;
+    const x = R * Math.cos(th), z = R * Math.sin(th);
+    if (Math.hypot(x - ship.x, z - ship.z) < (initial ? 3 : 2.5)) continue;
+    const gold = R < 4.2 && Math.random() < 0.25 + S.level * 0.03;
+    return { R, th, gold, ph: Math.random() * 6.28 };
+  }
+  return { R: 8, th: Math.random() * 6.28, gold: false, ph: 0 };
+}
+function spawnDebris() {
+  for (let tries = 0; tries < 30; tries++) {
+    const R = 7 + Math.random() * 13, th = Math.random() * Math.PI * 2;
+    const x = R * Math.cos(th), z = R * Math.sin(th);
+    if (Math.hypot(x - ship.x, z - ship.z) < 5) continue;
+    const dir = Math.random() < 0.4 ? -1 : 1;
+    const f = 0.8 + Math.random() * 0.3, vc = vCirc(R) * f * dir;
+    const tx = z / R, tz = -x / R, rad = (Math.random() - 0.5) * 0.06;
+    return { x, z, vx: tx * vc + x / R * rad, vz: tz * vc + z / R * rad, s: 0.24 + Math.random() * 0.14, spin: Math.random() };
+  }
+  return null;
+}
+function orbPos(o) { return [o.R * Math.cos(o.th), GY, o.R * Math.sin(o.th)]; }
+
+function shipR() { return Math.hypot(ship.x, ship.z); }
+function shipV() { return Math.hypot(ship.vx, ship.vz); }
+
+function thrustDir() {
+  const { R, F } = planeBasis();
+  let dx = 0, dy = 0;
+  const k = input.keys;
+  if (k.has('ArrowUp') || k.has('KeyW')) dy += 1;
+  if (k.has('ArrowDown') || k.has('KeyS')) dy -= 1;
+  if (k.has('ArrowRight') || k.has('KeyD')) dx += 1;
+  if (k.has('ArrowLeft') || k.has('KeyA')) dx -= 1;
+  if (input.ptr) {
+    const sp = project([ship.x, GY, ship.z]);
+    if (sp) {
+      const px = input.ptr.x - sp[0], py = sp[1] - input.ptr.y;
+      const l = Math.hypot(px, py);
+      if (l > 8) { dx = px / l; dy = py / l; }
+    }
+  }
+  if (!dx && !dy) return null;
+  const wx = R[0] * dx + F[0] * dy, wz = R[1] * dx + F[1] * dy, l = Math.hypot(wx, wz) || 1;
+  return [wx / l, wz / l];
+}
+
+const THRUST = 0.0042, BURN = 11;
+function update(dt) {
+  S.real += dt;
+  const dts = dt * TS;
+  const r0 = shipR();
+  let dir = thrustDir();
+  const auto = (input.keys.has('Space') || input.holdBtn) && !dir;
+  ship.auto = auto;
+  if (auto) {
+    const sgn = (ship.x * ship.vz - ship.z * ship.vx) <= 0 ? 1 : -1;
+    const vc = vCirc(Math.max(r0, 1.6)) * sgn;
+    const dvx = ship.z / r0 * vc - ship.vx, dvz = -ship.x / r0 * vc - ship.vz;
+    const l = Math.hypot(dvx, dvz);
+    dir = l > 0.0015 ? [dvx / l, dvz / l] : null;
+  }
+  const canBurn = S.fuel > 0.5 && dir;
+  ship.thrust += ((canBurn ? 1 : 0) - ship.thrust) * Math.min(1, dt * 10);
+  if (canBurn) S.fuel = Math.max(0, S.fuel - BURN * dt);
+  S.fuel = Math.min(100, S.fuel + (1.2 + 9 * diskGlow(r0)) * dt);
+
+  const n = Math.min(90, Math.max(1, Math.ceil(dts / (0.03 * Math.pow(Math.max(r0, 1.05), 1.5)))));
+  const h = dts / n;
+  for (let i = 0; i < n; i++) {
+    const g = gravity(ship.x, ship.z);
+    let ax = g[0], az = g[1];
+    if (canBurn) { ax += dir[0] * THRUST; az += dir[1] * THRUST; }
+    ship.vx += ax * h; ship.vz += az * h;
+    const sp = Math.hypot(ship.vx, ship.vz);
+    if (sp > 0.97) { ship.vx *= 0.97 / sp; ship.vz *= 0.97 / sp; }
+    ship.x += ship.vx * h; ship.z += ship.vz * h;
+    if (Math.hypot(ship.x, ship.z) < 1.04) break;
+  }
+  const r = shipR(), v = shipV();
+  if (canBurn) { ship.hx += (dir[0] - ship.hx) * Math.min(1, dt * 12); ship.hz += (dir[1] - ship.hz) * Math.min(1, dt * 12); }
+  else if (v > 1e-4) { ship.hx += (ship.vx / v - ship.hx) * dt * 2; ship.hz += (ship.vz / v - ship.hz) * dt * 2; }
+  const hl = Math.hypot(ship.hx, ship.hz) || 1; ship.hx /= hl; ship.hz /= hl;
+
+  const rate = clockRate(r, v), mult = multAt(r, v);
+  S.t += dts; S.tau += dts * rate;
+  S.maxMult = Math.max(S.maxMult, mult);
+  AU.dilation(mult);
+  AU.engine(ship.thrust);
+
+  zoneToasts(r, mult);
+
+  // кванты
+  for (let i = 0; i < orbs.length; i++) {
+    const o = orbs[i];
+    o.th -= omega(o.R) * dts;
+    o.ph += dt * 3;
+    const p = orbPos(o);
+    if (Math.hypot(p[0] - ship.x, p[2] - ship.z) < (o.gold ? 0.62 : 0.55)) {
+      collect(o, mult, p);
+      orbs[i] = spawnOrb(false);
+    }
+  }
+  // обломки
+  const want = Math.min(6, Math.floor((S.level - 1) * 1.25));
+  while (debris.length < want) { const d = spawnDebris(); if (!d) break; debris.push(d); }
+  for (let i = debris.length - 1; i >= 0; i--) {
+    const d = debris[i];
+    const dr = Math.hypot(d.x, d.z);
+    const m = Math.min(60, Math.max(1, Math.ceil(dts / (0.05 * Math.pow(Math.max(dr, 1.1), 1.5)))));
+    const hh = dts / m;
+    for (let k = 0; k < m; k++) {
+      const g = gravity(d.x, d.z);
+      d.vx += g[0] * hh; d.vz += g[1] * hh; d.x += d.vx * hh; d.z += d.vz * hh;
+    }
+    const nr = Math.hypot(d.x, d.z);
+    if (nr < 1.3 || nr > 40) { const nd = spawnDebris(); if (nd) debris[i] = nd; else debris.splice(i, 1); continue; }
+    if (S.inv <= 0 && Math.hypot(d.x - ship.x, d.z - ship.z) < d.s + 0.2) hitDebris(d);
+  }
+
+  S.inv = Math.max(0, S.inv - dt);
+  S.comboT = Math.max(0, S.comboT - dt);
+  if (S.comboT <= 0) S.combo = 1;
+
+  if (r < 1.06) return die('horizon');
+  if (r > 36) {
+    S.lostT += dt;
+    if (S.lostT > 0.01 && !S.zones.lost) { S.zones.lost = 1; toast('Связь слабеет', 'Вернись ближе к дыре', 2.5); }
+    if (r > 46) return die('void');
+  } else { S.lostT = 0; S.zones.lost = 0; }
+}
+
+function zoneToasts(r, mult) {
+  const z = S.zones;
+  if (r < 6 && !z.inner) { z.inner = 1; toast('Внутренний диск', 'Здесь газ светится ярче всего'); }
+  if (r < 3 && !z.isco) { z.isco = 1; toast('Ниже ISCO', 'Устойчивых орбит больше нет. Держи газ!'); }
+  if (r < 1.5 && !z.photon) { z.photon = 1; toast('Фотонная сфера', 'Здесь даже свет летает по кругу'); }
+  if (mult > 2 && !z.m2) { z.m2 = 1; toast('Время ×2', 'Твои часы идут вдвое медленнее земных'); }
+  if (mult > 5 && !z.m5) { z.m5 = 1; toast('Время ×5', 'Минута у тебя — пять минут на Земле'); }
+}
+
+function collect(o, mult, p) {
+  S.combo = S.comboT > 0 ? Math.min(5, S.combo + 1) : 1;
+  S.comboT = 7;
+  const pts = Math.round(100 * (o.gold ? 3 : 1) * mult * S.combo);
+  S.score += pts;
+  S.collected++;
+  S.fuel = Math.min(100, S.fuel + (o.gold ? 30 : 14));
+  AU.collect(mult, S.combo, o.gold);
+  const sp = project(p);
+  if (sp) sparks.push({ x: sp[0], y: sp[1], t: 0, text: '+' + pts, gold: o.gold });
+  if (S.collected % 5 === 0) {
+    S.level++;
+    AU.level();
+    toast('Уровень ' + S.level, S.level === 2 ? 'Появились обломки. Береги корпус' : 'Кванты опускаются глубже к горизонту');
+  }
+}
+
+function hitDebris(d) {
+  S.hull--; S.inv = 2.2; S.flash = 1; S.shake = 1;
+  const dx = ship.x - d.x, dz = ship.z - d.z, l = Math.hypot(dx, dz) || 1;
+  ship.vx += dx / l * 0.03; ship.vz += dz / l * 0.03;
+  AU.hit();
+  try { navigator.vibrate && navigator.vibrate([60, 40, 90]); } catch (e) {}
+  if (S.hull <= 0) die('hull');
+  else toast('Удар обломка', 'Корпус: ' + S.hull + ' из 3', 1.8);
+}
+
+function die(cause) {
+  S.cause = cause;
+  S.mode = 'dying'; S.dyingT = 0;
+  ship.thrust = 0; AU.engine(0);
+  AU.death(cause);
+  $('#bHold').hidden = true; $('#bPause').hidden = true; $('#bCam').hidden = true;
+}
+
+function updateDying(dt) {
+  S.dyingT += dt;
+  if (S.cause === 'horizon') {
+    // Для далёкого наблюдателя зонд «застывает»: замедляем падение
+    const r = shipR();
+    const k = Math.max(0.02, (r - 1) * 2);
+    ship.x *= 1 - 0.02 * k * dt * 10; ship.z *= 1 - 0.02 * k * dt * 10;
+    const th = Math.atan2(ship.z, ship.x) - dt * 0.6 * k;
+    const rr = Math.max(1.0, shipR());
+    ship.x = rr * Math.cos(th); ship.z = rr * Math.sin(th);
+  } else if (S.cause === 'void') {
+    ship.x += ship.vx * dt * TS; ship.z += ship.vz * dt * TS;
+  }
+  S.fade = Math.min(1, Math.max(0, (S.dyingT - 1.2) / 1.6));
+  if (S.dyingT > 3) showOver();
+}
+
+function showOver() {
+  S.mode = 'over';
+  $('#bHold').hidden = true; $('#bPause').hidden = true; $('#bCam').hidden = true;
+  const newBest = S.score > S.best;
+  if (newBest) { S.best = S.score; store.set('eh.best', S.best); }
+  const T = {
+    horizon: ['Горизонт пересечён', 'Связь потеряна навсегда',
+      'Изнутри ты просто пролетел черту и ничего особенного не заметил. А для нас твой зонд застыл у края тени, краснея и угасая, и будет виден там вечно.'],
+    hull: ['Корпус разрушен', 'Обломки диска',
+      'В диске летают камни со скоростями в десятки тысяч километров в секунду. Следи за красными точками на мини-карте.'],
+    void: ['Потерян в пустоте', 'Слишком далеко',
+      'Зонд набрал вторую космическую и ушёл в межзвёздную тьму. Чтобы остаться на орбите, гаси скорость против направления полёта.'],
+  }[S.cause] || ['Конец полёта', '', ''];
+  $('#overTitle').textContent = T[0];
+  $('#overEyebrow').textContent = newBest ? 'Новый рекорд · ' + T[1] : T[1];
+  const earth = fmtTime(S.t * SEC_PER_UNIT), mine = fmtTime(S.tau * SEC_PER_UNIT);
+  $('#overText').textContent = T[2] + ' Ты прожил ' + mine + ', а на Земле за это время прошло ' + earth + '.';
+  $('#oScore').textContent = S.score.toLocaleString('ru-RU');
+  $('#oBest').textContent = S.best.toLocaleString('ru-RU');
+  $('#oOrbs').textContent = S.collected;
+  $('#oMult').textContent = '×' + S.maxMult.toFixed(1);
+  $('#oTau').textContent = mine;
+  $('#oT').textContent = earth;
+  showOverlay('over');
+  S.fade = 0;
+  menuCam.az = Math.atan2(cam.eye[2], cam.eye[0]);
+}
+
+function fmtTime(sec) {
+  sec = Math.max(0, Math.round(sec));
+  const d = Math.floor(sec / 86400), h = Math.floor(sec % 86400 / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60;
+  if (d > 0) return d + ' д ' + h + ' ч';
+  if (h > 0) return h + ' ч ' + String(m).padStart(2, '0') + ' мин';
+  return m + ' мин ' + String(s).padStart(2, '0') + ' с';
+}
+
+function toast(text, sub, life) { toasts.push({ text, sub: sub || '', t: 0, life: life || 2.6 }); if (toasts.length > 3) toasts.shift(); }
+
+/* ---------------------------- Камеры ---------------------------- */
+const chase = { dx: 0, dz: -1 };
+function snapChase() { const v = shipV() || 1; chase.dx = ship.vx / v; chase.dz = ship.vz / v; chaseCam(1); }
+function chaseCam(k) {
+  const v = shipV();
+  if (v > 1e-4) {
+    chase.dx += (ship.vx / v - chase.dx) * k * 0.6; chase.dz += (ship.vz / v - chase.dz) * k * 0.6;
+    const l = Math.hypot(chase.dx, chase.dz) || 1; chase.dx /= l; chase.dz /= l;
+  }
+  const r = shipR(), rx = ship.x / r, rz = ship.z / r;
+  let eye, tgt;
+  if (S.camMode === 'chase') {
+    const back = 4.6, hgt = 1.55;
+    eye = [ship.x - chase.dx * back + rx * 1.1, GY + hgt, ship.z - chase.dz * back + rz * 1.1];
+    tgt = [ship.x + chase.dx * 3 - rx * 1.4, GY - 0.1, ship.z + chase.dz * 3 - rz * 1.4];
+    cam.fov += (68 - cam.fov) * k;
+  } else {
+    const d = Math.max(30, r * 1.7), el = 0.95;
+    eye = [Math.cos(el) * d * 0.15, Math.sin(el) * d, Math.cos(el) * d];
+    tgt = [0, 0, 0];
+    cam.fov += (52 - cam.fov) * k;
+  }
+  const er = V.len(eye);
+  if (er < 1.9) eye = V.mul(eye, 1.9 / er);
+  cam.eye = V.lerp(cam.eye, eye, k);
+  cam.tgt = V.lerp(cam.tgt, tgt, k);
+}
+const menuCam = { az: 0.4 };
+function cinematicCam(dt) {
+  menuCam.az += dt * 0.035;
+  const el = 0.11 + Math.sin(S.real * 0.07) * 0.05, d = 21;
+  const eye = [d * Math.cos(el) * Math.cos(menuCam.az), d * Math.sin(el), d * Math.cos(el) * Math.sin(menuCam.az)];
+  const fwd = V.norm(V.mul(eye, -1)), right = V.norm(V.cross(fwd, [0, 1, 0])), up = V.cross(right, fwd);
+  const wide = W / H > 1.1;
+  const tgt = wide ? V.add(V.mul(right, -5.5), V.mul(up, -0.6)) : V.mul(up, -5.2);
+  const k = Math.min(1, dt * 2);
+  cam.eye = V.lerp(cam.eye, eye, k); cam.tgt = V.lerp(cam.tgt, tgt, k);
+  cam.fov += ((wide ? 50 : 62) - cam.fov) * k;
+}
+function obsCam(dt) {
+  if (obs.auto && !obs.drag) obs.az += dt * 0.04;
+  const k = Math.min(1, dt * 8);
+  const eye = [obs.dist * Math.cos(obs.el) * Math.cos(obs.az), obs.dist * Math.sin(obs.el), obs.dist * Math.cos(obs.el) * Math.sin(obs.az)];
+  cam.eye = V.lerp(cam.eye, eye, k); cam.tgt = V.lerp(cam.tgt, [0, 0, 0], k);
+  cam.fov += (60 - cam.fov) * k;
+}
+
+/* ---------------------------- Объекты для шейдера ---------------------------- */
+const OBJ = new Float32Array(64), OBJC = new Float32Array(64);
+let nObj = 0;
+function pushObj(p, rad, c, type) {
+  if (nObj >= 16) return;
+  const i = nObj * 4;
+  OBJ[i] = p[0]; OBJ[i + 1] = p[1]; OBJ[i + 2] = p[2]; OBJ[i + 3] = rad;
+  OBJC[i] = c[0]; OBJC[i + 1] = c[1]; OBJC[i + 2] = c[2]; OBJC[i + 3] = type;
+  nObj++;
+}
+function buildObjects() {
+  nObj = 0;
+  if (S.mode === 'play' || S.mode === 'dying' || (S.mode === 'pause' && S.prevMode === 'play')) {
+    const blink = S.inv > 0 && Math.floor(S.inv * 10) % 2 === 0;
+    const stretch = S.mode === 'dying' && S.cause === 'horizon' ? Math.min(1, S.dyingT / 1.5) : 0;
+    if (!blink && S.fade < 0.95) {
+      const sx = [ship.x, GY, ship.z];
+      pushObj(sx, 0.16 * (1 - stretch * 0.6), [0.82, 0.92, 1.0], 0);
+      pushObj([ship.x + ship.hx * 0.18, GY, ship.z + ship.hz * 0.18], 0.085, [0.45, 0.85, 1.0], 0);
+      if (stretch > 0) {
+        const r = shipR();
+        pushObj([ship.x - ship.x / r * 0.3 * stretch, GY, ship.z - ship.z / r * 0.3 * stretch], 0.08, [0.7, 0.85, 1.0], 0);
+      }
+      if (ship.thrust > 0.05) {
+        const fl = 0.3 + Math.random() * 0.06;
+        pushObj([ship.x - ship.hx * fl, GY, ship.z - ship.hz * fl], 0.2 * ship.thrust, ship.auto ? [0.4, 1.0, 0.9] : [0.5, 0.75, 1.0], 3);
+      }
+    }
+    for (const o of orbs) {
+      const pul = 1 + Math.sin(o.ph) * 0.12;
+      pushObj(orbPos(o), (o.gold ? 0.25 : 0.19) * pul, o.gold ? [1.0, 0.92, 0.65] : [1.0, 0.7, 0.28], 1);
+    }
+    for (const d of debris) pushObj([d.x, GY, d.z], d.s, [0.62, 0.5, 0.44], 2);
+  } else if (S.mode === 'obs' || (S.mode === 'pause' && S.prevMode === 'obs')) {
+    if (obs.planet) {
+      const R = 8.5, th = -S.diskT * 2 * omega(R);
+      const pp = [R * Math.cos(th), 0.0, R * Math.sin(th)];
+      pushObj(pp, 0.55, [0.25, 0.42, 0.75], 4);
+      const mth = S.real * 0.9;
+      pushObj(V.add(pp, [Math.cos(mth) * 1.1, Math.sin(mth) * 0.25, Math.sin(mth) * 1.1]), 0.16, [0.6, 0.58, 0.55], 2);
+    }
+  }
+}
+
+/* ---------------------------- Рендер ---------------------------- */
+let needsRender = true;
+function render() {
+  setCamBasis();
+  const sw = RT.scene.w, sh = RT.scene.h;
+  const sc = P.scene;
+  gl.useProgram(sc.p);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, RT.scene.fb);
+  gl.viewport(0, 0, sw, sh);
+  const shake = reduceMotion ? 0 : S.shake * 0.06;
+  const eye = shake ? V.add(cam.eye, [(Math.random() - .5) * shake, (Math.random() - .5) * shake, (Math.random() - .5) * shake]) : cam.eye;
+  gl.uniform2f(sc.u.uRes, sw, sh);
+  gl.uniform3fv(sc.u.uCam, eye);
+  gl.uniform3fv(sc.u.uRight, cam.right);
+  gl.uniform3fv(sc.u.uUp, cam.up);
+  gl.uniform3fv(sc.u.uFwd, cam.fwd);
+  gl.uniform1f(sc.u.uTan, cam.tan);
+  gl.uniform1f(sc.u.uPix, 2 * cam.tan / sh);
+  gl.uniform1f(sc.u.uDiskT, S.diskT);
+  gl.uniform1f(sc.u.uSteps, 300);
+  const inObs = S.mode === 'obs' || (S.mode === 'pause' && S.prevMode === 'obs');
+  gl.uniform1f(sc.u.uDoppler, inObs && !obs.doppler ? 0 : 1);
+  gl.uniform1f(sc.u.uDiskOn, inObs && !obs.disk ? 0 : 1);
+  gl.uniform1f(sc.u.uN, nObj);
+  gl.uniform4fv(sc.u.uObj, OBJ);
+  gl.uniform4fv(sc.u.uObjC, OBJC);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+  // яркие места → размытие (bloom)
+  gl.useProgram(P.bright.p);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, RT.b1.fb);
+  gl.viewport(0, 0, RT.b1.w, RT.b1.h);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, RT.scene.tex);
+  gl.uniform1i(P.bright.u.uTex, 0);
+  gl.uniform2f(P.bright.u.uTexel, 1 / sw, 1 / sh);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  gl.useProgram(P.blur.p);
+  gl.uniform1i(P.blur.u.uTex, 0);
+  for (let i = 0; i < 2; i++) {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, RT.b2.fb);
+    gl.bindTexture(gl.TEXTURE_2D, RT.b1.tex);
+    gl.uniform2f(P.blur.u.uDir, (1 + i) / RT.b1.w, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, RT.b1.fb);
+    gl.bindTexture(gl.TEXTURE_2D, RT.b2.tex);
+    gl.uniform2f(P.blur.u.uDir, 0, (1 + i) / RT.b1.h);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+
+  gl.useProgram(P.comp.p);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.viewport(0, 0, glc.width, glc.height);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, RT.scene.tex);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, RT.b1.tex);
+  gl.uniform1i(P.comp.u.uScene, 0); gl.uniform1i(P.comp.u.uBloom, 1);
+  gl.uniform1f(P.comp.u.uBloomK, 0.75);
+  gl.uniform1f(P.comp.u.uFade, S.fade);
+  gl.uniform1f(P.comp.u.uFlash, S.flash);
+  gl.uniform1f(P.comp.u.uTime, S.real);
+  gl.uniform1f(P.comp.u.uGrain, reduceMotion ? 0 : 0.03);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  gl.activeTexture(gl.TEXTURE0);
+}
+
+/* ---------------------------- HUD ---------------------------- */
+const C = {
+  ink: '#f4ede3', muted: '#a99f94', amber: '#ffb35c', hot: '#fff1d6', cyan: '#8fe3ff', danger: '#ff5a6e',
+  panel: 'rgba(7,8,15,0.62)', line: 'rgba(255,196,130,0.22)',
+};
+const F = { mono: '"JetBrains Mono", ui-monospace, Menlo, monospace', body: 'Onest, system-ui, sans-serif', disp: 'Unbounded, "Arial Black", sans-serif' };
+
+function predict() {
+  let x = ship.x, z = ship.z, vx = ship.vx, vz = ship.vz;
+  const pts = []; let fate = 'orbit';
+  let travelled = 0, px = x, pz = z;
+  for (let i = 0; i < 520; i++) {
+    const r = Math.hypot(x, z);
+    if (r < 1.05) { fate = 'fall'; break; }
+    if (r > 46) { fate = 'escape'; break; }
+    const h = Math.min(2.2, 0.05 * Math.pow(r, 1.5));
+    const g = gravity(x, z);
+    vx += g[0] * h; vz += g[1] * h; x += vx * h; z += vz * h;
+    travelled += Math.hypot(x - px, z - pz); px = x; pz = z;
+    if (i % 3 === 0) pts.push([x, z]);
+    if (travelled > 2 * Math.PI * Math.max(r, 3) * 1.05 && i > 60) break;
+  }
+  pts.push([x, z]);
+  return { pts, fate };
+}
+
+function drawHUD(dt) {
+  const ctx = hx;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  ctx.shadowColor = 'rgba(0,0,0,0.85)'; ctx.shadowBlur = 6;
+  if (S.mode === 'obs') return drawObsLabels(ctx);
+  if (S.mode !== 'play' && S.mode !== 'dying' && !(S.mode === 'pause' && S.prevMode === 'play')) return;
+
+  const r = shipR(), v = shipV(), mult = multAt(r, v);
+  const safeT = 12, safeL = 14;
+  const pr = S.mode === 'play' || S.mode === 'pause' ? predict() : null;
+
+  // траектория
+  if (pr && S.fade < 0.5) {
+    ctx.save();
+    const n = pr.pts.length;
+    for (let i = 0; i < n; i++) {
+      const p = project([pr.pts[i][0], GY, pr.pts[i][1]]);
+      if (!p) continue;
+      const a = 1 - i / n;
+      const end = pr.fate === 'fall' && i > n * 0.75;
+      ctx.fillStyle = end ? C.danger : C.cyan;
+      ctx.globalAlpha = 0.15 + a * 0.6;
+      const s = Math.max(1.2, Math.min(3, 26 / p[2]));
+      ctx.beginPath(); ctx.arc(p[0], p[1], s, 0, 6.283); ctx.fill();
+    }
+    if (pr.fate === 'fall') {
+      const last = pr.pts[n - 1], p = project([last[0], GY, last[1]]);
+      if (p) {
+        ctx.globalAlpha = 0.9; ctx.strokeStyle = C.danger; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(p[0] - 6, p[1] - 6); ctx.lineTo(p[0] + 6, p[1] + 6); ctx.moveTo(p[0] + 6, p[1] - 6); ctx.lineTo(p[0] - 6, p[1] + 6); ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
+  // маркеры квантов с множителем
+  ctx.save();
+  ctx.font = '600 11px ' + F.mono; ctx.textAlign = 'center';
+  for (const o of orbs) {
+    const p = project(orbPos(o));
+    if (!p || p[0] < -20 || p[0] > W + 20 || p[1] < -20 || p[1] > H + 20) continue;
+    const m = multAt(o.R, vCirc(o.R));
+    const rad = Math.max(9, Math.min(26, 6 / p[2] * H / 2 * 0.4 / cam.tan));
+    ctx.globalAlpha = 0.55;
+    ctx.strokeStyle = o.gold ? C.hot : C.amber; ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let k = 0; k < 4; k++) { const a0 = k * Math.PI / 2 + 0.35; ctx.arc(p[0], p[1], rad, a0, a0 + 0.8); ctx.moveTo(p[0] + Math.cos(a0 + Math.PI / 2) * rad, p[1] + Math.sin(a0 + Math.PI / 2) * rad); }
+    ctx.stroke();
+    if (m > 1.25 || o.gold) {
+      ctx.globalAlpha = 0.9; ctx.fillStyle = o.gold ? C.hot : C.amber;
+      ctx.fillText('×' + (m * (o.gold ? 3 : 1)).toFixed(1), p[0], p[1] - rad - 5);
+    }
+  }
+  ctx.restore();
+
+  // вспышки очков
+  ctx.save(); ctx.textAlign = 'center';
+  for (let i = sparks.length - 1; i >= 0; i--) {
+    const s = sparks[i]; s.t += dt;
+    if (s.t > 1.4) { sparks.splice(i, 1); continue; }
+    ctx.globalAlpha = 1 - s.t / 1.4;
+    ctx.font = '700 ' + (s.gold ? 22 : 17) + 'px ' + F.mono;
+    ctx.fillStyle = s.gold ? C.hot : C.amber;
+    ctx.fillText(s.text, s.x, s.y - 20 - s.t * 40);
+  }
+  ctx.restore();
+
+  // верхний левый блок: очки, множитель, часы
+  const L = Math.max(safeL, 14);
+  ctx.save();
+  ctx.textBaseline = 'top';
+  ctx.fillStyle = C.muted; ctx.font = '500 11px ' + F.mono;
+  ctx.fillText('ОЧКИ · УР. ' + S.level, L, safeT + 4);
+  ctx.fillStyle = C.ink; ctx.font = '800 28px ' + F.disp;
+  ctx.fillText(S.score.toLocaleString('ru-RU'), L, safeT + 20);
+  const mcol = mult > 5 ? C.danger : mult > 2 ? C.hot : mult > 1.3 ? C.amber : C.muted;
+  ctx.fillStyle = mcol; ctx.font = '700 20px ' + F.mono;
+  const multText = '×' + mult.toFixed(mult < 10 ? 2 : 1);
+  ctx.fillText(multText, L, safeT + 58);
+  const mw = ctx.measureText(multText).width;
+  ctx.fillStyle = C.muted; ctx.font = '500 11px ' + F.mono;
+  ctx.fillText('ЗАМЕДЛЕНИЕ ВРЕМЕНИ', L + mw + 8, safeT + 62);
+  if (S.combo > 1) {
+    ctx.fillStyle = C.cyan; ctx.font = '700 12px ' + F.mono;
+    ctx.fillText('КОМБО ×' + S.combo, L + mw + 8, safeT + 76);
+  }
+  ctx.font = '500 12px ' + F.mono;
+  ctx.fillStyle = C.cyan; ctx.fillText('ТЫ     ' + fmtTime(S.tau * SEC_PER_UNIT), L, safeT + 92);
+  ctx.fillStyle = C.muted; ctx.fillText('ЗЕМЛЯ  ' + fmtTime(S.t * SEC_PER_UNIT), L, safeT + 108);
+  ctx.restore();
+
+  // нижний левый: топливо, корпус, радиус
+  const bottom = H - 16;
+  const isPhone = W < 560;
+  const bx = L, by = isPhone ? bottom - 108 : bottom - 58;
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = C.muted; ctx.font = '500 11px ' + F.mono;
+  ctx.fillText('ТОПЛИВО', bx, by);
+  const fw = 150;
+  ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fillRect(bx, by + 6, fw, 6);
+  ctx.fillStyle = S.fuel < 20 ? C.danger : C.cyan; ctx.fillRect(bx, by + 6, fw * S.fuel / 100, 6);
+  for (let i = 0; i < 3; i++) {
+    ctx.fillStyle = i < S.hull ? C.ink : 'rgba(255,255,255,0.12)';
+    ctx.beginPath(); const hx0 = bx + fw + 14 + i * 14; ctx.moveTo(hx0, by + 3); ctx.lineTo(hx0 + 5, by + 9); ctx.lineTo(hx0, by + 15); ctx.lineTo(hx0 - 5, by + 9); ctx.closePath(); ctx.fill();
+  }
+  const zone = r < 1.5 ? 'фотонная сфера' : r < 3 ? 'ниже ISCO' : r < 15 ? 'аккреционный диск' : 'открытый космос';
+  ctx.fillStyle = r < 3 ? C.danger : C.ink; ctx.font = '700 14px ' + F.mono;
+  ctx.fillText('r = ' + r.toFixed(2) + ' rₛ', bx, by + 34);
+  ctx.fillStyle = C.muted; ctx.font = '500 11px ' + F.mono;
+  ctx.fillText(zone + ' · v = ' + (v * 100).toFixed(0) + '% c', bx, by + 50);
+  ctx.restore();
+
+  drawMinimap(ctx, pr);
+  drawToasts(ctx, dt);
+}
+
+function drawMinimap(ctx, pr) {
+  const isPhone = W < 560;
+  const R = isPhone ? 54 : 74;
+  const cx = W - R - 16, cy = isPhone ? H - R - 72 : H - R - 16;
+  const MAXR = 24;
+  const { R: bR, F: bF } = planeBasis();
+  const m = (x, z) => {
+    const a = x * bR[0] + z * bR[1], b = x * bF[0] + z * bF[1];
+    const rr = Math.hypot(a, b) || 1e-6, s = Math.sqrt(Math.min(rr, MAXR) / MAXR) * R / rr;
+    return [cx + a * s, cy - b * s];
+  };
+  const rad = (r) => Math.sqrt(r / MAXR) * R;
+  ctx.save();
+  ctx.fillStyle = C.panel; ctx.strokeStyle = C.line; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(cx, cy, R + 6, 0, 6.283); ctx.fill(); ctx.stroke();
+  // диск
+  const grd = ctx.createRadialGradient(cx, cy, rad(3), cx, cy, rad(15));
+  grd.addColorStop(0, 'rgba(255,200,120,0.45)'); grd.addColorStop(1, 'rgba(255,140,60,0)');
+  ctx.fillStyle = grd; ctx.beginPath(); ctx.arc(cx, cy, rad(15), 0, 6.283); ctx.arc(cx, cy, rad(3), 0, 6.283, true); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,179,92,0.7)'; ctx.setLineDash([2, 3]);
+  ctx.beginPath(); ctx.arc(cx, cy, rad(3), 0, 6.283); ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,90,110,0.7)';
+  ctx.beginPath(); ctx.arc(cx, cy, rad(1.5), 0, 6.283); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#000'; ctx.strokeStyle = 'rgba(255,241,214,0.5)';
+  ctx.beginPath(); ctx.arc(cx, cy, rad(1), 0, 6.283); ctx.fill(); ctx.stroke();
+  // путь
+  if (pr) {
+    ctx.strokeStyle = pr.fate === 'fall' ? 'rgba(255,90,110,0.8)' : 'rgba(143,227,255,0.6)'; ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    let first = true;
+    for (const p of pr.pts) { const q = m(p[0], p[1]); if (first) { ctx.moveTo(q[0], q[1]); first = false; } else ctx.lineTo(q[0], q[1]); }
+    ctx.stroke();
+  }
+  for (const o of orbs) { const p = orbPos(o), q = m(p[0], p[2]); ctx.fillStyle = o.gold ? C.hot : C.amber; ctx.beginPath(); ctx.arc(q[0], q[1], o.gold ? 3 : 2.3, 0, 6.283); ctx.fill(); }
+  for (const d of debris) { const q = m(d.x, d.z); ctx.fillStyle = C.danger; ctx.fillRect(q[0] - 2, q[1] - 2, 4, 4); }
+  const q = m(ship.x, ship.z);
+  ctx.fillStyle = C.cyan; ctx.beginPath(); ctx.arc(q[0], q[1], 3.5, 0, 6.283); ctx.fill();
+  const q2 = m(ship.x + ship.hx * 1.5, ship.z + ship.hz * 1.5);
+  ctx.strokeStyle = C.cyan; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(q[0], q[1]); ctx.lineTo(q2[0], q2[1]); ctx.stroke();
+  ctx.restore();
+}
+
+function drawToasts(ctx, dt) {
+  ctx.save(); ctx.textAlign = 'center';
+  let y = Math.max(150, H * 0.3);
+  for (let i = toasts.length - 1; i >= 0; i--) {
+    const t = toasts[i]; t.t += dt;
+    if (t.t > t.life) { toasts.splice(i, 1); continue; }
+  }
+  for (const t of toasts) {
+    const a = Math.min(1, t.t * 4, (t.life - t.t) * 2);
+    ctx.globalAlpha = a;
+    let fs = W < 560 ? 18 : 24;
+    ctx.font = '800 ' + fs + 'px ' + F.disp;
+    const tw = ctx.measureText(t.text).width;
+    if (tw > W - 32) { fs = Math.floor(fs * (W - 32) / tw); ctx.font = '800 ' + fs + 'px ' + F.disp; }
+    ctx.fillStyle = C.hot;
+    ctx.fillText(t.text, W / 2, y);
+    if (t.sub) { ctx.fillStyle = C.muted; ctx.font = '500 14px ' + F.body; ctx.fillText(t.sub, W / 2, y + 24); }
+    y += 62;
+  }
+  ctx.restore();
+}
+
+/* Подписи в обсерватории: где тень, кольцо, «арка» диска и доплеровские стороны */
+function drawObsLabels(ctx) {
+  if (!obs.labels) return;
+  const c = project([0, 0, 0]);
+  if (!c) return;
+  const D = V.len(cam.eye);
+  const sinA = 2.598 / D * Math.sqrt(Math.max(0, 1 - 1 / D));
+  if (sinA >= 1) return;
+  const ang = Math.asin(sinA);
+  const pxR = Math.tan(ang) / cam.tan * H / 2;
+  const elev = Math.abs(Math.asin(cam.eye[1] / D));
+  const items = [];
+  items.push({ x: c[0] - pxR * 0.35, y: c[1] + pxR * 0.2, text: 'Тень', sub: 'отсюда не выходит даже свет', dx: -1, dy: 1 });
+  items.push({ x: c[0] + Math.cos(-0.8) * pxR * 1.01, y: c[1] + Math.sin(-0.8) * pxR * 1.01, text: 'Фотонное кольцо', sub: 'свет, облетевший дыру', dx: 1, dy: -1 });
+  if (obs.disk && elev < 0.6) {
+    items.push({ x: c[0] - pxR * 0.15, y: c[1] - pxR * 1.32, text: 'Задняя сторона диска', sub: 'её свет загнулся над дырой', dx: -1, dy: -1.3 });
+  }
+  if (obs.disk && obs.doppler && elev < 1.1) {
+    const rr = [cam.right[0], 0, cam.right[2]], rl = Math.hypot(rr[0], rr[2]) || 1;
+    for (const s of [1, -1]) {
+      const q = [rr[0] / rl * 8 * s, 0, rr[2] / rl * 8 * s];
+      const p = project(q); if (!p) continue;
+      const u = [q[2], 0, -q[0]];
+      const toward = V.dot(u, V.sub(cam.eye, q)) > 0;
+      items.push({ x: p[0], y: p[1], text: toward ? 'Газ летит к нам' : 'Газ улетает', sub: toward ? 'ярче и голубее' : 'тусклее и краснее', dx: s * 0.6, dy: 1.6 });
+    }
+  }
+  ctx.save();
+  for (const it of items) {
+    const len = 42, ex = it.x + it.dx * len, ey = it.y + it.dy * len * 0.8;
+    if (ex < 10 || ex > W - 10 || ey < 30 || ey > H - 20) continue;
+    ctx.strokeStyle = 'rgba(255,241,214,0.55)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(it.x, it.y); ctx.lineTo(ex, ey); ctx.stroke();
+    ctx.fillStyle = C.hot; ctx.beginPath(); ctx.arc(it.x, it.y, 2.5, 0, 6.283); ctx.fill();
+    ctx.textAlign = it.dx < 0 ? 'right' : 'left';
+    const tx = ex + (it.dx < 0 ? -6 : 6);
+    ctx.font = '500 13px ' + F.body; ctx.fillStyle = C.ink;
+    ctx.fillText(it.text, tx, ey + (it.dy < 0 ? -14 : 4));
+    ctx.font = '400 11px ' + F.body; ctx.fillStyle = C.muted;
+    ctx.fillText(it.sub, tx, ey + (it.dy < 0 ? 0 : 18));
+  }
+  ctx.font = '500 11px ' + F.mono; ctx.fillStyle = C.muted; ctx.textAlign = 'left';
+  ctx.fillText('РАССТОЯНИЕ ' + D.toFixed(1) + ' rₛ · ' + (D * 12.7).toFixed(0) + ' МЛН КМ', 16, 26);
+  ctx.restore();
+}
+
+/* ---------------------------- Звук ---------------------------- */
+const AU = {
+  ctx: null, on: store.get('eh.sound', true), master: null, send: null, osc: [], filt: null, eng: null, last: 1,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      const ctx = this.ctx = new Ctx();
+      const comp = ctx.createDynamicsCompressor(); comp.connect(ctx.destination);
+      this.master = ctx.createGain(); this.master.gain.value = this.on ? 0.8 : 0; this.master.connect(comp);
+      const rev = ctx.createConvolver(); rev.buffer = this.impulse(3.8); rev.connect(this.master);
+      this.send = ctx.createGain(); this.send.gain.value = 0.55; this.send.connect(rev);
+      // гул
+      this.filt = ctx.createBiquadFilter(); this.filt.type = 'lowpass'; this.filt.frequency.value = 520; this.filt.Q.value = 1.2;
+      const dg = ctx.createGain(); dg.gain.value = 0.11;
+      this.filt.connect(dg); dg.connect(this.master); dg.connect(this.send);
+      [[55, 'sawtooth', .35], [55.4, 'sawtooth', .35], [82.4, 'triangle', .5], [110.2, 'sine', .6], [164.6, 'sine', .25]].forEach(([f, t, g]) => {
+        const o = ctx.createOscillator(); o.type = t; o.frequency.value = f;
+        const og = ctx.createGain(); og.gain.value = g; o.connect(og); og.connect(this.filt); o.start(); this.osc.push(o);
+      });
+      const lfo = ctx.createOscillator(); lfo.frequency.value = 0.07;
+      const lg = ctx.createGain(); lg.gain.value = 180; lfo.connect(lg); lg.connect(this.filt.frequency); lfo.start();
+      // шум двигателя
+      const nb = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate), d = nb.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      this.noise = nb;
+      const ns = ctx.createBufferSource(); ns.buffer = nb; ns.loop = true;
+      const nf = ctx.createBiquadFilter(); nf.type = 'lowpass'; nf.frequency.value = 700;
+      this.eng = ctx.createGain(); this.eng.gain.value = 0;
+      ns.connect(nf); nf.connect(this.eng); this.eng.connect(this.master); ns.start();
+    } catch (e) { this.ctx = null; }
+  },
+  impulse(sec) {
+    const ctx = this.ctx, n = Math.floor(ctx.sampleRate * sec), b = ctx.createBuffer(2, n, ctx.sampleRate);
+    for (let c = 0; c < 2; c++) { const d = b.getChannelData(c); for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 2.6); }
+    return b;
+  },
+  toggle() {
+    this.on = !this.on; store.set('eh.sound', this.on);
+    if (this.master) this.master.gain.setTargetAtTime(this.on ? 0.8 : 0, this.ctx.currentTime, 0.05);
+    syncSoundBtn();
+  },
+  dilation(m) {
+    if (!this.ctx || Math.abs(m - this.last) < 0.01) return;
+    this.last = m;
+    const t = this.ctx.currentTime, cents = -1200 * Math.log2(m) * 0.55;
+    for (const o of this.osc) o.detune.setTargetAtTime(cents, t, 0.4);
+    this.filt.frequency.setTargetAtTime(520 / Math.sqrt(m), t, 0.4);
+  },
+  engine(k) { if (this.ctx) this.eng.gain.setTargetAtTime(k * 0.09, this.ctx.currentTime, 0.05); },
+  tone(f, t0, dur, type, vol, toSend) {
+    const ctx = this.ctx, o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type; o.frequency.value = f;
+    g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(vol, t0 + 0.01); g.gain.exponentialRampToValueAtTime(0.0008, t0 + dur);
+    o.connect(g); g.connect(this.master); if (toSend) g.connect(this.send);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+    return o;
+  },
+  collect(m, combo, gold) {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime, scale = [0, 3, 5, 7, 10, 12, 15];
+    const base = 523.25 / Math.sqrt(m);
+    const n1 = scale[Math.min(scale.length - 1, combo - 1)], n2 = n1 + (gold ? 12 : 7);
+    this.tone(base * Math.pow(2, n1 / 12), t, 0.5 * Math.sqrt(m), 'triangle', 0.16, true);
+    this.tone(base * Math.pow(2, n2 / 12), t + 0.08 * Math.sqrt(m), 0.7 * Math.sqrt(m), 'sine', 0.12, true);
+  },
+  level() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    [0, 4, 7, 12].forEach((n, i) => this.tone(392 * Math.pow(2, n / 12), t + i * 0.09, 0.8, 'triangle', 0.1, true));
+  },
+  hit() {
+    if (!this.ctx) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    const o = this.tone(120, t, 0.45, 'square', 0.2, false); o.frequency.exponentialRampToValueAtTime(35, t + 0.4);
+    const s = ctx.createBufferSource(); s.buffer = this.noise;
+    const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 900;
+    const g = ctx.createGain(); g.gain.setValueAtTime(0.35, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+    s.connect(f); f.connect(g); g.connect(this.master); g.connect(this.send); s.start(t); s.stop(t + 0.4);
+  },
+  death(cause) {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const o = this.tone(cause === 'void' ? 220 : 330, t, 3.6, 'sine', 0.22, true);
+    o.frequency.exponentialRampToValueAtTime(cause === 'void' ? 440 : 22, t + 3.4);
+    for (const x of this.osc) x.detune.setTargetAtTime(cause === 'horizon' ? -2400 : 0, t, 1.2);
+  },
+  click() { if (this.ctx) this.tone(880, this.ctx.currentTime, 0.08, 'sine', 0.05, false); },
+  reset() { if (!this.ctx) return; this.last = 0; this.dilation(1); this.engine(0); },
+};
+function syncSoundBtn() {
+  const b = $('#bSound'); b.classList.toggle('off', !AU.on);
+  b.querySelector('.w').style.display = AU.on ? '' : 'none';
+  b.setAttribute('aria-pressed', String(AU.on));
+}
+
+/* ---------------------------- Режимы и UI ---------------------------- */
+const overlays = ['menu', 'pause', 'over'];
+function showOverlay(id) { for (const o of overlays) $('#' + o).hidden = o !== id; }
+
+let wakeLock = null;
+function wake() { try { navigator.wakeLock && navigator.wakeLock.request('screen').then((l) => { wakeLock = l; }).catch(() => {}); } catch (e) {} }
+
+function startGame() {
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  AU.init(); AU.reset(); AU.click();
+  showOverlay(null);
+  $('#obspanel').hidden = true;
+  S.mode = 'play'; S.paused = false;
+  resetGame();
+  $('#bHold').hidden = false; $('#bPause').hidden = false; $('#bCam').hidden = false;
+  wake();
+}
+function toMenu() {
+  AU.reset();
+  S.mode = 'menu'; S.fade = 0; S.flash = 0;
+  showOverlay('menu');
+  $('#obspanel').hidden = true; $('#bHold').hidden = true; $('#bPause').hidden = true; $('#bCam').hidden = true;
+  updateBestLine();
+  menuCam.az = Math.atan2(cam.eye[2], cam.eye[0]);
+}
+function startObs() {
+  AU.init(); AU.reset(); AU.click();
+  showOverlay(null);
+  S.mode = 'obs';
+  obs.az = Math.atan2(cam.eye[2], cam.eye[0]);
+  $('#obspanel').hidden = false; $('#bPause').hidden = true; $('#bHold').hidden = true; $('#bCam').hidden = true;
+}
+function pauseGame() {
+  if (S.mode !== 'play') return;
+  S.prevMode = 'play'; S.mode = 'pause';
+  ship.thrust = 0; AU.engine(0);
+  showOverlay('pause');
+  needsRender = true;
+}
+function resumeGame() {
+  if (S.mode !== 'pause') return;
+  S.mode = S.prevMode; showOverlay(null);
+  input.keys.clear(); input.ptr = null;
+}
+function updateBestLine() {
+  $('#bestLine').innerHTML = S.best > 0 ? 'Рекорд: <b>' + S.best.toLocaleString('ru-RU') + '</b>' : '';
+}
+
+$('#bPlay').onclick = startGame;
+$('#bAgain').onclick = startGame;
+$('#bObs').onclick = startObs;
+$('#bObsBack').onclick = toMenu;
+$('#bMenu').onclick = toMenu;
+$('#bQuit').onclick = toMenu;
+$('#bResume').onclick = resumeGame;
+$('#bPause').onclick = pauseGame;
+$('#bSound').onclick = () => { AU.init(); AU.toggle(); };
+$('#bCam').onclick = () => { S.camMode = S.camMode === 'chase' ? 'top' : 'chase'; AU.click(); };
+$('#bHow').onclick = () => { const h = $('#how'); h.hidden = !h.hidden; $('#bHow').setAttribute('aria-expanded', String(!h.hidden)); AU.init(); AU.click(); };
+const hold = $('#bHold');
+hold.addEventListener('pointerdown', (e) => { e.preventDefault(); input.holdBtn = true; hold.classList.add('on'); try { hold.setPointerCapture(e.pointerId); } catch (er) {} });
+const holdOff = () => { input.holdBtn = false; hold.classList.remove('on'); };
+hold.addEventListener('pointerup', holdOff); hold.addEventListener('pointercancel', holdOff); hold.addEventListener('lostpointercapture', holdOff);
+
+function chipToggle(id, key) {
+  const b = $(id);
+  b.onclick = () => { obs[key] = !obs[key]; b.setAttribute('aria-pressed', String(obs[key])); AU.click(); };
+}
+chipToggle('#tDoppler', 'doppler'); chipToggle('#tDisk', 'disk'); chipToggle('#tLabels', 'labels'); chipToggle('#tPlanet', 'planet');
+
+addEventListener('keydown', (e) => {
+  if (e.code === 'KeyM') { AU.init(); AU.toggle(); return; }
+  if (S.mode === 'play') {
+    if (e.code === 'KeyP' || e.code === 'Escape') { pauseGame(); return; }
+    if (e.code === 'KeyV') { S.camMode = S.camMode === 'chase' ? 'top' : 'chase'; return; }
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+    input.keys.add(e.code);
+  } else if (S.mode === 'pause') {
+    if (e.code === 'KeyP' || e.code === 'Escape') resumeGame();
+  } else if (S.mode === 'obs') {
+    const k = { ArrowLeft: [-0.08, 0], ArrowRight: [0.08, 0], ArrowUp: [0, 0.06], ArrowDown: [0, -0.06] }[e.code];
+    if (k) { obs.az += k[0]; obs.el = Math.max(-1.45, Math.min(1.45, obs.el + k[1])); obs.auto = false; e.preventDefault(); }
+    if (e.code === 'Equal' || e.code === 'NumpadAdd') obs.dist = Math.max(2.4, obs.dist * 0.9);
+    if (e.code === 'Minus' || e.code === 'NumpadSubtract') obs.dist = Math.min(70, obs.dist * 1.1);
+    if (e.code === 'Escape') toMenu();
+  } else if (S.mode === 'menu' && e.code === 'Enter' && document.activeElement === document.body) startGame();
+});
+addEventListener('keyup', (e) => input.keys.delete(e.code));
+addEventListener('blur', () => { input.keys.clear(); input.ptr = null; if (S.mode === 'play') pauseGame(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && S.mode === 'play') pauseGame(); });
+
+const ptrs = new Map();
+hud.addEventListener('pointerdown', (e) => {
+  AU.init();
+  ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  try { hud.setPointerCapture(e.pointerId); } catch (er) {}
+  if (S.mode === 'play') input.ptr = { id: e.pointerId, x: e.clientX, y: e.clientY };
+  else if (S.mode === 'obs') {
+    obs.auto = false;
+    if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; obs.pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), dist: obs.dist }; obs.drag = null; }
+    else obs.drag = { x: e.clientX, y: e.clientY, az: obs.az, el: obs.el };
+  }
+});
+hud.addEventListener('pointermove', (e) => {
+  if (!ptrs.has(e.pointerId)) return;
+  ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (S.mode === 'play' && input.ptr && input.ptr.id === e.pointerId) { input.ptr.x = e.clientX; input.ptr.y = e.clientY; }
+  else if (S.mode === 'obs') {
+    if (obs.pinch && ptrs.size >= 2) {
+      const [a, b] = [...ptrs.values()];
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      obs.dist = Math.max(2.4, Math.min(70, obs.pinch.dist * obs.pinch.d / Math.max(d, 1)));
+    } else if (obs.drag) {
+      obs.az = obs.drag.az + (e.clientX - obs.drag.x) * 0.006;
+      obs.el = Math.max(-1.45, Math.min(1.45, obs.drag.el + (e.clientY - obs.drag.y) * 0.005));
+    }
+  }
+});
+const ptrUp = (e) => {
+  ptrs.delete(e.pointerId);
+  if (input.ptr && input.ptr.id === e.pointerId) input.ptr = null;
+  if (ptrs.size < 2) obs.pinch = null;
+  if (ptrs.size === 0) obs.drag = null;
+};
+hud.addEventListener('pointerup', ptrUp); hud.addEventListener('pointercancel', ptrUp);
+hud.addEventListener('wheel', (e) => {
+  if (S.mode !== 'obs') return;
+  e.preventDefault(); obs.auto = false;
+  obs.dist = Math.max(2.4, Math.min(70, obs.dist * Math.exp(e.deltaY * 0.0012)));
+}, { passive: false });
+hud.addEventListener('contextmenu', (e) => e.preventDefault());
+
+/* ---------------------------- Цикл ---------------------------- */
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, Math.max(0, (now - last) / 1000)); last = now;
+  const paused = S.mode === 'pause';
+  if (!paused) {
+    adaptQuality(dt);
+    S.diskT += dt * TS * 0.45;
+    if (S.mode !== 'play') S.real += dt;
+    if (S.mode === 'play') update(dt);
+    else if (S.mode === 'dying') updateDying(dt);
+    if (S.mode === 'play' || S.mode === 'dying') chaseCam(Math.min(1, dt * 5));
+    else if (S.mode === 'obs') obsCam(dt);
+    else cinematicCam(dt);
+    S.flash = Math.max(0, S.flash - dt * 2.2);
+    S.shake = Math.max(0, S.shake - dt * 3);
+    needsRender = true;
+  }
+  if (needsRender) {
+    buildObjects();
+    render();
+    drawHUD(paused ? 0 : dt);
+    needsRender = false;
+  }
+  requestAnimationFrame(frame);
+}
+
+syncSoundBtn();
+updateBestLine();
+resize();
+cinematicCam(1);
+requestAnimationFrame(frame);
+</script>
+<!-- ARTIFACT-END -->
+</body>
+</html>
