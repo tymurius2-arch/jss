@@ -3,7 +3,7 @@ name: Publish school portal
 on:
   push:
     branches: [main]
-    paths: ["school-portal/public/**", "price-guess/**", "rick-morty/**"]
+    paths: ["school-portal/public/**", "price-guess/**", "rick-morty/**", "rocket-builder/**"]
   workflow_dispatch:
 
 permissions:
@@ -24,13 +24,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
-      # Портал — в корне сайта, «Угадай цену» — в /price-guess/, «Рик и Морти» — в /rick-morty/
+      # Портал — в корне сайта, «Угадай цену» — в /price-guess/, «Рик и Морти» — в /rick-morty/, «Ракетостроитель» — в /rocket-builder/
       - name: Assemble site
         run: |
           mkdir -p _site
           cp -r school-portal/public/. _site/
           cp -r price-guess _site/price-guess
           cp -r rick-morty _site/rick-morty
+          cp -r rocket-builder _site/rocket-builder
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
