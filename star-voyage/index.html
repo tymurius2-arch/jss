@@ -1524,8 +1524,6 @@ function updateAscent(dt) {
   const R = rocket.root;
   R.position.set(0, ROCKET_BASE.y + asc.y, asc.z);
   R.rotation.set(th, 0, 0);
-  const shakeK = asc.q / ASC.QL;
-  G.shake = Math.max(G.shake, h < .3 ? .5 * asc.thr : 0, shakeK > .8 ? (shakeK - .8) * .8 : 0);
   // огонь и дым
   const flameK = asc.thr * (.75 + Math.random() * .25);
   for (const k of ['srbL', 'srbR', 'core', 'upper']) {
@@ -1726,7 +1724,7 @@ function autopilot(dt, fwd) {
 function damage(n, why, quiet) {
   if (ship.dead > 0) return;
   ship.shield -= n; ship.hitT = 0;
-  if (!quiet || Math.random() < .02) { G.shake = Math.max(G.shake, .5); if (!quiet) toast(why, 'Щит: ' + Math.max(0, Math.round(ship.shield)) + ' %', 1.6); }
+  if (!quiet || Math.random() < .02) { G.shake = Math.max(G.shake, .25); if (!quiet) toast(why, 'Щит: ' + Math.max(0, Math.round(ship.shield)) + ' %', 1.6); }
   try { if (!quiet && navigator.vibrate) navigator.vibrate(60); } catch (e) {}
   if (ship.shield <= 0) {
     ship.dead = 3; ship.speed = 0; ship.firing = false; laser.visible = false; AU.set(AU.laserG, 0);
@@ -1803,26 +1801,27 @@ function updateCamera(dt) {
     look = pad2world(rp.clone().add(V3(0, .02, .04 * s)));
     camera.fov += (58 - camera.fov) * k;
   } else {
-    // погоня за кораблём
-    const fwd = shipFwd(), shipUp = V3(0, 0, 1).applyQuaternion(ship.quat);
-    const back = .16 + Math.min(ship.speed, 300) / 300 * .05;
-    pos = ship.pos.clone().addScaledVector(fwd, -back).addScaledVector(shipUp, .055);
+    // Стабилизированная камера: едет за кораблём без отставания,
+    // а повороты сглаживаются отдельно — поэтому газ и турбо не раскачивают картинку.
+    if (!camState.q) camState.q = ship.quat.clone();
+    if (G.phaseT < .05) camState.q.copy(ship.quat);
+    camState.q.slerp(ship.quat, Math.min(1, dt * 7));
+    const fwd = V3(0, 1, 0).applyQuaternion(camState.q), camUp = V3(0, 0, 1).applyQuaternion(camState.q);
+    pos = ship.pos.clone().addScaledVector(fwd, -.17).addScaledVector(camUp, .055);
     look = ship.pos.clone().addScaledVector(fwd, .5);
-    up = shipUp;
-    const fovT = 62 + clamp((ship.speed - 100) / 3000, 0, 1) * 22;
-    camera.fov += (fovT - camera.fov) * k;
-    if (camState.init) {
-      camState.pos.lerp(pos, Math.min(1, dt * 10)); camState.look.lerp(look, Math.min(1, dt * 12)); camState.up.lerp(up, Math.min(1, dt * 8)).normalize();
-      // при больших скоростях — жёсткая привязка, иначе камера отстанет
-      if (camState.pos.distanceTo(pos) > .5) camState.pos.copy(pos);
-      if (camState.look.distanceTo(look) > .8) camState.look.copy(look);
-    }
+    up = camUp;
+    const fovT = 62 + clamp((ship.speed - 100) / 3000, 0, 1) * 8;
+    camera.fov += (fovT - camera.fov) * Math.min(1, dt * 2);
+    camState.pos.copy(pos); camState.look.copy(look); camState.up.copy(up);
   }
-  if (!camState.init || G.phase === 'menu') { camState.pos.copy(pos); camState.look.copy(look); camState.up.copy(up); camState.init = true; }
+  // на взлёте камера плавно переходит с земли к ракете, а дальше держится жёстко
+  const rigid = G.phase === 'ascent' && asc.t > 7;
+  if (!camState.init || G.phase === 'menu' || rigid) { camState.pos.copy(pos); camState.look.copy(look); camState.up.copy(up); camState.init = true; }
   else if (G.phase !== 'space') { camState.pos.lerp(pos, k); camState.look.lerp(look, Math.min(1, dt * 8)); camState.up.lerp(up, k).normalize(); }
   camera.position.copy(camState.pos);
+  // лёгкое вздрагивание только от взрывов и ударов
   if (G.shake > 0 && !reduceMotion) {
-    const s = G.shake * (G.phase === 'space' ? .006 : .004);
+    const s = G.shake * .002;
     camera.position.add(V3(rand(-s, s), rand(-s, s), rand(-s, s)));
   }
   camera.up.copy(camState.up);
