@@ -108,5 +108,5 @@ if ($local) {
 Say ''
 Say 'Запускаю Geometry Dash...' 'Cyan'
 Start-Process "steam://rungameid/$AppId"
-Say 'Готово. Зайдите в любой уровень — бот сам начнёт его проходить.' 'Green'
+Say 'Готово. Откройте уровень и нажмите кнопку Bot рядом с Play (или Bot в меню паузы).' 'Green'
 Say 'Статус бота виден в левом верхнем углу уровня. Настройки: Geode -> AutoBot -> Settings.'

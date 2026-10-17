@@ -1,6 +1,9 @@
-// AutoBot: takes control when you enter a level and finds a route through it.
+// AutoBot: plays a level for you and finds a route through it.
+// Started by the "Bot" button on the level page or in the pause menu
+// (or on every level, if "Start on every level" is on).
 //
-// 1. Search: plays in practice mode. On every death the route search (see
+// 1. Search: by default every try starts from the beginning in normal mode;
+//    with "Search in practice mode" it plays in practice mode instead. On every death the route search (see
 //    route_search.hpp) picks a new input plan; checkpoints are placed every
 //    0.2 s so a new try starts right before the changed spot.
 // 2. Final: when the end is reached, the found plan is played from the start in
@@ -9,6 +12,8 @@
 
 #include <Geode/Geode.hpp>
 #include <Geode/modify/GJBaseGameLayer.hpp>
+#include <Geode/modify/LevelInfoLayer.hpp>
+#include <Geode/modify/PauseLayer.hpp>
 #include <Geode/modify/PlayLayer.hpp>
 
 #include "route_search.hpp"
@@ -44,6 +49,7 @@ struct Session {
 };
 
 Session s;
+bool s_startNextLevel = false; // set by the level page button
 
 bool settingBool(char const* key) { return Mod::get()->getSettingValue<bool>(key); }
 
@@ -237,6 +243,64 @@ void onDeath(PlayLayer* pl, PlayerObject* player) {
     queueReset();
 }
 
+void addLabel(PlayLayer* pl) {
+    if (s.label || !settingBool("show-status")) return;
+    auto label = CCLabelBMFont::create("AutoBot", "chatFont.fnt");
+    label->setAnchorPoint({0.f, 1.f});
+    label->setScale(0.6f);
+    label->setOpacity(200);
+    auto size = CCDirector::sharedDirector()->getWinSize();
+    label->setPosition({6.f, size.height - 4.f});
+    label->setID("status"_spr);
+    pl->addChild(label, 1000);
+    s.label = label;
+}
+
+// Takes over the current level and restarts it.
+void startSession(PlayLayer* pl) {
+    addLabel(pl);
+    if (pl->m_levelSettings->m_platformerMode || pl->m_levelSettings->m_twoPlayerMode) {
+        s.phase = Phase::Unsupported;
+        updateLabel();
+        return;
+    }
+
+    s.active = true;
+    s.key = levelKey(pl->m_level);
+    s.practice = settingBool("use-practice");
+    s.bestPercent = 0.f;
+    s.activePlan.clear();
+    s.lastCheckpointTick = 0;
+    s.held = false;
+
+    RouteSearch::Plan saved;
+    bool solved = false;
+    if (loadPlan(s.key, saved, solved) && solved) {
+        log::info("level {}: replaying saved route", s.key);
+        s.phase = Phase::Final;
+        s.plan = std::move(saved);
+    }
+    else {
+        log::info("level {}: searching for a route", s.key);
+        startSearch(std::move(saved));
+    }
+
+    if (settingBool("safe-mode")) pl->m_isTestMode = true;
+    updateLabel();
+    // Restart so the first try starts from a clean state.
+    queueReset();
+}
+
+// Gives the level back to the player.
+void stopSession(PlayLayer* pl) {
+    if (s.active) sendButton(pl, false);
+    s.active = false;
+    s.phase = Phase::Off;
+    s.resetQueued = false;
+    setSpeed(1.f);
+    if (s.label) s.label->setString("AutoBot: off");
+}
+
 } // namespace
 
 // ---------- hooks ----------
@@ -278,49 +342,9 @@ class $modify(AutoBotPlayLayer, PlayLayer) {
     bool init(GJGameLevel* level, bool useReplay, bool dontCreateObjects) {
         endSession();
         if (!PlayLayer::init(level, useReplay, dontCreateObjects)) return false;
-        if (!settingBool("enabled")) return true;
-
-        if (settingBool("show-status")) {
-            auto label = CCLabelBMFont::create("AutoBot", "chatFont.fnt");
-            label->setAnchorPoint({0.f, 1.f});
-            label->setScale(0.6f);
-            label->setOpacity(200);
-            auto size = CCDirector::sharedDirector()->getWinSize();
-            label->setPosition({6.f, size.height - 4.f});
-            label->setID("status"_spr);
-            this->addChild(label, 1000);
-            s.label = label;
-        }
-
-        if (m_levelSettings->m_platformerMode || m_levelSettings->m_twoPlayerMode) {
-            s.phase = Phase::Unsupported;
-            updateLabel();
-            return true;
-        }
-
-        s.active = true;
-        s.key = levelKey(level);
-        s.practice = settingBool("use-practice");
-        s.bestPercent = 0.f;
-        s.activePlan.clear();
-        s.lastCheckpointTick = 0;
-
-        RouteSearch::Plan saved;
-        bool solved = false;
-        if (loadPlan(s.key, saved, solved) && solved) {
-            log::info("level {}: replaying saved route", s.key);
-            s.phase = Phase::Final;
-            s.plan = std::move(saved);
-        }
-        else {
-            log::info("level {}: searching for a route", s.key);
-            startSearch(std::move(saved));
-        }
-
-        if (settingBool("safe-mode")) m_isTestMode = true;
-        updateLabel();
-        // Restart once so the first try starts from a clean state (and in practice mode).
-        queueReset();
+        bool start = s_startNextLevel || settingBool("auto-start");
+        s_startNextLevel = false;
+        if (start) startSession(this);
         return true;
     }
 
@@ -388,5 +412,70 @@ class $modify(AutoBotPlayLayer, PlayLayer) {
     void onQuit() {
         endSession();
         PlayLayer::onQuit();
+    }
+};
+
+// "Bot" button next to Play on the level page: plays this level with the bot.
+class $modify(AutoBotLevelInfoLayer, LevelInfoLayer) {
+    bool init(GJGameLevel* level, bool challenge) {
+        if (!LevelInfoLayer::init(level, challenge)) return false;
+        s_startNextLevel = false;
+
+        auto sprite = ButtonSprite::create("Bot", "goldFont.fnt", "GJ_button_02.png", 0.8f);
+        sprite->setScale(0.75f);
+        auto button = CCMenuItemSpriteExtra::create(
+            sprite, this, menu_selector(AutoBotLevelInfoLayer::onAutoBot));
+        button->setID("play-with-bot-button"_spr);
+
+        auto menu = CCMenu::create();
+        menu->setID("bot-menu"_spr);
+        menu->addChild(button);
+        // Bottom-left of the Play button.
+        auto size = CCDirector::sharedDirector()->getWinSize();
+        CCPoint play = m_playBtnMenu
+            ? m_playBtnMenu->getPosition()
+            : CCPoint{size.width / 2.f, size.height / 2.f + 51.f};
+        menu->setPosition(play + CCPoint{-72.f, -38.f});
+        this->addChild(menu, 10);
+        return true;
+    }
+
+    void onAutoBot(CCObject* sender) {
+        s_startNextLevel = true;
+        this->onPlay(sender);
+    }
+};
+
+// "Bot: on/off" button in the pause menu: turns the bot on or off for this level.
+class $modify(AutoBotPauseLayer, PauseLayer) {
+    void customSetup() {
+        PauseLayer::customSetup();
+
+        auto sprite = ButtonSprite::create(
+            playing() ? "Bot: on" : "Bot: off", "goldFont.fnt",
+            playing() ? "GJ_button_01.png" : "GJ_button_04.png", 0.8f);
+        sprite->setScale(0.7f);
+        auto button = CCMenuItemSpriteExtra::create(
+            sprite, this, menu_selector(AutoBotPauseLayer::onToggleBot));
+        button->setID("toggle-bot-button"_spr);
+
+        auto menu = CCMenu::create();
+        menu->setID("bot-menu"_spr);
+        menu->addChild(button);
+        menu->setPosition({50.f, 28.f});
+        this->addChild(menu, 10);
+    }
+
+    void onToggleBot(CCObject* sender) {
+        auto pl = PlayLayer::get();
+        if (!pl) return;
+        if (playing()) {
+            stopSession(pl);
+            this->onResume(sender);
+            return;
+        }
+        startSession(pl);
+        // The bot restarts the level right after the pause menu closes.
+        this->onResume(sender);
     }
 };

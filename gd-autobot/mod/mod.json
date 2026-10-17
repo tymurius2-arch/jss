@@ -5,29 +5,29 @@
 	},
 	"id": "tymurius.gd-autobot",
 	"name": "AutoBot",
-	"version": "v1.0.0",
+	"version": "v1.1.0",
 	"developer": "tymurius",
-	"description": "Detects when you enter a level and finds a route through it on its own",
+	"description": "Plays levels for you: finds a route by trial and error, then passes the level",
 	"settings": {
-		"enabled": {
+		"auto-start": {
 			"type": "bool",
-			"name": "Enable bot",
-			"description": "When on, the bot takes control as soon as you enter a level.",
-			"default": true
+			"name": "Start on every level",
+			"description": "When on, the bot takes over in every level you enter. When off, use the Bot button on the level page or in the pause menu.",
+			"default": false
 		},
 		"speed": {
 			"type": "float",
 			"name": "Search speed",
 			"description": "Game speed while the bot is searching for a route (1 = normal). The final run is always at normal speed.",
-			"default": 2.0,
+			"default": 3.0,
 			"min": 1.0,
-			"max": 4.0
+			"max": 8.0
 		},
 		"use-practice": {
 			"type": "bool",
 			"name": "Search in practice mode",
-			"description": "Uses practice checkpoints so every new try starts close to the obstacle. Much faster.",
-			"default": true
+			"description": "Search with practice checkpoints: much faster, but uses practice mode. When off, every try starts from the beginning in normal mode.",
+			"default": false
 		},
 		"safe-mode": {
 			"type": "bool",
@@ -57,5 +57,11 @@
 			"description": "Shows the bot status in the top-left corner of the level.",
 			"default": true
 		}
-	}
+	},
+	"tags": [
+		"gameplay",
+		"cheat",
+		"utility"
+	],
+	"repository": "https://github.com/tymurius2-arch/jss"
 }
