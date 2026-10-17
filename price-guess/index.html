@@ -73,6 +73,18 @@
   #start .btn-main { font-size: 20px; padding: 18px; border-radius: 16px; }
   #start .count { color: var(--accent); font-weight: 800; }
   #start .btn-ghost { width: 100%; margin-top: 10px; font-size: 18px; padding: 16px; border-radius: 16px; }
+  .btn-endless { width: 100%; margin-top: 10px; font-size: 18px; padding: 16px; border-radius: 16px;
+    background: linear-gradient(90deg, #7a5cff, #ff5c9d); color: #fff; }
+  .btn-endless:hover { filter: brightness(1.08); }
+  .hud-left { display: flex; align-items: center; gap: 6px 10px; flex-wrap: wrap; min-width: 0; }
+  .streak { color: var(--mid); font-weight: 800; }
+  .hud-stop { background: var(--card2); color: var(--muted); font-size: 13px; padding: 6px 10px; border-radius: 99px; }
+  .bar.endless > div { width: 100% !important; background: linear-gradient(90deg, #7a5cff, #ff5c9d); opacity: .6; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0 0 16px; }
+  .stats > div { background: var(--card2); border-radius: 12px; padding: 10px 6px; }
+  .stats b { display: block; font-size: 22px; }
+  .stats span { font-size: 12px; color: var(--muted); }
+  .history-note { color: var(--muted); font-size: 13px; margin: -8px 0 14px; text-align: left; }
   .summary { color: var(--muted); font-size: 15px; line-height: 1.5; margin: 16px 0 0; }
   .summary b { color: var(--text); }
 
@@ -232,6 +244,7 @@
     <p class="sub">Показываем товар с маркетплейса — ты называешь цену. Чем ближе, тем больше очков. Против тебя играет ИИ.<br>В игре <span class="count" id="countAll"></span> товаров.</p>
     <div class="card">
       <button class="btn-main" id="startBtn">Играть</button>
+      <button class="btn-endless" id="endlessBtn">♾️ Бесконечный режим</button>
       <button class="btn-ghost" id="settingsBtn">⚙️ Настройки</button>
       <p class="summary" id="summary"></p>
       <p class="sub" id="bestLine" style="margin:12px 0 0;text-align:center"></p>
@@ -280,7 +293,9 @@
           <button class="chip" data-n="10">10</button>
           <button class="chip" data-n="15">15</button>
           <button class="chip" data-n="20">20</button>
+          <button class="chip" data-n="0">∞ Бесконечно</button>
         </div>
+        <p class="set-hint">В бесконечном режиме товары идут без конца, пока не нажмёшь «Закончить».</p>
       </div>
 
       <div class="set-block">
@@ -301,8 +316,12 @@
   <!-- Раунд -->
   <section id="game" class="hidden">
     <div class="hud">
-      <div id="roundLabel">Раунд 1/10</div>
-      <div><span class="score" id="scoreLabel">0</span> : <span class="ai" id="aiLabel">0</span></div>
+      <div class="hud-left">
+        <span id="roundLabel">Раунд 1/10</span>
+        <span class="streak hidden" id="streakLabel"></span>
+        <button class="hud-stop hidden" id="stopBtn">Закончить</button>
+      </div>
+      <div style="white-space:nowrap;flex:none"><span class="score" id="scoreLabel">0</span> : <span class="ai" id="aiLabel">0</span></div>
     </div>
     <div class="bar"><div id="progress"></div></div>
     <div class="card" id="gameCard">
@@ -351,11 +370,17 @@
   <!-- Итог -->
   <section id="end" class="hidden">
     <div class="card final">
-      <div class="label">Твой счёт</div>
+      <div class="label" id="finalLabel">Твой счёт</div>
       <div class="big" id="finalScore">0</div>
+      <div class="stats hidden" id="endlessStats">
+        <div><b id="stRounds">0</b><span>раундов</span></div>
+        <div><b id="stAvg">0</b><span>в среднем за раунд</span></div>
+        <div><b id="stStreak">0</b><span>лучшая серия побед</span></div>
+      </div>
       <div class="vs"><span style="color:var(--accent)" id="finalYou"></span><span style="color:var(--ai)" id="finalAi"></span></div>
       <p class="sub" id="verdict" style="margin-bottom:16px"></p>
       <ul class="history" id="history"></ul>
+      <p class="history-note hidden" id="historyNote"></p>
       <div class="row">
         <button class="btn-main" id="againBtn" style="flex:1">Ещё раз</button>
         <button class="btn-ghost" id="menuBtn">Меню</button>
@@ -409,12 +434,13 @@
     if (settings.min > settings.max) [settings.min, settings.max] = [settings.max, settings.min];
     settings.shops = (settings.shops || []).filter((s) => SHOPS[s]);
     if (!settings.shops.length) settings.shops = Object.keys(SHOPS);
-    if (![5, 10, 15, 20].includes(settings.rounds)) settings.rounds = 10;
+    if (![0, 5, 10, 15, 20].includes(settings.rounds)) settings.rounds = 10;   // 0 = бесконечно
   }
   function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) {} }
   function clampPrice(v) { v = Math.round(Number(v) || 0); return Math.min(MAX, Math.max(0, v)); }
 
   let rounds = settings.rounds;
+  let endless = false, streak = 0, bestStreak = 0;
   let deck = [], round = 0, score = 0, aiScore = 0, current = null, hinted = false, history = [];
 
   $("rate").textContent = RATE;
@@ -574,11 +600,16 @@
   }
 
   // ---------- хранилище рекорда ----------
-  function getBest() { try { return Number(localStorage.getItem("priceGuessBest")) || 0; } catch (e) { return 0; } }
-  function setBest(v) { try { localStorage.setItem("priceGuessBest", String(v)); } catch (e) {} }
+  function getNum(k) { try { return Number(localStorage.getItem(k)) || 0; } catch (e) { return 0; } }
+  function setNum(k, v) { try { localStorage.setItem(k, String(v)); } catch (e) {} }
+  function getBest() { return getNum("priceGuessBest"); }
+  function setBest(v) { setNum("priceGuessBest", v); }
   function showBest() {
-    const b = getBest();
-    $("bestLine").textContent = b ? "Рекорд: " + fmt(b) + " очков" : "";
+    const b = getBest(), e = getNum("priceGuessBestEndless"), st = getNum("priceGuessBestStreak");
+    const parts = [];
+    if (b) parts.push("Рекорд: " + fmt(b) + " очков");
+    if (e || st) parts.push("∞: " + fmt(e) + " очков, серия " + fmt(st));
+    $("bestLine").textContent = parts.join(" · ");
   }
 
   // ---------- утилиты ----------
@@ -636,20 +667,16 @@
   }
   function pool() { return ALL.filter((p) => matches(p, settings)); }
 
-  function startGame() {
-    rounds = settings.rounds;
-    const items = pool();
-    if (items.length < 1) { openSettings(); return; }
-    // Магазины чередуются по очереди-случайно, чтобы маленькие магазины тоже попадались,
-    // и одна категория не идёт два раза подряд
+  // Колода: магазины чередуются случайно, чтобы маленькие магазины тоже попадались,
+  // и одна категория не идёт два раза подряд
+  function buildDeck(items, size, prevCat) {
     const byShop = {};
-    for (const p of shuffle(items)) (byShop[p.shop] = byShop[p.shop] || []).push(p);
-    const deckSize = Math.min(items.length, rounds * 4);   // запас на случай битых картинок
+    for (const p of shuffle(items.slice())) (byShop[p.shop] = byShop[p.shop] || []).push(p);
     const out = [];
-    while (out.length < deckSize) {
+    while (out.length < size) {
       const shops = Object.keys(byShop).filter((k) => byShop[k].length);
       if (!shops.length) break;
-      const prev = out.length ? out[out.length - 1].cat : null;
+      const prev = out.length ? out[out.length - 1].cat : prevCat;
       let src = byShop[shops[Math.floor(Math.random() * shops.length)]];
       let i = src.findIndex((p) => p.cat !== prev);
       if (i < 0) {
@@ -658,19 +685,47 @@
       }
       out.push(src.splice(i, 1)[0]);
     }
-    deck = out;
-    round = 0; score = 0; aiScore = 0; history = [];
+    return out;
+  }
+
+  // В бесконечном режиме колода пополняется: сначала идут все ещё не показанные товары,
+  // а когда показаны все — круг начинается заново
+  let shownIds = new Set();
+  function refillDeck() {
+    const items = pool();
+    let fresh = items.filter((p) => !shownIds.has(p.id) && !deck.includes(p));
+    if (!fresh.length) { shownIds = new Set(); fresh = items.filter((p) => !deck.includes(p) && p !== current); }
+    const prevCat = deck.length ? deck[deck.length - 1].cat : current ? current.cat : null;
+    deck.push(...buildDeck(fresh, 40, prevCat));
+  }
+
+  function startGame(opts) {
+    endless = opts && opts.endless != null ? opts.endless : settings.rounds === 0;
+    rounds = endless ? Infinity : settings.rounds;
+    const items = pool();
+    if (items.length < 1) { openSettings(); return; }
+    shownIds = new Set();
+    current = null;
+    deck = endless ? [] : buildDeck(items, Math.min(items.length, rounds * 4));   // запас на случай битых картинок
+    if (endless) refillDeck();
+    round = 0; score = 0; aiScore = 0; history = []; streak = 0; bestStreak = 0;
+    $("stopBtn").classList.toggle("hidden", !endless);
+    $("streakLabel").classList.toggle("hidden", !endless);
+    document.querySelector("#game .bar").classList.toggle("endless", endless);
     show("game");
     nextRound();
   }
 
   function nextRound() {
     stopSuspense();
+    if (endless && deck.length < 3) refillDeck();
     if (round >= rounds || !deck.length) return finish();
     round++;
     current = deck.shift();
+    shownIds.add(current.id);
     hinted = false;
-    $("roundLabel").textContent = "Раунд " + round + "/" + rounds;
+    $("roundLabel").textContent = endless ? "Раунд " + round + " · ∞" : "Раунд " + round + "/" + rounds;
+    paintStreak();
     $("scoreLabel").textContent = fmt(score);
     $("aiLabel").textContent = fmt(aiScore);
     $("progress").style.width = ((round - 1) / rounds * 100) + "%";
@@ -798,6 +853,10 @@
     $("aiLabel").textContent = fmt(aiScore);
     $("progress").style.width = (round / rounds * 100) + "%";
     $("nextBtn").textContent = round >= rounds ? "Итоги" : "Дальше";
+    // серия побед подряд над ИИ (ничья серию не обрывает)
+    if (youPts > aiPts) { streak++; bestStreak = Math.max(bestStreak, streak); }
+    else if (youPts < aiPts) streak = 0;
+    paintStreak();
 
     // кто выиграл раунд — та и музыка
     const card = $("gameCard"), v = $("verdictLine");
@@ -820,12 +879,18 @@
     $("nextBtn").focus();
   }
 
+  function paintStreak() {
+    if (!endless) return;
+    $("streakLabel").textContent = streak ? "🔥 " + streak + " подряд" : "";
+  }
+
   function setPts(el, pts, extra) {
     el.textContent = "+" + fmt(pts) + extra;
     el.style.color = pts >= 700 ? "var(--good)" : pts >= 300 ? "var(--mid)" : "var(--bad)";
   }
 
   function finish() {
+    stopSuspense();
     const played = history.length;
     $("finalScore").textContent = fmt(score);
     $("finalYou").textContent = "Ты " + fmt(score);
@@ -833,13 +898,30 @@
     const avg = played ? score / played : 0;
     let v = score > aiScore ? "Ты обыграл ИИ! " : score < aiScore ? "ИИ победил. " : "Ничья с ИИ. ";
     v += avg >= 800 ? "Ты явно часто сидишь на маркетплейсах." : avg >= 500 ? "Неплохо чувствуешь цены." : avg >= 250 ? "Есть куда расти — попробуй ещё раз." : "Цены — явно не твоё 🙂";
-    const best = getBest();
-    if (score > best) { setBest(score); v += " Новый рекорд!"; }
+    $("finalLabel").textContent = endless ? "Бесконечный режим · твой счёт" : "Твой счёт";
+    $("endlessStats").classList.toggle("hidden", !endless);
+    if (endless) {
+      $("stRounds").textContent = fmt(played);
+      $("stAvg").textContent = fmt(avg);
+      $("stStreak").textContent = fmt(bestStreak);
+      const rec = [];
+      if (played && score > getNum("priceGuessBestEndless")) { setNum("priceGuessBestEndless", score); rec.push("счёт"); }
+      if (bestStreak > getNum("priceGuessBestStreak")) { setNum("priceGuessBestStreak", bestStreak); rec.push("серия побед"); }
+      if (rec.length) v += " Новый рекорд: " + rec.join(" и ") + "!";
+    } else {
+      const best = getBest();
+      if (score > best) { setBest(score); v += " Новый рекорд!"; }
+    }
+    if (!played) v = "Ни одного раунда не сыграно.";
     $("verdict").textContent = v;
-    if (score > aiScore) { Sound.gameWin(); confetti(); } else if (score < aiScore) Sound.gameLose(); else Sound.tie();
-    $("history").innerHTML = history.map((h) =>
+    if (played) { if (score > aiScore) { Sound.gameWin(); confetti(); } else if (score < aiScore) Sound.gameLose(); else Sound.tie(); }
+    // в длинной игре показываем последние 30 товаров, свежие сверху
+    const list = endless ? history.slice(-30).reverse() : history;
+    $("history").innerHTML = list.map((h) =>
       "<li><span>" + escapeHtml(h.title) + "</span><span>" + fmt(h.price) + " ₴ · <b>+" + fmt(h.youPts) + "</b></span></li>"
     ).join("");
+    $("historyNote").classList.toggle("hidden", !(endless && history.length > 30));
+    $("historyNote").textContent = "Показаны последние 30 из " + fmt(history.length) + " товаров.";
     show("end");
   }
 
@@ -889,7 +971,7 @@
     const n = ALL.filter((p) => matches(p, draft)).length;
     const f = $("fits");
     if (n === 0) { f.textContent = "Под эти настройки не подходит ни одного товара — расширь диапазон цен или выбери другие магазины."; f.className = "fits bad"; }
-    else if (n < draft.rounds) { f.textContent = "Подходит товаров: " + fmtCount(n) + " — меньше, чем раундов. Игра будет короче."; f.className = "fits bad"; }
+    else if (draft.rounds && n < draft.rounds) { f.textContent = "Подходит товаров: " + fmtCount(n) + " — меньше, чем раундов. Игра будет короче."; f.className = "fits bad"; }
     else { f.textContent = "Подходит товаров: " + fmtCount(n); f.className = "fits"; }
     $("setDone").disabled = n === 0;
   }
@@ -906,8 +988,9 @@
     const price = settings.min === 0 && settings.max === MAX ? "любая" : fmt(settings.min) + " – " + fmt(settings.max) + " ₴";
     const n = pool().length;
     $("summary").innerHTML = "Магазины: <b>" + escapeHtml(shops) + "</b> · Цена: <b>" + price + "</b><br>Раундов: <b>" +
-      settings.rounds + "</b> · Звук: <b>" + (Sound.enabled ? "вкл" : "выкл") + "</b> · Товаров: <b>" + fmtCount(n) + "</b>";
+      (settings.rounds || "∞") + "</b> · Звук: <b>" + (Sound.enabled ? "вкл" : "выкл") + "</b> · Товаров: <b>" + fmtCount(n) + "</b>";
     $("startBtn").disabled = n === 0;
+    $("endlessBtn").disabled = n === 0;
   }
 
   function setPrice(which, value) {
@@ -951,7 +1034,9 @@
     if (draft && !$("settings").classList.contains("hidden")) renderSettings();
   };
   paintSoundBtn();
-  $("againBtn").onclick = startGame;
+  $("againBtn").onclick = () => startGame({ endless });
+  $("endlessBtn").onclick = () => { Sound.unlock(); startGame({ endless: true }); };
+  $("stopBtn").onclick = () => { if (!suspenseTimer) finish(); };   // во время ожидания ответа не прерываем
   $("menuBtn").onclick = () => { stopSuspense(); renderSummary(); showBest(); show("start"); };
   $("nextBtn").onclick = nextRound;
   $("guessForm").addEventListener("submit", submitGuess);
