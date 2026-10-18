@@ -406,6 +406,17 @@
     if (ok) { toast(t("contacts.sent")); if (C.web3formsKey) form.reset(); }
   });
 
+  /* На комп'ютері посилання tel: віддається системі, і та може відкрити будь-яку програму.
+     Тому там не дзвонимо, а копіюємо номер і показуємо його. */
+  document.addEventListener("click", (e) => {
+    const a = e.target.closest('a[href^="tel:"]');
+    if (!a || matchMedia("(pointer: coarse)").matches) return;
+    e.preventDefault();
+    const num = C.phoneDisplay || a.getAttribute("href").slice(4);
+    const done = () => toast(t("d.phoneCopied", { p: num }));
+    navigator.clipboard ? navigator.clipboard.writeText(num).then(done, done) : done();
+  });
+
   /* ---------- Налаштування ---------- */
   function placeSegInk(seg) {
     let ink = $(".seg-ink", seg);
