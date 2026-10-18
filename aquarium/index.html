@@ -1,0 +1,663 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Аквариум эволюции</title>
+<meta name="description" content="Живая симуляция естественного отбора: рыбки ищут еду, размножаются и передают потомкам гены. Хищники охотятся, слабые вымирают — смотри, как меняется вид.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&display=swap">
+<style>
+  /* Экран: вода на весь экран, справа (на телефоне — снизу) стеклянная панель со статистикой. */
+  :root {
+    color-scheme: dark;
+    --bg: #04121f;
+    --panel: rgba(6, 22, 38, 0.82);
+    --line: rgba(140, 210, 255, 0.16);
+    --ink: #e6f5ff;
+    --muted: #8fb0c6;
+    --accent: #4fe0c0;
+    --prey: #6fd3ff;
+    --pred: #ff6b5e;
+    --food: #9dff7a;
+    --font: "Rubik", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font-family: var(--font); overflow: hidden; }
+  canvas#tank { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
+
+  .panel {
+    position: fixed; top: 12px; right: 12px; width: 300px; max-height: calc(100% - 24px); overflow-y: auto;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 14px;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 10px 40px rgba(0,0,0,.35);
+  }
+  .panel.hidden { display: none; }
+  h1 { font-size: 18px; margin: 0 0 2px; font-weight: 700; letter-spacing: .2px; }
+  .sub { color: var(--muted); font-size: 12px; margin: 0 0 12px; line-height: 1.4; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 10px; }
+  .stat { background: rgba(255,255,255,.04); border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; }
+  .stat b { display: block; font-size: 18px; font-variant-numeric: tabular-nums; }
+  .stat span { font-size: 11px; color: var(--muted); }
+  .stat.prey b { color: var(--prey); } .stat.pred b { color: var(--pred); } .stat.food b { color: var(--food); }
+
+  .tabs { display: flex; gap: 4px; margin: 6px 0; }
+  .tabs button { flex: 1; }
+  canvas#chart { width: 100%; height: 120px; display: block; background: rgba(0,0,0,.2); border-radius: 10px; border: 1px solid var(--line); }
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 11px; color: var(--muted); margin: 6px 0 10px; }
+  .legend i { display: inline-block; width: 10px; height: 3px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
+
+  button {
+    font: inherit; font-size: 13px; color: var(--ink); background: rgba(255,255,255,.06);
+    border: 1px solid var(--line); border-radius: 9px; padding: 7px 10px; cursor: pointer; transition: background .15s;
+  }
+  button:hover { background: rgba(255,255,255,.12); }
+  button.on { background: var(--accent); color: #022; border-color: transparent; font-weight: 500; }
+  .row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+  .row button { flex: 1 1 auto; }
+  label.slider { display: block; font-size: 12px; color: var(--muted); margin: 8px 0; }
+  label.slider output { float: right; color: var(--ink); font-variant-numeric: tabular-nums; }
+  input[type=range] { width: 100%; accent-color: var(--accent); margin-top: 4px; }
+
+  .inspect { margin-top: 10px; padding: 10px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid var(--line); font-size: 12px; }
+  .inspect h2 { font-size: 14px; margin: 0 0 6px; display: flex; align-items: center; gap: 8px; }
+  .inspect .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+  .gene { display: grid; grid-template-columns: 70px 1fr 40px; align-items: center; gap: 6px; margin: 3px 0; color: var(--muted); }
+  .gene .bar { height: 6px; background: rgba(255,255,255,.08); border-radius: 3px; overflow: hidden; }
+  .gene .bar div { height: 100%; background: var(--accent); }
+  .gene em { font-style: normal; color: var(--ink); text-align: right; font-variant-numeric: tabular-nums; }
+  .hint { font-size: 11px; color: var(--muted); line-height: 1.5; margin-top: 10px; }
+
+  .toggle { position: fixed; top: 12px; right: 12px; display: none; z-index: 2; }
+  .toast {
+    position: fixed; left: 50%; top: 18px; transform: translateX(-50%); background: var(--panel); border: 1px solid var(--line);
+    padding: 10px 16px; border-radius: 12px; font-size: 14px; opacity: 0; transition: opacity .3s; pointer-events: none; max-width: calc(100% - 32px); text-align: center;
+  }
+  .toast.show { opacity: 1; }
+
+  @media (max-width: 700px) {
+    .panel { top: auto; bottom: 0; right: 0; left: 0; width: auto; max-height: 52%; border-radius: 16px 16px 0 0; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
+    .toggle { display: block; }
+    canvas#chart { height: 90px; }
+  }
+</style>
+</head>
+<body>
+<canvas id="tank"></canvas>
+<button class="toggle" id="toggle">Панель</button>
+<div class="toast" id="toast"></div>
+
+<aside class="panel" id="panel">
+  <h1>Аквариум эволюции</h1>
+  <p class="sub">Рыбки едят планктон и делятся, передавая гены с мутациями. Хищники охотятся на тех, кто меньше. Нажми на воду — насыпать корм, на рыбу — посмотреть её гены.</p>
+
+  <div class="stats">
+    <div class="stat prey"><b id="nPrey">0</b><span>рыбки</span></div>
+    <div class="stat pred"><b id="nPred">0</b><span>хищники</span></div>
+    <div class="stat food"><b id="nFood">0</b><span>планктон</span></div>
+  </div>
+  <div class="stats">
+    <div class="stat"><b id="tTime">0:00</b><span>время</span></div>
+    <div class="stat"><b id="maxGen">1</b><span>поколение</span></div>
+    <div class="stat"><b id="births">0</b><span>рождений</span></div>
+  </div>
+
+  <div class="tabs">
+    <button data-chart="pop" class="on">Популяция</button>
+    <button data-chart="genes">Гены рыбок</button>
+  </div>
+  <canvas id="chart"></canvas>
+  <div class="legend" id="legend"></div>
+
+  <div class="row" id="speedRow">
+    <button id="pause">⏸ Пауза</button>
+    <button data-speed="1" class="on">1×</button>
+    <button data-speed="3">3×</button>
+    <button data-speed="8">8×</button>
+  </div>
+  <label class="slider">Планктон в секунду <output id="foodOut">10</output>
+    <input type="range" id="foodRate" min="0" max="40" step="1" value="10">
+  </label>
+  <label class="slider">Сила мутаций <output id="mutOut">8%</output>
+    <input type="range" id="mutRate" min="0" max="30" step="1" value="8">
+  </label>
+  <div class="row">
+    <button id="addPrey">+5 рыбок</button>
+    <button id="addPred">+1 хищник</button>
+  </div>
+  <div class="row">
+    <button id="reset">↺ Заново</button>
+    <button id="senses">Показать зрение</button>
+  </div>
+  <div class="row">
+    <button id="migrate" class="on">Миграция: вкл</button>
+  </div>
+
+  <div class="inspect" id="inspect" hidden></div>
+
+  <p class="hint">Каждый ген — компромисс. Быстрые догоняют еду, но тратят больше энергии. Крупные выдерживают голод и не по зубам хищникам, но медленнее. Дальнее зрение помогает найти еду и заметить врага, но тоже стоит энергии. Убери планктон — выживут экономные. Добавь хищников — станут быстрыми и крупными, а спасаться будут в водорослях. Если вид вымрет, при включённой миграции из глубины приплывут новые особи.</p>
+</aside>
+
+<script>
+"use strict";
+// ---------- Константы и гены ----------
+// Гены: speed (скорость), size (размер), sense (дальность зрения), hue (цвет, ни на что не влияет — метка родства).
+const GENES = {
+  speed: { min: 0.3, max: 3.5, label: "Скорость" },
+  size:  { min: 3,   max: 18,  label: "Размер" },
+  sense: { min: 20,  max: 260, label: "Зрение" },
+};
+const SAND = 46;            // высота песка
+const CELL = 64;            // ячейка пространственной сетки
+const MAX_FOOD = 500;
+const MAX_FISH = 420;
+
+const tank = document.getElementById("tank");
+const ctx = tank.getContext("2d");
+let W = 0, H = 0, DPR = 1;
+
+const rand = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+function gauss() { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+
+// ---------- Состояние мира ----------
+let fish = [], food = [], particles = [], bubbles = [], plants = [];
+let simTime = 0, births = 0, maxGen = 1, nextId = 1;
+let history = [];           // снимки раз в секунду
+let paused = false, timeScale = 1, foodRate = 10, mutation = 0.08;
+let selected = null, showSenses = false, chartMode = "pop";
+let foodAcc = 0, histAcc = 0, migrate = true, noPreySince = null, noPredSince = null;
+
+function makeGenes(kind) {
+  if (kind === "pred") return { speed: rand(1.3, 1.5), size: rand(10, 12), sense: rand(110, 140), hue: rand(0, 20) };
+  return { speed: rand(0.9, 1.3), size: rand(5, 7), sense: rand(60, 90), hue: rand(170, 220) };
+}
+
+function mutate(g) {
+  const m = { hue: (g.hue + gauss() * 10 + 360) % 360 };
+  for (const k in GENES) m[k] = clamp(g[k] * (1 + gauss() * mutation), GENES[k].min, GENES[k].max);
+  return m;
+}
+
+function spawnFish(kind, genes, x, y, gen = 1, energy) {
+  const g = genes || makeGenes(kind);
+  const f = {
+    id: nextId++, kind, g, gen,
+    x: x ?? rand(40, W - 40), y: y ?? rand(40, H - SAND - 40),
+    vx: rand(-1, 1), vy: rand(-0.3, 0.3),
+    energy: energy ?? maxEnergy(g) * 0.6,
+    age: 0, kids: 0, meals: 0, rest: 0, phase: Math.random() * 6.28,
+    wander: Math.random() * 6.28, dead: false,
+  };
+  fish.push(f);
+  if (gen > maxGen) maxGen = gen;
+  return f;
+}
+
+const maxEnergy = g => 20 + g.size * 6;
+// Расход энергии в секунду: движение (растёт с размером и квадратом скорости), зрение, базовый обмен.
+function costPerSec(f) {
+  const g = f.g, s = g.size / 8;
+  const move = 0.9 * s * s * g.speed * g.speed;
+  const eyes = g.sense / 120 * 0.45;
+  const base = 0.35 * s;
+  return (move + eyes + base) * (f.kind === "pred" ? 0.2 : 1);
+}
+
+function spawnFood(x, y, pellet = false) {
+  if (food.length >= MAX_FOOD) return;
+  food.push({ x: x ?? rand(10, W - 10), y: y ?? rand(10, H - SAND - 10), vy: pellet ? rand(10, 22) : 0, ph: Math.random() * 6.28, value: pellet ? 9 : 5, pellet });
+}
+
+function resetWorld() {
+  fish = []; food = []; particles = []; history = [];
+  simTime = 0; births = 0; maxGen = 1; selected = null; noPreySince = noPredSince = null;
+  for (let i = 0; i < 40; i++) spawnFish("prey");
+  for (let i = 0; i < 3; i++) spawnFish("pred");
+  for (let i = 0; i < 160; i++) spawnFood();
+  renderInspect();
+}
+
+// ---------- Пространственная сетка ----------
+let gridW = 0, gridH = 0, foodGrid = [], fishGrid = [];
+function buildGrids() {
+  gridW = Math.ceil(W / CELL) + 1; gridH = Math.ceil(H / CELL) + 1;
+  const n = gridW * gridH;
+  if (foodGrid.length !== n) { foodGrid = Array.from({ length: n }, () => []); fishGrid = Array.from({ length: n }, () => []); }
+  for (let i = 0; i < n; i++) { foodGrid[i].length = 0; fishGrid[i].length = 0; }
+  for (const p of food) foodGrid[cellOf(p.x, p.y)].push(p);
+  for (const f of fish) if (!f.dead) fishGrid[cellOf(f.x, f.y)].push(f);
+}
+function cellOf(x, y) { return clamp(Math.floor(y / CELL), 0, gridH - 1) * gridW + clamp(Math.floor(x / CELL), 0, gridW - 1); }
+function query(grid, x, y, r, cb) {
+  const x0 = clamp(Math.floor((x - r) / CELL), 0, gridW - 1), x1 = clamp(Math.floor((x + r) / CELL), 0, gridW - 1);
+  const y0 = clamp(Math.floor((y - r) / CELL), 0, gridH - 1), y1 = clamp(Math.floor((y + r) / CELL), 0, gridH - 1);
+  for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) { const c = grid[cy * gridW + cx]; for (let i = 0; i < c.length; i++) cb(c[i]); }
+}
+
+// ---------- Шаг симуляции ----------
+function step(dt) {
+  simTime += dt;
+
+  foodAcc += foodRate * dt * (W * H / (1280 * 800));
+  while (foodAcc >= 1) { spawnFood(); foodAcc--; }
+
+  for (const p of food) {
+    if (p.pellet) { p.y += p.vy * dt; if (p.y > H - SAND - 4) { p.y = H - SAND - 4; p.vy = 0; } }
+    else { p.ph += dt; p.x += Math.sin(p.ph * 0.7) * 3 * dt; p.y += Math.cos(p.ph * 0.5) * 2 * dt; }
+  }
+
+  buildGrids();
+
+  const newborns = [];
+  for (const f of fish) {
+    if (f.dead) continue;
+    const g = f.g, maxV = g.speed * 55;
+    f.age += dt;
+    let ax = 0, ay = 0;
+
+    // Цель: ближайшая еда (планктон или подходящая жертва)
+    let target = null, bestD = g.sense * g.sense;
+    if (f.kind === "prey") {
+      query(foodGrid, f.x, f.y, g.sense, p => {
+        if (p.eaten) return;
+        const dx = p.x - f.x, dy = p.y - f.y, d = dx * dx + dy * dy;
+        if (d < bestD) { bestD = d; target = p; }
+      });
+    } else if ((f.rest -= dt) <= 0) {
+      // хищник после еды несколько секунд переваривает и не охотится
+      query(fishGrid, f.x, f.y, g.sense, o => {
+        if (o.dead || o === f || o.hidden || o.g.size * 1.15 > g.size) return; // спряталась или слишком крупная
+        if (o.kind === "pred" && f.energy > maxEnergy(g) * 0.15) return; // своих не трогаем, пока не голодают
+        const dx = o.x - f.x, dy = o.y - f.y, d = dx * dx + dy * dy;
+        if (d < bestD) { bestD = d; target = o; }
+      });
+    }
+
+    // Опасность: хищники рядом, которые могут нас съесть
+    let fleeX = 0, fleeY = 0, scared = false;
+    query(fishGrid, f.x, f.y, g.sense, o => {
+      if (o === f || o.dead || o.kind !== "pred" || f.g.size * 1.15 > o.g.size) return;
+      if (f.kind === "pred") return;
+      const dx = f.x - o.x, dy = f.y - o.y, d = Math.hypot(dx, dy) || 1;
+      if (d < g.sense) { const w = (1 - d / g.sense); fleeX += dx / d * w; fleeY += dy / d * w; scared = true; }
+    });
+
+    if (scared) { const l = Math.hypot(fleeX, fleeY) || 1; ax += fleeX / l * 3; ay += fleeY / l * 3; }
+    if (target) {
+      const dx = target.x - f.x, dy = target.y - f.y, d = Math.hypot(dx, dy) || 1;
+      ax += dx / d * (scared ? 1 : 2.2); ay += dy / d * (scared ? 1 : 2.2);
+    } else {
+      f.wander += gauss() * 1.2 * dt;
+      ax += Math.cos(f.wander) * 0.8; ay += Math.sin(f.wander) * 0.4;
+    }
+
+    // Стенки, поверхность и песок
+    const m = 30 + g.size;
+    if (f.x < m) ax += (m - f.x) / m * 3;
+    if (f.x > W - m) ax -= (f.x - (W - m)) / m * 3;
+    if (f.y < m) ay += (m - f.y) / m * 3;
+    if (f.y > H - SAND - m) ay -= (f.y - (H - SAND - m)) / m * 3;
+
+    const sprint = scared || target ? 1 : 0.55;
+    f.vx += ax * maxV * 2.5 * dt; f.vy += ay * maxV * 2.5 * dt;
+    const v = Math.hypot(f.vx, f.vy), lim = maxV * sprint;
+    if (v > lim) { f.vx = f.vx / v * lim; f.vy = f.vy / v * lim; }
+    f.x = clamp(f.x + f.vx * dt, 2, W - 2); f.y = clamp(f.y + f.vy * dt, 2, H - SAND - 2);
+    f.phase += dt * (4 + v * 0.12);
+    f.hidden = f.kind === "prey" && inWeeds(f.x, f.y);
+
+    // Энергия: бег стоит дороже, чем неспешное плавание
+    f.energy -= costPerSec(f) * (0.45 + 0.55 * sprint) * dt;
+
+    // Еда
+    if (target && !target.eaten && !target.dead) {
+      const reach = g.size + (f.kind === "prey" ? 3 : target.g.size * 0.6);
+      if (Math.hypot(target.x - f.x, target.y - f.y) < reach) {
+        if (f.kind === "prey") { target.eaten = true; f.energy += target.value; }
+        else { target.dead = true; target.cause = "съели"; f.energy += 6 + target.g.size * 2.5 + target.energy * 0.25; f.rest = 5; burst(target.x, target.y, `hsl(${target.g.hue},80%,65%)`, 10); }
+        f.meals++;
+      }
+    }
+
+    // Размножение делением
+    const cap = maxEnergy(g);
+    if (f.energy > cap) f.energy = cap;
+    const ready = f.kind === "prey" ? 0.82 : 0.95;
+    const minAge = f.kind === "prey" ? 4 : 20;
+    const pause = f.kind === "prey" ? 3 : 30; // перерыв между детьми
+    if (f.energy >= cap * ready && f.age > minAge && f.age - (f.lastKid || 0) > pause && fish.length + newborns.length < MAX_FISH && !crowded(f)) {
+      f.energy *= 0.5; f.kids++; births++; f.lastKid = f.age;
+      const kid = { kind: f.kind, g: mutate(g), x: f.x + rand(-6, 6), y: f.y + rand(-6, 6), gen: f.gen + 1, energy: f.energy * 0.9 };
+      newborns.push(kid);
+      burst(f.x, f.y, "rgba(200,255,240,.9)", 5);
+    }
+
+    const lifespan = f.kind === "prey" ? 90 : 140;
+    if (f.energy <= 0) { f.dead = true; f.cause = "от голода"; burst(f.x, f.y, "rgba(150,160,170,.7)", 6); }
+    else if (f.age > lifespan * (0.8 + g.size / 40)) { f.dead = true; f.cause = "от старости"; burst(f.x, f.y, "rgba(150,160,170,.7)", 6); }
+  }
+
+  for (const k of newborns) spawnFish(k.kind, k.g, k.x, k.y, k.gen, k.energy);
+  if (selected && selected.dead) { selected.diedAt = simTime; }
+  fish = fish.filter(f => !f.dead);
+  food = food.filter(p => !p.eaten);
+
+  histAcc += dt;
+  if (histAcc >= 1) { histAcc = 0; snapshot(); }
+
+  checkExtinction();
+}
+
+// Вымирание и миграция: если вид исчез, через время из глубины приплывают новые особи
+function checkExtinction() {
+  let prey = 0, pred = 0;
+  for (const f of fish) f.kind === "pred" ? pred++ : prey++;
+  if (prey) noPreySince = null;
+  else if (noPreySince === null) { noPreySince = simTime; toast(migrate ? "Рыбки вымерли. Скоро приплывут новые…" : "Рыбки вымерли. Нажми «+5 рыбок» или «Заново»."); }
+  else if (migrate && simTime - noPreySince > 15) {
+    for (let i = 0; i < 6; i++) spawnFish("prey", null, rand(0, 1) < 0.5 ? 20 : W - 20);
+    noPreySince = null; toast("Приплыла стайка рыбок");
+  }
+  if (pred) noPredSince = null;
+  else if (noPredSince === null) { noPredSince = simTime; if (simTime > 1) toast("Хищники вымерли"); }
+  else if (migrate && simTime - noPredSince > 60 && prey >= 25) {
+    spawnFish("pred", null, rand(0, 1) < 0.5 ? 20 : W - 20);
+    noPredSince = null; toast("Из глубины приплыл хищник");
+  }
+}
+
+// Хищники территориальны: не заводят потомство, если рядом уже двое других
+function crowded(f) {
+  if (f.kind !== "pred") return false;
+  let n = 0;
+  query(fishGrid, f.x, f.y, 220, o => { if (o !== f && !o.dead && o.kind === "pred" && Math.hypot(o.x - f.x, o.y - f.y) < 220) n++; });
+  return n >= 2;
+}
+
+function snapshot() {
+  let prey = 0, pred = 0, sp = 0, sz = 0, se = 0;
+  for (const f of fish) {
+    if (f.kind === "pred") { pred++; continue; }
+    prey++; sp += f.g.speed; sz += f.g.size; se += f.g.sense;
+  }
+  history.push({ t: simTime, prey, pred, food: food.length, speed: prey ? sp / prey : null, size: prey ? sz / prey : null, sense: prey ? se / prey : null });
+  if (history.length > 600) history.shift();
+}
+
+// Рыбка в гуще водорослей не видна хищникам
+function inWeeds(x, y) {
+  for (const p of plants) if (Math.abs(x - p.x) < 10 + p.blades * 4 && y > H - SAND - p.h * 0.8) return true;
+  return false;
+}
+
+// ---------- Частицы и декор ----------
+function burst(x, y, color, n) {
+  for (let i = 0; i < n; i++) particles.push({ x, y, vx: rand(-40, 40), vy: rand(-40, 20), life: rand(0.4, 0.9), color });
+}
+
+function initDecor() {
+  plants = [];
+  const n = Math.max(4, Math.round(W / 110));
+  for (let i = 0; i < n; i++) {
+    plants.push({ x: rand(0, W), h: rand(60, Math.min(220, H * 0.35)), w: rand(5, 10), hue: rand(110, 160), ph: Math.random() * 6.28, blades: 1 + (Math.random() * 3 | 0) });
+  }
+  bubbles = [];
+  for (let i = 0; i < 30; i++) bubbles.push(newBubble(true));
+}
+function newBubble(anywhere) {
+  return { x: rand(0, W), y: anywhere ? rand(0, H) : H - SAND, r: rand(1.5, 4.5), v: rand(25, 60), ph: Math.random() * 6.28 };
+}
+
+// ---------- Отрисовка ----------
+let sandPattern = null;
+function draw(realDt) {
+  const water = ctx.createLinearGradient(0, 0, 0, H);
+  water.addColorStop(0, "#0d4a6e"); water.addColorStop(0.5, "#082d48"); water.addColorStop(1, "#041726");
+  ctx.fillStyle = water; ctx.fillRect(0, 0, W, H);
+
+  // Лучи света сверху
+  ctx.save(); ctx.globalCompositeOperation = "lighter";
+  for (let i = 0; i < 5; i++) {
+    const x = W * (0.15 + i * 0.2) + Math.sin(performance.now() / 4000 + i * 2) * 60;
+    const gr = ctx.createLinearGradient(0, 0, 0, H * 0.85);
+    gr.addColorStop(0, "rgba(160,230,255,0.07)"); gr.addColorStop(1, "rgba(160,230,255,0)");
+    ctx.fillStyle = gr; ctx.beginPath();
+    ctx.moveTo(x - 30, 0); ctx.lineTo(x + 30, 0); ctx.lineTo(x + 140, H * 0.85); ctx.lineTo(x - 40, H * 0.85); ctx.fill();
+  }
+  ctx.restore();
+
+  // Песок
+  ctx.fillStyle = "#3a3122"; ctx.beginPath(); ctx.moveTo(0, H);
+  for (let x = 0; x <= W; x += 20) ctx.lineTo(x, H - SAND + Math.sin(x * 0.013) * 6 + Math.sin(x * 0.041) * 3);
+  ctx.lineTo(W, H); ctx.fill();
+  ctx.fillStyle = "rgba(255,230,180,0.06)"; ctx.fillRect(0, H - SAND + 8, W, 2);
+
+  // Водоросли
+  const t = performance.now() / 1000;
+  for (const p of plants) {
+    for (let b = 0; b < p.blades; b++) {
+      const bx = p.x + b * 7 - p.blades * 3;
+      ctx.strokeStyle = `hsl(${p.hue + b * 8},45%,${22 + b * 4}%)`; ctx.lineWidth = p.w; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(bx, H - SAND + 6);
+      const segs = 8;
+      for (let s = 1; s <= segs; s++) {
+        const k = s / segs;
+        ctx.lineTo(bx + Math.sin(t * 0.9 + p.ph + k * 2.5 + b) * 14 * k, H - SAND + 6 - p.h * k * (1 - b * 0.15));
+      }
+      ctx.stroke();
+    }
+  }
+
+  // Пузыри
+  ctx.strokeStyle = "rgba(200,240,255,0.35)"; ctx.lineWidth = 1;
+  for (const b of bubbles) {
+    b.y -= b.v * realDt; b.ph += realDt * 3; b.x += Math.sin(b.ph) * 0.3;
+    if (b.y < -10) Object.assign(b, newBubble(false));
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 6.28); ctx.stroke();
+  }
+
+  // Еда
+  ctx.save(); ctx.globalCompositeOperation = "lighter";
+  for (const p of food) {
+    if (p.pellet) { ctx.fillStyle = "#e8b25a"; ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, 6.28); ctx.fill(); continue; }
+    const a = 0.55 + Math.sin(p.ph * 2) * 0.25;
+    ctx.fillStyle = `rgba(150,255,120,${a * 0.25})`; ctx.beginPath(); ctx.arc(p.x, p.y, 5, 0, 6.28); ctx.fill();
+    ctx.fillStyle = `rgba(190,255,150,${a})`; ctx.beginPath(); ctx.arc(p.x, p.y, 1.8, 0, 6.28); ctx.fill();
+  }
+  ctx.restore();
+
+  // Зрение
+  if (showSenses || selected) {
+    ctx.lineWidth = 1;
+    for (const f of (showSenses ? fish : [selected])) {
+      if (!f || f.dead) continue;
+      ctx.strokeStyle = f.kind === "pred" ? "rgba(255,110,94,0.18)" : "rgba(111,211,255,0.16)";
+      if (f === selected) ctx.strokeStyle = "rgba(255,255,255,0.5)";
+      ctx.beginPath(); ctx.arc(f.x, f.y, f.g.sense, 0, 6.28); ctx.stroke();
+    }
+  }
+
+  // Рыбы
+  for (const f of fish) drawFish(f);
+
+  // Частицы
+  for (const p of particles) {
+    p.life -= realDt; p.x += p.vx * realDt; p.y += p.vy * realDt; p.vx *= 0.94; p.vy *= 0.94;
+    ctx.globalAlpha = Math.max(0, p.life); ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, 6.28); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  particles = particles.filter(p => p.life > 0);
+
+  if (paused) {
+    ctx.fillStyle = "rgba(0,0,0,.25)"; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = "#fff"; ctx.font = "600 22px Rubik, sans-serif"; ctx.textAlign = "center";
+    ctx.fillText("Пауза", (W - (isWide() ? 324 : 0)) / 2, H / 2);
+  }
+}
+
+function drawFish(f) {
+  const g = f.g, s = g.size;
+  const ang = Math.atan2(f.vy, f.vx);
+  const hungry = f.energy / maxEnergy(g);
+  const light = 45 + hungry * 20, sat = 40 + hungry * 45;
+  const wig = Math.sin(f.phase) * 0.35;
+  const pred = f.kind === "pred";
+  const L = pred ? s * 1.9 : s * 1.5, Hh = pred ? s * 0.62 : s * 0.75;
+
+  ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(ang);
+  // хвост
+  ctx.fillStyle = `hsl(${g.hue},${sat}%,${light - 12}%)`;
+  ctx.save(); ctx.translate(-L * 0.8, 0); ctx.rotate(wig);
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-s * 0.9, -Hh * 0.9); ctx.lineTo(-s * 0.7, 0); ctx.lineTo(-s * 0.9, Hh * 0.9); ctx.closePath(); ctx.fill();
+  ctx.restore();
+  // спинной плавник
+  if (pred) { ctx.beginPath(); ctx.moveTo(-L * 0.3, -Hh * 0.7); ctx.lineTo(L * 0.05, -Hh * 1.5); ctx.lineTo(L * 0.25, -Hh * 0.7); ctx.fill(); }
+  // тело
+  const body = ctx.createLinearGradient(0, -Hh, 0, Hh);
+  body.addColorStop(0, `hsl(${g.hue},${sat}%,${light + 12}%)`); body.addColorStop(1, `hsl(${g.hue},${sat}%,${light - 10}%)`);
+  ctx.fillStyle = body;
+  ctx.beginPath(); ctx.ellipse(0, 0, L, Hh, 0, 0, 6.28); ctx.fill();
+  if (pred) { ctx.fillStyle = "rgba(255,255,255,.75)"; ctx.beginPath(); ctx.moveTo(L * 0.85, Hh * 0.15); ctx.lineTo(L * 0.6, Hh * 0.45); ctx.lineTo(L * 0.5, Hh * 0.18); ctx.fill(); }
+  // глаз
+  ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(L * 0.55, -Hh * 0.25, Math.max(1.4, s * 0.2), 0, 6.28); ctx.fill();
+  ctx.fillStyle = "#021"; ctx.beginPath(); ctx.arc(L * 0.6, -Hh * 0.25, Math.max(0.8, s * 0.11), 0, 6.28); ctx.fill();
+  ctx.restore();
+
+  if (f === selected) {
+    ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.arc(f.x, f.y, L + 8, 0, 6.28); ctx.stroke(); ctx.setLineDash([]);
+  }
+}
+
+// ---------- График ----------
+const chart = document.getElementById("chart"), cctx = chart.getContext("2d");
+const SERIES = {
+  pop: [["prey", "Рыбки", "#6fd3ff"], ["pred", "Хищники", "#ff6b5e"], ["food", "Планктон", "#9dff7a"]],
+  genes: [["speed", "Скорость", "#ffd166"], ["size", "Размер", "#c49bff"], ["sense", "Зрение", "#4fe0c0"]],
+};
+function drawChart() {
+  const r = chart.getBoundingClientRect(), w = Math.round(r.width * DPR), h = Math.round(r.height * DPR);
+  if (!w || !h) return;
+  if (chart.width !== w || chart.height !== h) { chart.width = w; chart.height = h; }
+  cctx.clearRect(0, 0, w, h);
+  const data = history.slice(-240);
+  if (data.length < 2) return;
+  const pad = 6 * DPR;
+  cctx.strokeStyle = "rgba(255,255,255,.06)"; cctx.lineWidth = 1;
+  for (let i = 1; i < 4; i++) { cctx.beginPath(); cctx.moveTo(0, h * i / 4); cctx.lineTo(w, h * i / 4); cctx.stroke(); }
+  for (const [key, , color] of SERIES[chartMode]) {
+    // Гены нормируем по их диапазону, популяции — по общему максимуму
+    let lo = 0, hi = 1;
+    if (chartMode === "genes") { lo = GENES[key].min; hi = GENES[key].max; }
+    else hi = Math.max(10, ...data.map(d => Math.max(d.prey, d.pred, chartMode === "pop" ? d.food : 0)));
+    cctx.strokeStyle = color; cctx.lineWidth = 2 * DPR; cctx.lineJoin = "round"; cctx.beginPath();
+    let started = false;
+    data.forEach((d, i) => {
+      const v = d[key]; if (v == null) { started = false; return; }
+      const x = i / (data.length - 1) * w, y = h - pad - (v - lo) / (hi - lo) * (h - pad * 2);
+      started ? cctx.lineTo(x, y) : cctx.moveTo(x, y); started = true;
+    });
+    cctx.stroke();
+  }
+}
+function renderLegend() {
+  document.getElementById("legend").innerHTML = SERIES[chartMode].map(([k, name, c]) => {
+    let val = "";
+    const last = history[history.length - 1];
+    if (last && last[k] != null) val = chartMode === "genes" ? " " + last[k].toFixed(k === "sense" ? 0 : 2) : " " + last[k];
+    return `<span><i style="background:${c}"></i>${name}${val}</span>`;
+  }).join("");
+}
+
+// ---------- Панель ----------
+const $ = id => document.getElementById(id);
+function fmtTime(s) { s = Math.floor(s); const m = Math.floor(s / 60); return `${m}:${String(s % 60).padStart(2, "0")}`; }
+function updateStats() {
+  let prey = 0, pred = 0;
+  for (const f of fish) f.kind === "pred" ? pred++ : prey++;
+  $("nPrey").textContent = prey; $("nPred").textContent = pred; $("nFood").textContent = food.length;
+  $("tTime").textContent = fmtTime(simTime); $("maxGen").textContent = maxGen; $("births").textContent = births;
+  renderLegend(); renderInspect();
+}
+
+function renderInspect() {
+  const box = $("inspect");
+  if (!selected) { box.hidden = true; return; }
+  const f = selected, g = f.g; box.hidden = false;
+  const bar = (k) => {
+    const p = (g[k] - GENES[k].min) / (GENES[k].max - GENES[k].min) * 100;
+    return `<div class="gene">${GENES[k].label}<div class="bar"><div style="width:${p.toFixed(0)}%"></div></div><em>${g[k].toFixed(k === "sense" ? 0 : 2)}</em></div>`;
+  };
+  const status = f.dead ? `<p style="color:var(--pred);margin:6px 0 0">Умерла ${f.cause}.</p>` : "";
+  box.innerHTML = `<h2><span class="dot" style="background:hsl(${g.hue},70%,60%)"></span>${f.kind === "pred" ? "Хищник" : "Рыбка"} №${f.id}</h2>
+    ${bar("speed")}${bar("size")}${bar("sense")}
+    <div class="gene">Энергия<div class="bar"><div style="width:${Math.max(0, f.energy / maxEnergy(g) * 100).toFixed(0)}%;background:var(--food)"></div></div><em>${Math.max(0, f.energy).toFixed(0)}</em></div>
+    <p style="margin:6px 0 0;color:var(--muted)">Поколение ${f.gen} · возраст ${fmtTime(f.age)} · детей ${f.kids} · съела ${f.meals}<br>Расход: ${costPerSec(f).toFixed(2)} энергии/с</p>${status}`;
+}
+
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("show"), 3500); }
+const isWide = () => window.innerWidth > 700 && !$("panel").classList.contains("hidden");
+
+$("pause").onclick = () => { paused = !paused; $("pause").textContent = paused ? "▶ Пуск" : "⏸ Пауза"; $("pause").classList.toggle("on", paused); };
+document.querySelectorAll("[data-speed]").forEach(b => b.onclick = () => {
+  timeScale = +b.dataset.speed; document.querySelectorAll("[data-speed]").forEach(x => x.classList.toggle("on", x === b));
+});
+document.querySelectorAll("[data-chart]").forEach(b => b.onclick = () => {
+  chartMode = b.dataset.chart; document.querySelectorAll("[data-chart]").forEach(x => x.classList.toggle("on", x === b)); renderLegend();
+});
+$("foodRate").oninput = e => { foodRate = +e.target.value; $("foodOut").textContent = foodRate; };
+$("mutRate").oninput = e => { mutation = e.target.value / 100; $("mutOut").textContent = e.target.value + "%"; };
+$("addPrey").onclick = () => { for (let i = 0; i < 5; i++) spawnFish("prey"); };
+$("addPred").onclick = () => spawnFish("pred");
+$("reset").onclick = () => { resetWorld(); toast("Новый аквариум"); };
+$("senses").onclick = () => { showSenses = !showSenses; $("senses").classList.toggle("on", showSenses); };
+$("migrate").onclick = () => { migrate = !migrate; $("migrate").classList.toggle("on", migrate); $("migrate").textContent = "Миграция: " + (migrate ? "вкл" : "выкл"); };
+$("toggle").onclick = () => $("panel").classList.toggle("hidden");
+
+// Клик по воде: выбрать рыбу или насыпать корм
+tank.addEventListener("pointerdown", e => {
+  const x = e.clientX, y = e.clientY;
+  let best = null, bd = Infinity;
+  for (const f of fish) {
+    const d = Math.hypot(f.x - x, f.y - y);
+    if (d < Math.max(22, f.g.size * 2.2) && d < bd) { bd = d; best = f; }
+  }
+  if (best) { selected = best; renderInspect(); if (window.innerWidth <= 700) $("panel").classList.remove("hidden"); return; }
+  if (selected) { selected = null; renderInspect(); }
+  for (let i = 0; i < 8; i++) spawnFood(x + rand(-14, 14), Math.min(y + rand(-10, 10), H - SAND - 6), true);
+});
+
+// ---------- Цикл ----------
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  const oldW = W, oldH = H;
+  W = window.innerWidth; H = window.innerHeight;
+  tank.width = Math.round(W * DPR); tank.height = Math.round(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  if (oldW) for (const o of [...fish, ...food]) { o.x = o.x / oldW * W; o.y = clamp(o.y / oldH * H, 2, H - SAND - 2); }
+  initDecor();
+}
+window.addEventListener("resize", resize);
+
+let last = performance.now(), statAcc = 0;
+function frame(now) {
+  const realDt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (!paused) {
+    const total = realDt * timeScale, steps = Math.ceil(total / (1 / 60));
+    for (let i = 0; i < steps; i++) step(total / steps);
+  }
+  draw(realDt);
+  statAcc += realDt;
+  if (statAcc > 0.25) { statAcc = 0; updateStats(); drawChart(); }
+  requestAnimationFrame(frame);
+}
+
+resize();
+resetWorld();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
