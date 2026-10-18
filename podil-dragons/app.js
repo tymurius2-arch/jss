@@ -194,7 +194,10 @@
     const phone = C.phone || "";
     $("#detailBody").innerHTML = `
       <div class="gallery">
-        <div class="gallery-main" id="gMain">${media(it)}</div>
+        <div class="gallery-main" id="gMain">${photos && photos.length > 1
+          ? `<div class="g-track" id="gTrack">${photos.map((p, i) => `<img src="${p}" alt="" ${i ? 'loading="lazy"' : ""} decoding="async">`).join("")}</div>
+             <span class="g-count" id="gCount">1 / ${photos.length}</span>`
+          : media(it)}</div>
         ${photos && photos.length > 1 ? `<div class="gallery-thumbs">${photos.map((p, i) => `<button type="button" class="${i ? "" : "on"}" data-g="${i}"><img src="${p}" alt=""></button>`).join("")}</div>` : ""}
       </div>
       <div class="detail-info">
@@ -205,36 +208,73 @@
         ${L(it.desc) ? `<p class="detail-desc">${esc(L(it.desc))}</p>` : ""}
         <div class="advice"><b>${esc(t("d.architect"))}</b><p>${esc(t("d.architectText"))}</p></div>
         <div class="detail-actions">
-          ${phone ? `<a class="btn btn-red" href="tel:${esc(phone.replace(/[^\d+]/g, ""))}">${esc(t("d.call"))}</a>` : ""}
-          <a class="btn btn-ghost" href="#/contacts" data-ask="${esc(it.id)}">${esc(t("d.ask"))}</a>
-          <button class="btn btn-ghost btn-sm" type="button" data-share="${esc(it.id)}">${esc(t("d.share"))}</button>
+          ${phone ? `<a class="btn btn-red" href="tel:${esc(phone.replace(/[^\d+]/g, ""))}"><span class="lbl-long">${esc(t("d.call"))}</span><span class="lbl-short">${esc(t("d.callShort"))}</span></a>` : ""}
+          <a class="btn btn-ghost" href="#/contacts" data-ask="${esc(it.id)}"><span class="lbl-long">${esc(t("d.ask"))}</span><span class="lbl-short">${esc(t("d.askShort"))}</span></a>
+          <button class="btn btn-ghost btn-sm share-btn" type="button" data-share="${esc(it.id)}" aria-label="${esc(t("d.share"))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3M7 8l5-5 5 5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg><span class="btn-label">${esc(t("d.share"))}</span></button>
           <button class="fav-btn${favs.has(it.id) ? " on" : ""}" style="position:static;border:1.5px solid var(--line)" type="button" data-fav="${esc(it.id)}" aria-label="${esc(t("card.fav"))}">${HEART}</button>
         </div>
       </div>`;
     openModal("#detail");
-    if (photos) $$("#detailBody [data-g]").forEach((b) => b.addEventListener("click", () => {
-      $$("#detailBody [data-g]").forEach((x) => x.classList.toggle("on", x === b));
-      $("#gMain").innerHTML = `<img src="${photos[+b.dataset.g]}" alt="">`;
-    }));
+    // Фото гортаються свайпом; мініатюри і лічильник йдуть слідом.
+    const track = $("#gTrack");
+    if (track) {
+      const thumbs = $$("#detailBody [data-g]");
+      const mark = (i) => { thumbs.forEach((x, k) => x.classList.toggle("on", k === i)); $("#gCount").textContent = `${i + 1} / ${photos.length}`; };
+      thumbs.forEach((b) => b.addEventListener("click", () => track.scrollTo({ left: +b.dataset.g * track.clientWidth, behavior: settings.motion === "on" ? "smooth" : "auto" })));
+      track.addEventListener("scroll", () => mark(Math.round(track.scrollLeft / track.clientWidth)), { passive: true });
+    }
   }
 
   /* ---------- Модальні вікна ---------- */
   let lastFocus = null;
+  /* Кожне вікно додає запис в історію, тож кнопка «Назад» на телефоні закриває вікно, а не сайт. */
+  const touchLike = () => matchMedia("(pointer: coarse)").matches;
   function openModal(sel) {
     const m = $(sel); lastFocus = document.activeElement;
     m.hidden = false; m.classList.remove("closing"); document.body.classList.add("locked");
-    m.querySelector(".modal-card").scrollTop = 0;
-    setTimeout(() => { const f = m.querySelector("input:not([type=radio]):not([type=file]), .modal-x"); f && f.focus({ preventScroll: true }); }, 60);
+    m.querySelector(".modal-scroll").scrollTop = 0;
+    m.querySelector(".modal-card").style.transform = "";
+    if (!m._pushed) { history.pushState({ pdModal: m.id }, ""); m._pushed = true; }
+    // На телефоні не ставимо фокус у поле, щоб клавіатура не вискакувала одразу.
+    if (!touchLike()) setTimeout(() => { const f = m.querySelector("input:not([type=radio]):not([type=file]):not(.hp), .modal-x"); f && f.focus({ preventScroll: true }); }, 60);
   }
-  function closeModal(m) {
+  // keepHistory: вікно закривається через перехід за посиланням — тоді історію не чіпаємо.
+  function closeModal(m, keepHistory) {
     if (!m || m.hidden || m.classList.contains("closing")) return;
     m.classList.add("closing");
     const done = () => { m.hidden = true; m.classList.remove("closing"); if (!$$(".modal").some((x) => !x.hidden)) document.body.classList.remove("locked"); };
     settings.motion === "off" ? done() : setTimeout(done, 280);
-    if (m.id === "detail" && /[?&]id=/.test(location.hash)) history.replaceState(null, "", location.hash.replace(/[?&]id=[^&]*/, ""));
-    lastFocus && lastFocus.focus && lastFocus.focus({ preventScroll: true });
+    if (m._pushed) { m._pushed = false; if (!keepHistory && history.state && history.state.pdModal === m.id) history.back(); }
+    if (!touchLike()) lastFocus && lastFocus.focus && lastFocus.focus({ preventScroll: true });
   }
-  document.addEventListener("click", (e) => { if (e.target.closest("[data-close]")) closeModal(e.target.closest(".modal")); });
+  // На телефоні вікно-шторку можна стягнути пальцем вниз.
+  $$(".modal-card").forEach((card) => {
+    let y0 = null, dy = 0;
+    const scroller = $(".modal-scroll", card);
+    card.addEventListener("touchstart", (e) => {
+      if (innerWidth > 760 || scroller.scrollTop > 0 || e.target.closest("input, textarea, select, .g-track")) { y0 = null; return; }
+      y0 = e.touches[0].clientY; dy = 0; card.style.transition = "none";
+    }, { passive: true });
+    card.addEventListener("touchmove", (e) => {
+      if (y0 === null) return;
+      dy = Math.max(0, e.touches[0].clientY - y0);
+      if (dy > 0 && scroller.scrollTop <= 0) card.style.transform = `translateY(${dy}px)`;
+    }, { passive: true });
+    card.addEventListener("touchend", () => {
+      if (y0 === null) return;
+      card.style.transition = "transform .35s cubic-bezier(.22,1,.36,1)";
+      if (dy > 110) closeModal(card.closest(".modal")); else card.style.transform = "";
+      y0 = null;
+    });
+  });
+  addEventListener("popstate", () => {
+    $$(".modal").filter((m) => !m.hidden && m._pushed).forEach((m) => { m._pushed = false; closeModal(m, true); });
+    if (nav.classList.contains("open")) toggleNav(false);
+  });
+  document.addEventListener("click", (e) => {
+    const c = e.target.closest("[data-close]");
+    if (c) closeModal(e.target.closest(".modal"), !!c.closest("a[href]"));
+  });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") { $$(".modal").filter((m) => !m.hidden).forEach(closeModal); toggleNav(false); }
   });
@@ -330,13 +370,15 @@
     const share = e.target.closest("[data-share]");
     if (share) {
       const url = location.href.split("#")[0] + "#/sale?id=" + encodeURIComponent(share.dataset.share);
+      // На телефоні — системне меню «Поділитися» (Telegram, Viber…)
+      if (navigator.share && touchLike()) { const it = byId(share.dataset.share); navigator.share({ title: it ? L(it.title) : "PODIL DRAGONS", url }).catch(() => {}); return; }
       (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(() => toast(t("d.copied")), () => prompt("URL", url));
       return;
     }
     const ask = e.target.closest("[data-ask]");
     if (ask) {
       const it = byId(ask.dataset.ask);
-      closeModal($("#detail"));
+      closeModal($("#detail"), true);
       setTimeout(() => { const m = $("#contactForm").msg; m.value = `${L(it.title)} (${money(it.price)})\n`; $("#contactForm").topic.selectedIndex = 0; }, 50);
       return;
     }
@@ -347,6 +389,18 @@
     if ((e.key === "Enter" || e.key === " ") && e.target.classList && e.target.classList.contains("card")) { e.preventDefault(); openDetail(e.target.dataset.id); }
   });
 
+  // На телефоні додаткові фільтри сховані під кнопкою «Фільтри».
+  function countFilters() {
+    const f = $("#filters");
+    const n = ["district", "pmin", "pmax", "amin", "rooms"].filter((k) => f[k].value).length + (f.fav.checked ? 1 : 0) + (f.sort.value !== "new" ? 1 : 0);
+    const b = $("#fCount"); b.textContent = n; b.hidden = !n;
+  }
+  $("#filterToggle").addEventListener("click", () => {
+    const f = $("#filters"), open = !f.classList.contains("open");
+    f.classList.toggle("open", open); $("#filterToggle").setAttribute("aria-expanded", open);
+  });
+  $("#filters").addEventListener("input", countFilters);
+  $("#filters").addEventListener("reset", () => setTimeout(countFilters));
   $("#filters").addEventListener("input", renderListings);
   $("#filters").addEventListener("reset", () => { typeFilter = ""; setTimeout(() => { renderTypeTabs(); renderListings(); }); });
   $("#filters").addEventListener("submit", (e) => e.preventDefault());
@@ -365,7 +419,13 @@
   };
   const socialLinks = () => Object.keys(SOC_ICONS).filter((k) => SOC[k]).map((k) =>
     `<a class="soc" href="${esc(SOC[k])}" target="_blank" rel="noopener" aria-label="${k}" title="${k[0].toUpperCase() + k.slice(1)}"><svg viewBox="0 0 24 24">${SOC_ICONS[k]}</svg></a>`).join("");
+  function renderMobileBar() {
+    const call = $("#mbCall");
+    call.hidden = !C.phone;
+    call.href = "tel:" + (C.phone || "").replace(/[^\d+]/g, "");
+  }
   function renderContacts() {
+    renderMobileBar();
     const p = $("#cPhone"), m = $("#cEmail");
     p.hidden = !C.phoneDisplay; p.href = "tel:" + (C.phone || "").replace(/[^\d+]/g, ""); $("b", p).textContent = C.phoneDisplay || "";
     m.hidden = !C.email; m.href = "mailto:" + C.email; $("b", m).textContent = C.email || "";
@@ -464,6 +524,7 @@
   const nav = $("#nav"), burger = $("#burger");
   function toggleNav(open) {
     nav.classList.toggle("open", open); burger.setAttribute("aria-expanded", open);
+    document.body.classList.toggle("nav-open", open);
   }
   burger.addEventListener("click", (e) => { e.stopPropagation(); toggleNav(!nav.classList.contains("open")); });
   document.addEventListener("click", (e) => { if (nav.classList.contains("open") && !e.target.closest("#nav")) toggleNav(false); });
@@ -499,6 +560,7 @@
     const { page, params } = parseHash();
     toggleNav(false);
     if (page !== current) {
+      $$(".modal").filter((m) => !m.hidden).forEach((m) => closeModal(m, true));
       const prev = current && $(`.page[data-page="${current}"]`);
       const next = $(`.page[data-page="${page}"]`);
       const show = () => {
@@ -513,9 +575,15 @@
       requestAnimationFrame(moveNavInk);
     }
     if (page === "sale") {
-      if (params.get("fav")) { $("#filters").fav.checked = true; renderListings(); }
-      if (params.get("id")) setTimeout(() => openDetail(params.get("id")), 300);
+      if (params.get("fav")) { $("#filters").fav.checked = true; renderListings(); countFilters(); }
+      const id = params.get("id");
+      if (id) {
+        // Прибираємо id з адреси, щоб закриття картки не відкривало її знову.
+        history.replaceState(null, "", location.hash.replace(/[?&]id=[^&]*/, ""));
+        setTimeout(() => openDetail(id), 300);
+      }
     }
+    if (!params.get("id")) $$(".modal").filter((m) => !m.hidden && !m._pushed).forEach((m) => closeModal(m, true));
   }
   addEventListener("hashchange", route);
 
@@ -528,6 +596,7 @@
       ticking = false;
       const y = scrollY;
       topbar.classList.toggle("scrolled", y > 8);
+      document.body.classList.toggle("near-end", y + innerHeight > document.documentElement.scrollHeight - 140);
       if (current === "home" && settings.motion === "on" && y < innerHeight * 1.2) {
         dragonSvg.style.transform = `translateY(${y * 0.12}px)`;
         heroHead.style.transform = `translateY(${y * 0.25}px)`; heroHead.style.opacity = Math.max(0, 1 - y / (innerHeight * 0.7));

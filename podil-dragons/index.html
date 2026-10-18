@@ -169,8 +169,12 @@
       <form class="filters reveal" id="filters" autocomplete="off">
         <label class="f-search">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
-          <input type="search" name="q" data-i18n-ph="f.search">
+          <input type="search" name="q" data-i18n-ph="f.search" enterkeyhint="search">
         </label>
+        <button class="f-toggle" type="button" id="filterToggle" aria-expanded="false" aria-controls="filters">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+          <span data-i18n="f.more">Фільтри</span><span class="f-count" id="fCount" hidden>0</span>
+        </button>
         <label><span data-i18n="f.district"></span><select name="district" id="fDistrict"></select></label>
         <label><span data-i18n="f.priceMin"></span><input type="number" name="pmin" min="0" step="1000" inputmode="numeric"></label>
         <label><span data-i18n="f.priceMax"></span><input type="number" name="pmax" min="0" step="1000" inputmode="numeric"></label>
@@ -296,8 +300,8 @@
       <form class="card-form reveal" id="contactForm">
         <h2 data-i18n="contacts.form"></h2>
         <input class="hp" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
-        <label><span data-i18n="contacts.name"></span><input name="name" required maxlength="80"></label>
-        <label><span data-i18n="contacts.phoneF"></span><input name="reach" required maxlength="80"></label>
+        <label><span data-i18n="contacts.name"></span><input name="name" required maxlength="80" autocomplete="name"></label>
+        <label><span data-i18n="contacts.phoneF"></span><input name="reach" required maxlength="80" autocomplete="on"></label>
         <label><span data-i18n="contacts.topic"></span>
           <select name="topic">
             <option data-i18n="contacts.t1"></option><option data-i18n="contacts.t2"></option>
@@ -413,7 +417,7 @@
   <div class="modal-back" data-close></div>
   <div class="modal-card modal-wide" role="dialog" aria-modal="true" aria-labelledby="dTitle">
     <button class="icon-btn modal-x" type="button" data-close data-i18n-title="d.close" title="Закрити">✕</button>
-    <div class="detail" id="detailBody"></div>
+    <div class="detail modal-scroll" id="detailBody"></div>
   </div>
 </div>
 
@@ -422,7 +426,7 @@
   <div class="modal-back" data-close></div>
   <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="fTitle">
     <button class="icon-btn modal-x" type="button" data-close data-i18n-title="d.close" title="Закрити">✕</button>
-    <form id="listForm" class="list-form" novalidate>
+    <form id="listForm" class="list-form modal-scroll" novalidate>
       <h2 id="fTitle" data-i18n="form.title"></h2>
       <p class="muted" data-i18n="form.sub"></p>
       <input class="hp" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
@@ -464,6 +468,13 @@
   </div>
 </div>
 
+<!-- Нижня панель швидких дій — лише на телефонах -->
+<nav class="mbar" aria-label="Quick actions">
+  <a class="mb-btn" id="mbCall" href="#"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-phone"/></svg><span data-i18n="d.call">Зателефонувати</span></a>
+  <a class="mb-btn" href="#/sale"><svg viewBox="0 0 48 48" aria-hidden="true"><use href="#ic-apartment"/></svg><span data-i18n="nav.sale">Продаж</span></a>
+  <button class="mb-btn mb-main" type="button" data-action="open-form"><span data-i18n="cta.list">Виставити об'єкт</span></button>
+</nav>
+<div class="nav-backdrop" aria-hidden="true"></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <div class="page-curtain" aria-hidden="true"></div>
 
