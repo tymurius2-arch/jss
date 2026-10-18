@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://podil-dragons.example/sitemap.xml

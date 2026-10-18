@@ -6,7 +6,24 @@
 <title>PODIL DRAGONS — нерухомість і реконструкція в Києві</title>
 <meta name="description" content="Продаж квартир, будинків і комерційних площ у Києві та реконструкція будівель. Архітектор Микола Вихарєв.">
 <meta name="theme-color" content="#C8102E">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%23C8102E'/%3E%3Ctext x='32' y='46' font-size='40' text-anchor='middle' fill='%23FBF5EA' font-family='serif'%3E%E9%BE%8D%3C/text%3E%3C/svg%3E">
+<!-- Адрес сайта: замените podil-dragons.example на свой домен (4 места ниже) -->
+<link rel="canonical" href="https://podil-dragons.example/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="PODIL DRAGONS">
+<meta property="og:title" content="PODIL DRAGONS — нерухомість і реконструкція в Києві">
+<meta property="og:description" content="Квартири, будинки та комерційні площі в Києві. Архітектор Микола Вихарєв: реконструкція, проєкт, авторський нагляд.">
+<meta property="og:url" content="https://podil-dragons.example/">
+<meta property="og:image" content="https://podil-dragons.example/img/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="uk_UA">
+<meta property="og:locale:alternate" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://podil-dragons.example/img/og-image.png">
+<link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="img/icon-192.png" type="image/png" sizes="192x192">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Manrope:wght@400;500;600;700&family=Playfair+Display:wght@600;700;800&display=swap">
@@ -152,8 +169,12 @@
       <form class="filters reveal" id="filters" autocomplete="off">
         <label class="f-search">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
-          <input type="search" name="q" data-i18n-ph="f.search">
+          <input type="search" name="q" data-i18n-ph="f.search" enterkeyhint="search">
         </label>
+        <button class="f-toggle" type="button" id="filterToggle" aria-expanded="false" aria-controls="filters">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+          <span data-i18n="f.more">Фільтри</span><span class="f-count" id="fCount" hidden>0</span>
+        </button>
         <label><span data-i18n="f.district"></span><select name="district" id="fDistrict"></select></label>
         <label><span data-i18n="f.priceMin"></span><input type="number" name="pmin" min="0" step="1000" inputmode="numeric"></label>
         <label><span data-i18n="f.priceMax"></span><input type="number" name="pmax" min="0" step="1000" inputmode="numeric"></label>
@@ -233,6 +254,7 @@
     </div>
     <div class="wrap section about">
       <div class="portrait reveal">
+        <div class="portrait-photo" id="portraitPhoto" hidden></div>
         <div class="portrait-seal"><span>М</span><span>建</span><span>築</span><span>В</span></div>
         <div class="portrait-cap">
           <b data-i18n="about.name"></b>
@@ -243,11 +265,8 @@
         <p class="lead reveal" data-i18n="about.p1"></p>
         <p class="reveal" data-i18n="about.p2"></p>
         <p class="reveal" data-i18n="about.p3"></p>
-        <h2 class="reveal" data-i18n="about.projects"></h2>
-        <article class="project reveal">
-          <svg viewBox="0 0 120 80" aria-hidden="true"><use href="#ic-tower"/></svg>
-          <div><h3 data-i18n="about.kp"></h3><p data-i18n="about.kpS"></p></div>
-        </article>
+        <h2 class="reveal" id="projectsTitle" data-i18n="about.projects"></h2>
+        <div class="projects reveal" id="projects"></div>
       </div>
     </div>
     <div class="wrap section">
@@ -273,13 +292,16 @@
       <div class="contact-list">
         <a class="contact-item reveal" id="cPhone" href="#"><svg viewBox="0 0 24 24"><use href="#ic-phone"/></svg><div><span data-i18n="contacts.phone"></span><b></b></div></a>
         <a class="contact-item reveal" id="cEmail" href="#"><svg viewBox="0 0 24 24"><use href="#ic-mail"/></svg><div><span data-i18n="contacts.email"></span><b></b></div></a>
-        <div class="contact-item reveal"><svg viewBox="0 0 24 24"><use href="#ic-pin"/></svg><div><span data-i18n="contacts.address"></span><b data-i18n="contacts.addressV"></b></div></div>
-        <div class="contact-item reveal"><svg viewBox="0 0 24 24"><use href="#ic-clock"/></svg><div><span data-i18n="contacts.hours"></span><b data-i18n="contacts.hoursV"></b></div></div>
+        <div class="contact-item reveal"><svg viewBox="0 0 24 24"><use href="#ic-pin"/></svg><div><span data-i18n="contacts.address"></span><b id="cAddress"></b></div></div>
+        <div class="contact-item reveal"><svg viewBox="0 0 24 24"><use href="#ic-clock"/></svg><div><span data-i18n="contacts.hours"></span><b id="cHours"></b></div></div>
+        <div class="contact-item reveal" id="cSocialWrap" hidden><div><span data-i18n="contacts.social"></span><div class="socials" id="cSocial"></div></div></div>
+        <div class="map reveal" id="cMap" hidden></div>
       </div>
       <form class="card-form reveal" id="contactForm">
         <h2 data-i18n="contacts.form"></h2>
-        <label><span data-i18n="contacts.name"></span><input name="name" required maxlength="80"></label>
-        <label><span data-i18n="contacts.phoneF"></span><input name="reach" required maxlength="80"></label>
+        <input class="hp" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <label><span data-i18n="contacts.name"></span><input name="name" required maxlength="80" autocomplete="name"></label>
+        <label><span data-i18n="contacts.phoneF"></span><input name="reach" required maxlength="80" autocomplete="on"></label>
         <label><span data-i18n="contacts.topic"></span>
           <select name="topic">
             <option data-i18n="contacts.t1"></option><option data-i18n="contacts.t2"></option>
@@ -287,6 +309,7 @@
           </select>
         </label>
         <label><span data-i18n="contacts.msg"></span><textarea name="msg" rows="5" maxlength="2000"></textarea></label>
+        <label class="check"><input type="checkbox" name="consent" required><span><span data-i18n="form.consent"></span> <a href="#/privacy" data-i18n="form.consentLink"></a></span></label>
         <button class="btn btn-red" type="submit" data-i18n="contacts.send"></button>
       </form>
     </div>
@@ -339,19 +362,29 @@
         </div>
       </div>
       <div class="set-row reveal">
-        <div><h3 data-i18n="set.demo"></h3><p data-i18n="set.demoS"></p></div>
-        <div class="seg" data-setting="demo">
-          <button type="button" data-value="on" data-i18n="set.on"></button>
-          <button type="button" data-value="off" data-i18n="set.off"></button>
-        </div>
-      </div>
-      <div class="set-row reveal">
         <div><h3 data-i18n="set.data"></h3><p data-i18n="set.dataS"></p></div>
         <div class="set-btns">
           <button class="btn btn-ghost btn-sm" type="button" id="clearFav" data-i18n="set.clearFav"></button>
-          <button class="btn btn-ghost btn-sm danger" type="button" id="clearMine" data-i18n="set.clearMine"></button>
         </div>
       </div>
+    </div>
+  </section>
+
+  <!-- ПОЛІТИКА КОНФІДЕНЦІЙНОСТІ -->
+  <section class="page" data-page="privacy" hidden>
+    <div class="page-hero">
+      <div class="wrap">
+        <h1 class="reveal" data-i18n="pr.title"></h1>
+        <p class="reveal" data-i18n="pr.sub"></p>
+      </div>
+      <span class="page-glyph" aria-hidden="true">私</span>
+    </div>
+    <div class="wrap section privacy">
+      <h3 data-i18n="pr.h1"></h3><p data-privacy="pr.p1"></p>
+      <h3 data-i18n="pr.h2"></h3><p data-i18n="pr.p2"></p>
+      <h3 data-i18n="pr.h3"></h3><p data-i18n="pr.p3"></p>
+      <h3 data-i18n="pr.h4"></h3><p data-i18n="pr.p4"></p>
+      <h3 data-i18n="pr.h5"></h3><p data-privacy="pr.p5"></p>
     </div>
   </section>
 </main>
@@ -363,6 +396,7 @@
       <span class="seal seal-lg" aria-hidden="true">龍</span>
       <div><b>PODIL DRAGONS</b><span data-i18n="footer.tag"></span></div>
     </div>
+    <div class="socials footer-soc" id="fSocial"></div>
     <nav class="footer-nav">
       <a href="#/sale" data-i18n="nav.sale"></a>
       <a href="#/reconstruction" data-i18n="nav.reconstruction"></a>
@@ -371,7 +405,8 @@
       <a href="#/settings" data-i18n="nav.settings"></a>
     </nav>
     <div class="footer-meta">
-      <span>© <span id="year"></span> PODIL DRAGONS. <span data-i18n="footer.rights"></span></span>
+      <span>© <span id="year"></span> PODIL DRAGONS. <span data-i18n="footer.rights"></span> <span id="fCompany"></span></span>
+      <a href="#/privacy" data-i18n="footer.privacy"></a>
       <button class="link-btn" type="button" id="toTop" data-i18n="footer.top"></button>
     </div>
   </div>
@@ -382,7 +417,7 @@
   <div class="modal-back" data-close></div>
   <div class="modal-card modal-wide" role="dialog" aria-modal="true" aria-labelledby="dTitle">
     <button class="icon-btn modal-x" type="button" data-close data-i18n-title="d.close" title="Закрити">✕</button>
-    <div class="detail" id="detailBody"></div>
+    <div class="detail modal-scroll" id="detailBody"></div>
   </div>
 </div>
 
@@ -391,9 +426,10 @@
   <div class="modal-back" data-close></div>
   <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="fTitle">
     <button class="icon-btn modal-x" type="button" data-close data-i18n-title="d.close" title="Закрити">✕</button>
-    <form id="listForm" class="list-form" novalidate>
+    <form id="listForm" class="list-form modal-scroll" novalidate>
       <h2 id="fTitle" data-i18n="form.title"></h2>
       <p class="muted" data-i18n="form.sub"></p>
+      <input class="hp" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
       <fieldset class="type-pick">
         <legend data-i18n="form.type"></legend>
         <label><input type="radio" name="type" value="apartment" checked><span><svg viewBox="0 0 48 48"><use href="#ic-apartment"/></svg><b data-i18n="type.apartment"></b></span></label>
@@ -416,20 +452,13 @@
         <label><span data-i18n="form.year"></span><input name="year" type="number" min="1700" max="2100" inputmode="numeric"></label>
       </div>
       <label class="full"><span data-i18n="form.desc"></span><textarea name="desc" rows="4" maxlength="3000" data-i18n-ph="form.descPh"></textarea></label>
-      <div class="full">
-        <span class="label-text" data-i18n="form.photos"></span>
-        <label class="drop" id="drop">
-          <input type="file" accept="image/*" multiple id="photoInput">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16l4-4 3 3 5-5 4 4M4 20h16M12 4v8M8 8l4-4 4 4"/></svg>
-          <span data-i18n="form.photosHint"></span>
-        </label>
-        <div class="thumbs" id="thumbs"></div>
-      </div>
+      <p class="form-note full" data-i18n="form.note"></p>
       <div class="row2">
         <label><span data-i18n="form.contactName"></span><input name="contact" required maxlength="80" autocomplete="name"></label>
         <label><span data-i18n="form.phone"></span><input name="phone" type="tel" required maxlength="30" autocomplete="tel" placeholder="+380"></label>
       </div>
       <label class="check full"><input type="checkbox" name="kyiv" required><span data-i18n="form.kyiv"></span></label>
+      <label class="check full"><input type="checkbox" name="consent" required><span><span data-i18n="form.consent"></span> <a href="#/privacy" data-close data-i18n="form.consentLink"></a> *</span></label>
       <p class="form-err" id="formErr" role="alert"></p>
       <div class="form-actions">
         <button class="btn btn-ghost" type="button" data-close data-i18n="form.cancel"></button>
@@ -439,6 +468,13 @@
   </div>
 </div>
 
+<!-- Нижня панель швидких дій — лише на телефонах -->
+<nav class="mbar" aria-label="Quick actions">
+  <a class="mb-btn" id="mbCall" href="#"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-phone"/></svg><span data-i18n="d.call">Зателефонувати</span></a>
+  <a class="mb-btn" href="#/sale"><svg viewBox="0 0 48 48" aria-hidden="true"><use href="#ic-apartment"/></svg><span data-i18n="nav.sale">Продаж</span></a>
+  <button class="mb-btn mb-main" type="button" data-action="open-form"><span data-i18n="cta.list">Виставити об'єкт</span></button>
+</nav>
+<div class="nav-backdrop" aria-hidden="true"></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <div class="page-curtain" aria-hidden="true"></div>
 
@@ -466,7 +502,9 @@
   </defs>
 </svg>
 
+<script src="config.js"></script>
 <script src="i18n.js"></script>
+<script src="listings.js"></script>
 <script src="dragon.js"></script>
 <script src="app.js"></script>
 </body>

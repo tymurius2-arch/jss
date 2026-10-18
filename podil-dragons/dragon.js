@@ -4,7 +4,10 @@
 (function () {
   const NS = "http://www.w3.org/2000/svg";
   const W = 1200, H = 600;
-  const HX = 340, LEN = 760, N = 180;
+  const HX = 340, LEN = 760;
+  // На телефонах менше точок і 30 кадрів/с — дракон так само плавний, але батарея живе довше.
+  const LITE = matchMedia("(max-width: 700px), (pointer: coarse)").matches;
+  const N = LITE ? 120 : 180;
 
   const el = (tag, attrs, parent) => {
     const n = document.createElementNS(NS, tag);
@@ -202,7 +205,11 @@
 
     let raf = 0, running = false, visible = true;
     const reduce = () => document.documentElement.dataset.motion === "off";
-    function loop(ts) { frame(ts); raf = requestAnimationFrame(loop); }
+    let last = 0;
+    function loop(ts) {
+      if (!LITE || ts - last > 31) { frame(ts); last = ts; }
+      raf = requestAnimationFrame(loop);
+    }
     function start() {
       if (running || !visible || reduce() || document.hidden) return;
       running = true; raf = requestAnimationFrame(loop);
