@@ -1,0 +1,489 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Кубомир</title>
+<meta name="description" content="Бесконечный кубический мир в браузере: биомы, пещеры, руды, крафт, мобы, криперы, динамит, день и ночь.">
+<meta name="theme-color" content="#0b1020">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rubik:wght@400;600;800&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0b1020;
+    --panel: rgba(16, 20, 32, 0.88);
+    --panel-2: rgba(34, 40, 58, 0.92);
+    --ink: #f1f4ff;
+    --muted: #a7b0c8;
+    --accent: #7ee05a;
+    --accent-2: #ffd447;
+    --danger: #ff5a5a;
+    --slot: rgba(20, 22, 30, 0.72);
+    --slot-line: rgba(255, 255, 255, 0.18);
+    --pixel: "Press Start 2P", "Rubik", monospace;
+    --body: "Rubik", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --stone: none;
+    --dirt: none;
+    --sat: env(safe-area-inset-top, 0px);
+    --sab: env(safe-area-inset-bottom, 0px);
+    --sal: env(safe-area-inset-left, 0px);
+    --sar: env(safe-area-inset-right, 0px);
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; margin: 0; overflow: hidden; }
+  body {
+    background: var(--bg); color: var(--ink); font-family: var(--body);
+    -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+    touch-action: none; overscroll-behavior: none;
+  }
+  canvas#game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+
+  /* ---------- Экраны меню ---------- */
+  .screen {
+    position: fixed; inset: 0; z-index: 30; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    justify-content: flex-start; gap: 14px; overflow-y: auto; touch-action: pan-y;
+    padding: calc(16px + var(--sat)) max(16px, var(--sar)) calc(16px + var(--sab)) max(16px, var(--sal));
+  }
+  .screen::before, .screen::after { content: ""; margin: auto; }
+  .screen.dim { background: rgba(4, 6, 14, 0.55); backdrop-filter: blur(3px); }
+  .screen.dirt { background: var(--dirt) center / 64px repeat; image-rendering: pixelated; box-shadow: inset 0 0 0 100vmax rgba(0, 0, 0, .55); }
+  .card {
+    width: min(560px, 100%); background: var(--panel); border: 2px solid rgba(255, 255, 255, .12);
+    border-radius: 6px; padding: 18px; box-shadow: 0 20px 60px rgba(0, 0, 0, .5);
+  }
+  h1, h2, h3 { font-family: var(--pixel); font-weight: 400; margin: 0; line-height: 1.4; }
+  h2 { font-size: 16px; text-align: center; margin-bottom: 14px; letter-spacing: 1px; }
+  h3 { font-size: 11px; color: var(--accent-2); margin: 14px 0 8px; }
+  p { margin: 6px 0; line-height: 1.5; color: var(--muted); }
+
+  .logo { position: relative; text-align: center; margin-bottom: 8px; }
+  .logo h1 {
+    font-size: clamp(34px, 11vw, 84px); color: #e9e9e9; letter-spacing: 2px;
+    text-shadow: 0 2px 0 #9a9a9a, 0 4px 0 #6d6d6d, 0 6px 0 #4c4c4c, 0 8px 0 #2e2e2e, 0 12px 24px rgba(0, 0, 0, .6);
+    background: var(--stone) center / 48px repeat; -webkit-background-clip: text; background-clip: text;
+  }
+  .logo h1.textured { color: transparent; -webkit-text-stroke: 1px rgba(0,0,0,.35); }
+  .splash {
+    position: absolute; right: -6%; bottom: -4px; font-family: var(--pixel); font-size: clamp(9px, 2.3vw, 14px);
+    color: #ffef3b; text-shadow: 2px 2px 0 #3f3f00; transform: rotate(-16deg); animation: pulse 0.9s ease-in-out infinite alternate;
+    white-space: nowrap; pointer-events: none;
+  }
+  @keyframes pulse { from { transform: rotate(-16deg) scale(.92); } to { transform: rotate(-16deg) scale(1.06); } }
+  .menu-col { display: flex; flex-direction: column; gap: 10px; width: min(400px, 100%); }
+  .row { display: flex; gap: 10px; }
+  .row > * { flex: 1; }
+
+  .btn {
+    appearance: none; border: 0; cursor: pointer; font-family: var(--pixel); font-size: 12px; color: #f4f4f4;
+    padding: 14px 12px; min-height: 46px; border-radius: 3px; position: relative; text-shadow: 2px 2px 0 #3a3a3a;
+    background: linear-gradient(rgba(150,150,150,.25), rgba(60,60,60,.35)), var(--stone) center / 32px repeat, #6f6f6f;
+    box-shadow: inset 2px 2px 0 rgba(255,255,255,.35), inset -2px -3px 0 rgba(0,0,0,.45), 0 0 0 2px #111;
+    image-rendering: pixelated;
+  }
+  .btn:hover { filter: brightness(1.15) saturate(1.2); outline: 2px solid #fff; outline-offset: 0; }
+  .btn:active { transform: translateY(1px); }
+  .btn:focus-visible { outline: 3px solid var(--accent-2); outline-offset: 2px; }
+  .btn.primary { background: linear-gradient(rgba(126,224,90,.35), rgba(40,100,30,.5)), var(--stone) center / 32px repeat, #4b7a3a; }
+  .btn.danger { background: linear-gradient(rgba(255,90,90,.35), rgba(120,20,20,.5)), var(--stone) center / 32px repeat, #7a3a3a; }
+  .btn.small { font-size: 10px; min-height: 36px; padding: 8px 10px; }
+  .btn[disabled] { filter: grayscale(1) brightness(.6); cursor: not-allowed; }
+
+  label.field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+  input[type=text], input[type=search], select {
+    font: 15px var(--body); color: var(--ink); background: #0c0f18; border: 2px solid #555; border-radius: 3px; padding: 10px 12px;
+    -webkit-user-select: text; user-select: text;
+  }
+  input[type=text]:focus, input[type=search]:focus, select:focus { outline: none; border-color: var(--accent); }
+  .seg { display: flex; gap: 6px; flex-wrap: wrap; }
+  .seg button { flex: 1; min-width: 90px; }
+  .seg button.on { outline: 3px solid var(--accent); }
+  .slider { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; margin-bottom: 12px; font-size: 13px; color: var(--muted); }
+  .slider input { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); }
+  .slider b { color: var(--ink); font-weight: 600; }
+  .check { display: flex; align-items: center; gap: 10px; font-size: 14px; margin-bottom: 10px; cursor: pointer; }
+  .check input { width: 20px; height: 20px; accent-color: var(--accent); }
+
+  .worlds { display: flex; flex-direction: column; gap: 8px; max-height: 46vh; overflow-y: auto; margin-bottom: 12px; }
+  .world {
+    display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; padding: 12px; border-radius: 4px; cursor: pointer;
+    background: rgba(255,255,255,.05); border: 2px solid transparent;
+  }
+  .world:hover, .world.sel { border-color: var(--accent); background: rgba(126,224,90,.08); }
+  .world b { font-size: 15px; }
+  .world span { font-size: 12px; color: var(--muted); }
+  .world .del { grid-row: 1 / 3; grid-column: 2; align-self: center; }
+  .empty { text-align: center; color: var(--muted); padding: 20px; }
+
+  .help-grid { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 13px; }
+  .help-grid kbd { font: 10px var(--pixel); background: #222; border: 1px solid #555; border-bottom-width: 3px; padding: 4px 6px; border-radius: 3px; white-space: nowrap; justify-self: start; }
+
+  .ach-list { display: grid; gap: 8px; max-height: 60vh; overflow-y: auto; }
+  .ach { display: grid; grid-template-columns: 40px 1fr; gap: 10px; align-items: center; padding: 8px; background: rgba(255,255,255,.04); border-radius: 4px; opacity: .45; }
+  .ach.done { opacity: 1; background: rgba(126,224,90,.1); }
+  .ach img { width: 40px; height: 40px; image-rendering: pixelated; }
+  .ach b { display: block; font-size: 14px; }
+  .ach span { font-size: 12px; color: var(--muted); }
+
+  .progress { width: min(400px, 90%); height: 14px; border: 2px solid #ddd; background: #111; }
+  .progress > div { height: 100%; width: 0; background: linear-gradient(90deg, #4caf50, #9be36d); transition: width .2s; }
+  .tip { font-size: 13px; color: var(--muted); max-width: 460px; text-align: center; min-height: 3em; }
+
+  /* ---------- HUD ---------- */
+  #hud { position: fixed; inset: 0; z-index: 10; pointer-events: none; }
+  #crosshair { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; transform: translate(-50%, -50%); mix-blend-mode: difference; }
+  #crosshair::before, #crosshair::after { content: ""; position: absolute; background: #fff; }
+  #crosshair::before { left: 10px; top: 0; width: 2px; height: 22px; }
+  #crosshair::after { top: 10px; left: 0; height: 2px; width: 22px; }
+  #bottom { position: absolute; left: 50%; bottom: calc(6px + var(--sab)); transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  #bars { display: grid; grid-template-columns: 1fr 1fr; width: calc(var(--slot-size) * 9 + 4px); gap: 2px 8px; }
+  #hearts, #food, #air { display: flex; gap: 1px; height: 18px; }
+  #food, #air.right { flex-direction: row-reverse; }
+  #air { grid-column: 2; flex-direction: row-reverse; }
+  #bars img { width: 18px; height: 18px; image-rendering: pixelated; }
+  #hearts.blink img { filter: brightness(2.2); }
+  #hotbar { display: flex; padding: 2px; background: rgba(0,0,0,.55); border: 2px solid rgba(0,0,0,.8); box-shadow: 0 0 0 1px rgba(255,255,255,.15); pointer-events: auto; }
+  :root { --slot-size: 46px; }
+  .slot {
+    width: var(--slot-size); height: var(--slot-size); position: relative; display: grid; place-items: center;
+    background: var(--slot); box-shadow: inset 0 0 0 1px var(--slot-line);
+  }
+  .slot img { width: 76%; height: 76%; image-rendering: pixelated; pointer-events: none; }
+  .slot .n { position: absolute; right: 3px; bottom: 1px; font: 10px var(--pixel); color: #fff; text-shadow: 2px 2px 0 #222; pointer-events: none; }
+  .slot .dur { position: absolute; left: 12%; right: 12%; bottom: 4px; height: 3px; background: #000; pointer-events: none; }
+  .slot .dur i { display: block; height: 100%; }
+  #hotbar .slot.sel { box-shadow: inset 0 0 0 3px #fff, 0 0 0 2px #000; z-index: 1; }
+  #itemname { font: 11px var(--pixel); text-shadow: 2px 2px 0 #000; min-height: 14px; transition: opacity .4s; }
+  #toasts { position: absolute; top: calc(10px + var(--sat)); left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; width: min(92vw, 520px); }
+  .toast { background: rgba(10,12,20,.8); border: 2px solid rgba(255,255,255,.18); padding: 8px 14px; border-radius: 4px; font-size: 14px; text-align: center; animation: toastIn .25s ease-out; }
+  .toast.ach { border-color: var(--accent-2); display: flex; gap: 10px; align-items: center; text-align: left; }
+  .toast.ach img { width: 32px; height: 32px; image-rendering: pixelated; }
+  .toast.ach small { display: block; color: var(--accent-2); font: 9px var(--pixel); margin-bottom: 3px; }
+  .toast.out { opacity: 0; transition: opacity .5s; }
+  @keyframes toastIn { from { transform: translateY(-10px); opacity: 0; } }
+  #debug { position: absolute; left: calc(8px + var(--sal)); top: calc(8px + var(--sat)); font: 12px/1.5 ui-monospace, Menlo, Consolas, monospace; background: rgba(0,0,0,.45); padding: 6px 8px; white-space: pre; }
+  #minimap { position: absolute; right: calc(10px + var(--sar)); top: calc(10px + var(--sat)); width: 150px; height: 150px; border: 3px solid rgba(0,0,0,.7); border-radius: 50%; image-rendering: pixelated; box-shadow: 0 0 0 1px rgba(255,255,255,.25); }
+  #minimap.big { width: min(80vmin, 520px); height: min(80vmin, 520px); right: 50%; top: 50%; transform: translate(50%, -50%); border-radius: 6px; }
+  #coords { position: absolute; right: calc(10px + var(--sar)); top: calc(168px + var(--sat)); width: 150px; text-align: center; font: 9px var(--pixel); text-shadow: 1px 1px 0 #000; }
+  .overlay { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .15s; }
+  #ov-water { background: radial-gradient(ellipse at center, rgba(30,70,170,.25), rgba(10,30,90,.65)); }
+  #ov-lava { background: rgba(255,90,0,.55); }
+  #ov-hurt { background: radial-gradient(ellipse at center, transparent 40%, rgba(200,0,0,.55)); }
+  #ov-sleep { background: #000; transition: opacity 1.2s; }
+  #ov-portal { background: radial-gradient(circle, transparent 30%, rgba(0,0,0,.6)); }
+  #crack-hint { position: absolute; left: 50%; top: calc(50% + 22px); transform: translateX(-50%); width: 40px; height: 4px; background: rgba(0,0,0,.5); }
+  #crack-hint i { display: block; height: 100%; width: 0; background: #fff; }
+
+  /* ---------- Инвентарь ---------- */
+  #inv { z-index: 40; }
+  .inv-panel { width: min(980px, 100%); max-height: 100%; display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: start; }
+  .inv-box { background: #c6c6c6; color: #3f3f3f; border-radius: 4px; padding: 12px; box-shadow: inset 3px 3px 0 #fff, inset -3px -3px 0 #555, 0 20px 50px rgba(0,0,0,.6); }
+  .inv-box h3 { color: #3f3f3f; margin: 0 0 8px; font-size: 10px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .inv-box .grid { display: grid; grid-template-columns: repeat(9, var(--slot-size)); gap: 2px; }
+  .inv-box .slot { background: #8b8b8b; box-shadow: inset 2px 2px 0 #373737, inset -2px -2px 0 #fff; cursor: pointer; pointer-events: auto; }
+  .inv-box .slot:hover { background: #a9a9a9; }
+  .inv-box .hot { margin-top: 10px; }
+  .inv-side { display: flex; flex-direction: column; gap: 10px; min-height: 0; max-height: calc(100vh - 40px); }
+  .tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+  .tabs button { font: 9px var(--pixel); padding: 8px 10px; border: 0; background: #8b8b8b; color: #222; cursor: pointer; box-shadow: inset 2px 2px 0 #fff, inset -2px -2px 0 #555; }
+  .tabs button.on { background: #e8e8e8; }
+  .recipes { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; max-height: min(56vh, 520px); padding-right: 4px; touch-action: pan-y; }
+  .recipe { display: grid; grid-template-columns: 44px 1fr auto; gap: 8px; align-items: center; background: #b3b3b3; padding: 6px; box-shadow: inset 2px 2px 0 #e0e0e0, inset -2px -2px 0 #6e6e6e; }
+  .recipe.no { opacity: .55; }
+  .recipe .out { width: 44px; height: 44px; display: grid; place-items: center; background: #8b8b8b; position: relative; }
+  .recipe .out img { width: 34px; height: 34px; image-rendering: pixelated; }
+  .recipe .out .n { position: absolute; right: 2px; bottom: 1px; font: 9px var(--pixel); color: #fff; text-shadow: 1px 1px 0 #222; }
+  .recipe .nm { font-size: 13px; font-weight: 600; color: #222; }
+  .recipe .ing { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 3px; font-size: 12px; color: #333; }
+  .recipe .ing span { display: inline-flex; align-items: center; gap: 2px; }
+  .recipe .ing span.miss { color: #a00; }
+  .recipe .ing img { width: 18px; height: 18px; image-rendering: pixelated; }
+  .recipe .acts { display: flex; flex-direction: column; gap: 4px; }
+  .recipe .acts button { font: 9px var(--pixel); padding: 7px 8px; border: 0; cursor: pointer; background: #5d9c3a; color: #fff; box-shadow: inset 2px 2px 0 #8fd16b, inset -2px -2px 0 #2c5a18; }
+  .recipe .acts button[disabled] { background: #777; box-shadow: none; cursor: not-allowed; }
+  .catalog { display: grid; grid-template-columns: repeat(auto-fill, var(--slot-size)); gap: 2px; overflow-y: auto; max-height: min(56vh, 520px); touch-action: pan-y; }
+  .fuel { font-size: 12px; color: #333; display: flex; gap: 6px; align-items: center; }
+  #inv-search { padding: 7px 10px; font-size: 13px; background: #fff; color: #222; border-color: #777; }
+  #cursor-item { position: fixed; z-index: 60; width: 40px; height: 40px; pointer-events: none; transform: translate(-50%, -50%); }
+  #cursor-item img { width: 100%; height: 100%; image-rendering: pixelated; }
+  #cursor-item .n { position: absolute; right: -2px; bottom: -2px; font: 10px var(--pixel); color: #fff; text-shadow: 2px 2px 0 #222; }
+  #tooltip { position: fixed; z-index: 61; pointer-events: none; background: rgba(20,0,40,.92); border: 2px solid #3a0f80; color: #fff; padding: 6px 8px; font-size: 13px; border-radius: 3px; max-width: 240px; }
+  #tooltip small { display: block; color: #aab; font-size: 11px; margin-top: 2px; }
+
+  /* ---------- Консоль ---------- */
+  #console-wrap { position: fixed; left: 0; right: 0; bottom: calc(80px + var(--sab)); z-index: 45; padding: 0 max(10px, var(--sal)); }
+  #console { width: 100%; font: 15px ui-monospace, Menlo, Consolas, monospace; background: rgba(0,0,0,.7); color: #fff; border: 0; padding: 10px; }
+  #chatlog { position: fixed; left: max(10px, var(--sal)); bottom: calc(130px + var(--sab)); z-index: 11; font: 13px/1.5 ui-monospace, Menlo, Consolas, monospace; pointer-events: none; display: flex; flex-direction: column; gap: 2px; max-width: min(560px, 90vw); }
+  #chatlog div { background: rgba(0,0,0,.5); padding: 2px 8px; transition: opacity 1s; }
+
+  /* ---------- Сенсорное управление ---------- */
+  #touch { position: fixed; inset: 0; z-index: 9; pointer-events: none; }
+  #touch .zone { position: absolute; pointer-events: auto; }
+  #t-look { inset: 0; }
+  #t-move { left: 0; bottom: 0; width: 42%; height: 58%; }
+  #stick { position: absolute; width: 130px; height: 130px; margin: -65px 0 0 -65px; border-radius: 50%; background: rgba(255,255,255,.08); border: 2px solid rgba(255,255,255,.25); pointer-events: none; opacity: .0; transition: opacity .15s; }
+  #stick.on { opacity: 1; }
+  #stick i { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%; background: rgba(255,255,255,.35); }
+  #stick-hint { position: absolute; left: calc(70px + var(--sal)); bottom: calc(140px + var(--sab)); width: 110px; height: 110px; border-radius: 50%; border: 2px dashed rgba(255,255,255,.2); pointer-events: none; }
+  .tbtn {
+    position: absolute; pointer-events: auto; width: 62px; height: 62px; border-radius: 14px; display: grid; place-items: center;
+    background: rgba(20,24,36,.5); border: 2px solid rgba(255,255,255,.3); color: #fff; font-size: 24px; line-height: 1;
+    -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+  }
+  .tbtn.on, .tbtn:active { background: rgba(126,224,90,.45); }
+  .tbtn small { font: 7px var(--pixel); margin-top: -8px; }
+  #t-jump { right: calc(24px + var(--sar)); bottom: calc(150px + var(--sab)); width: 74px; height: 74px; border-radius: 50%; }
+  #t-break { right: calc(110px + var(--sar)); bottom: calc(200px + var(--sab)); }
+  #t-place { right: calc(110px + var(--sar)); bottom: calc(125px + var(--sab)); }
+  #t-up { right: calc(24px + var(--sar)); bottom: calc(232px + var(--sab)); }
+  #t-down { right: calc(24px + var(--sar)); bottom: calc(80px + var(--sab)); width: 74px; height: 56px; }
+  #t-sneak { left: calc(18px + var(--sal)); bottom: calc(80px + var(--sab)); width: 54px; height: 54px; border-radius: 50%; font-size: 18px; }
+  .ttop { position: absolute; top: calc(10px + var(--sat)); display: flex; gap: 8px; pointer-events: auto; }
+  .ttop button { width: 44px; height: 44px; border-radius: 10px; border: 2px solid rgba(255,255,255,.3); background: rgba(20,24,36,.55); color: #fff; font-size: 18px; display: grid; place-items: center; }
+  #ttop-l { left: calc(10px + var(--sal)); }
+
+  @media (max-width: 760px) {
+    .inv-panel { grid-template-columns: 1fr; }
+    .inv-side { max-height: none; }
+    .recipes, .catalog { max-height: 34vh; }
+  }
+  @media (max-height: 520px) {
+    .recipes, .catalog { max-height: calc(100vh - 150px); }
+    .inv-side { max-height: calc(100vh - 32px); }
+    .card { padding: 12px; }
+  }
+  @media (max-width: 760px), (max-height: 520px) {
+    :root { --slot-size: 38px; }
+    #minimap { width: 104px; height: 104px; }
+    #coords { top: calc(118px + var(--sat)); width: 104px; font-size: 7px; }
+    #bars img { width: 14px; height: 14px; }
+    #hearts, #food, #air { height: 14px; }
+  }
+  @media (max-width: 380px) { :root { --slot-size: 34px; } }
+  @media (pointer: coarse) {
+    #toasts { top: calc(64px + var(--sat)); width: min(60vw, 480px); }
+    .toast { font-size: 12px; padding: 6px 10px; }
+    #crack-hint { top: calc(50% + 26px); }
+    #debug { top: calc(60px + var(--sat)); }
+  }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="hud" hidden>
+  <div id="crosshair"></div>
+  <div id="crack-hint" hidden><i></i></div>
+  <div class="overlay" id="ov-water"></div>
+  <div class="overlay" id="ov-lava"></div>
+  <div class="overlay" id="ov-hurt"></div>
+  <div class="overlay" id="ov-sleep"></div>
+  <div id="toasts"></div>
+  <pre id="debug" hidden></pre>
+  <canvas id="minimap" width="160" height="160"></canvas>
+  <div id="coords"></div>
+  <div id="bottom">
+    <div id="itemname"></div>
+    <div id="bars"><div id="hearts"></div><div id="food"></div><div id="air"></div></div>
+    <div id="hotbar"></div>
+  </div>
+</div>
+<div id="chatlog"></div>
+
+<div id="touch" hidden>
+  <div class="zone" id="t-look"></div>
+  <div class="zone" id="t-move"></div>
+  <div id="stick-hint"></div>
+  <div id="stick"><i></i></div>
+  <button class="tbtn" id="t-jump" aria-label="Прыжок">⤒</button>
+  <button class="tbtn" id="t-break" aria-label="Ломать (держать)">⛏</button>
+  <button class="tbtn" id="t-place" aria-label="Поставить / использовать">▣</button>
+  <button class="tbtn" id="t-up" aria-label="Вверх" hidden>▲</button>
+  <button class="tbtn" id="t-down" aria-label="Вниз" hidden>▼</button>
+  <button class="tbtn" id="t-sneak" aria-label="Бег">»</button>
+  <div class="ttop" id="ttop-l">
+    <button id="t-pause" aria-label="Пауза">⏸</button>
+    <button id="t-inv" aria-label="Инвентарь">🎒</button>
+    <button id="t-fly" aria-label="Полёт" hidden>🕊</button>
+    <button id="t-chat" aria-label="Команды">⌨</button>
+    <button id="t-view" aria-label="Вид">👁</button>
+  </div>
+</div>
+
+<section class="screen" id="scr-main">
+  <div class="logo"><h1 id="logo-text">КУБОМИР</h1><div class="splash" id="splash">Бесконечный!</div></div>
+  <div class="menu-col">
+    <button class="btn primary" id="b-play">Играть</button>
+    <div class="row">
+      <button class="btn" id="b-settings">Настройки</button>
+      <button class="btn" id="b-help">Как играть</button>
+    </div>
+  </div>
+  <p style="font-size:12px;opacity:.7;text-align:center">Мир, текстуры, мобы и звуки созданы кодом прямо в браузере</p>
+</section>
+
+<section class="screen dim" id="scr-worlds" hidden>
+  <div class="card">
+    <h2>Миры</h2>
+    <div class="worlds" id="world-list"></div>
+    <div class="row">
+      <button class="btn primary" id="b-new">Новый мир</button>
+      <button class="btn" id="b-worlds-back">Назад</button>
+    </div>
+  </div>
+</section>
+
+<section class="screen dim" id="scr-new" hidden>
+  <form class="card" id="new-form" autocomplete="off">
+    <h2>Новый мир</h2>
+    <label class="field">Название<input type="text" id="nw-name" maxlength="32" value="Мой мир"></label>
+    <label class="field">Сид (пусто — случайный)<input type="text" id="nw-seed" maxlength="40" placeholder="например: кубомир"></label>
+    <div class="field">Режим
+      <div class="seg" id="nw-mode">
+        <button type="button" class="btn small on" data-v="survival">Выживание</button>
+        <button type="button" class="btn small" data-v="creative">Творчество</button>
+      </div>
+    </div>
+    <label class="field">Тип мира
+      <select id="nw-type">
+        <option value="normal">Обычный</option>
+        <option value="amplified">Высокие горы</option>
+        <option value="islands">Архипелаг</option>
+        <option value="flat">Плоский</option>
+      </select>
+    </label>
+    <label class="check"><input type="checkbox" id="nw-mobs" checked> Монстры ночью</label>
+    <div class="row">
+      <button class="btn primary" type="submit">Создать</button>
+      <button class="btn" type="button" id="b-new-back">Отмена</button>
+    </div>
+  </form>
+</section>
+
+<section class="screen dim" id="scr-settings" hidden>
+  <div class="card">
+    <h2>Настройки</h2>
+    <div class="slider">Дальность прорисовки <b id="v-dist"></b><input type="range" id="s-dist" min="2" max="12" step="1"></div>
+    <div class="slider">Поле зрения <b id="v-fov"></b><input type="range" id="s-fov" min="50" max="110" step="1"></div>
+    <div class="slider">Чувствительность <b id="v-sens"></b><input type="range" id="s-sens" min="0.2" max="3" step="0.1"></div>
+    <div class="slider">Громкость <b id="v-vol"></b><input type="range" id="s-vol" min="0" max="1" step="0.05"></div>
+    <div class="slider">Качество (разрешение) <b id="v-res"></b><input type="range" id="s-res" min="0.5" max="2" step="0.25"></div>
+    <label class="check"><input type="checkbox" id="s-music"> Музыка</label>
+    <label class="check"><input type="checkbox" id="s-clouds"> Облака</label>
+    <label class="check"><input type="checkbox" id="s-bob"> Покачивание камеры</label>
+    <label class="check"><input type="checkbox" id="s-autojump"> Автопрыжок</label>
+    <label class="check"><input type="checkbox" id="s-map"> Мини-карта</label>
+    <label class="check"><input type="checkbox" id="s-fps"> Показывать FPS и координаты</label>
+    <button class="btn" id="b-settings-back" style="width:100%">Готово</button>
+  </div>
+</section>
+
+<section class="screen dim" id="scr-help" hidden>
+  <div class="card">
+    <h2>Как играть</h2>
+    <p>Добывай ресурсы, строй, крафти инструменты и переживи ночь. Мир бесконечен и сохраняется сам.</p>
+    <h3>Компьютер</h3>
+    <div class="help-grid">
+      <kbd>WASD</kbd><span>ходить, <b>Ctrl</b> или двойное W — бег</span>
+      <kbd>Пробел</kbd><span>прыжок / плыть вверх; в творчестве двойной пробел — полёт</span>
+      <kbd>Shift</kbd><span>вниз в полёте, медленный шаг</span>
+      <kbd>ЛКМ</kbd><span>ломать блок / бить моба (удерживать)</span>
+      <kbd>ПКМ</kbd><span>поставить блок, есть, открыть верстак/печь, поджечь динамит, лечь в кровать</span>
+      <kbd>1–9, колесо</kbd><span>выбрать слот</span>
+      <kbd>E</kbd><span>инвентарь и крафт</span>
+      <kbd>Q</kbd><span>выбросить предмет</span>
+      <kbd>M</kbd><span>карта (мини / большая / скрыть)</span>
+      <kbd>F5</kbd><span>вид от третьего лица</span>
+      <kbd>T или /</kbd><span>команды: /time day, /gamemode creative, /give tnt 64, /spawn creeper, /tp x y z, /weather rain, /help</span>
+      <kbd>F3</kbd><span>отладка</span>
+      <kbd>Esc</kbd><span>пауза</span>
+    </div>
+    <h3>Телефон</h3>
+    <p>Левая половина — джойстик, правая — поворот камеры. Короткое касание — поставить блок или использовать, долгое — ломать. Кнопки ⛏ и ▣ делают то же самое.</p>
+    <h3>С чего начать</h3>
+    <p>Бревно → доски → верстак → палки → деревянная кирка → камень → печь и факелы. Уголь лежит в камне, железо глубже, алмазы — у самого дна, рядом с лавой. Криперы взрываются, зомби горят на солнце. Из пороха и песка получается динамит.</p>
+    <button class="btn" id="b-help-back" style="width:100%;margin-top:12px">Понятно</button>
+  </div>
+</section>
+
+<section class="screen dim" id="scr-pause" hidden>
+  <h2 style="font-size:20px">Пауза</h2>
+  <div class="menu-col">
+    <button class="btn primary" id="b-resume">Продолжить</button>
+    <button class="btn" id="b-ach">Достижения</button>
+    <div class="row">
+      <button class="btn" id="b-pause-settings">Настройки</button>
+      <button class="btn" id="b-pause-help">Помощь</button>
+    </div>
+    <button class="btn danger" id="b-quit">Сохранить и выйти</button>
+  </div>
+  <p id="pause-info" style="font-size:12px;text-align:center"></p>
+</section>
+
+<section class="screen dim" id="scr-ach" hidden>
+  <div class="card">
+    <h2>Достижения</h2>
+    <div class="ach-list" id="ach-list"></div>
+    <button class="btn" id="b-ach-back" style="width:100%;margin-top:12px">Назад</button>
+  </div>
+</section>
+
+<section class="screen" id="scr-death" hidden style="background:rgba(120,0,0,.45)">
+  <h2 style="font-size:26px;color:#fff;text-shadow:3px 3px 0 #400">Вы погибли!</h2>
+  <p id="death-cause" style="color:#fff"></p>
+  <div class="menu-col">
+    <button class="btn primary" id="b-respawn">Возродиться</button>
+    <button class="btn" id="b-death-quit">В главное меню</button>
+  </div>
+</section>
+
+<section class="screen dirt" id="scr-loading" hidden>
+  <h2 id="load-title">Генерация мира…</h2>
+  <div class="progress"><div id="load-bar"></div></div>
+  <p class="tip" id="load-tip"></p>
+</section>
+
+<section class="screen dim" id="inv" hidden>
+  <div class="inv-panel">
+    <div class="inv-box" id="inv-main">
+      <h3><span id="inv-title">Инвентарь</span><span id="inv-trash" title="Выбросить предмет из курсора" style="cursor:pointer;pointer-events:auto;font-size:18px">🗑</span></h3>
+      <div class="grid" id="inv-grid"></div>
+      <div class="grid hot" id="inv-hot"></div>
+    </div>
+    <div class="inv-box inv-side">
+      <div class="tabs" id="inv-tabs"></div>
+      <input type="search" id="inv-search" placeholder="Поиск…" hidden>
+      <div class="fuel" id="inv-fuel" hidden></div>
+      <div class="recipes" id="inv-recipes"></div>
+      <div class="catalog" id="inv-catalog" hidden></div>
+      <button class="btn small" id="b-inv-close">Закрыть (E)</button>
+    </div>
+  </div>
+</section>
+<div id="cursor-item" hidden></div>
+<div id="tooltip" hidden></div>
+<div id="console-wrap" hidden><input id="console" type="text" placeholder="/help — список команд" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+
+<noscript><p style="padding:20px">Для игры нужен JavaScript.</p></noscript>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js"
+  }
+}
+</script>
+<script src="noise.js"></script>
+<script src="blocks.js"></script>
+<script src="world.js"></script>
+<script type="module">
+  import * as THREE from 'three';
+  window.THREE = THREE;
+  const s = document.createElement('script');
+  s.src = 'game.js';
+  document.body.appendChild(s);
+</script>
+</body>
+</html>
