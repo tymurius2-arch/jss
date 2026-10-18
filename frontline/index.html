@@ -1745,6 +1745,10 @@ function drawFx() {
       ctx.fillStyle = big ? '#fff7ed' : '#fb923c'; ctx.beginPath(); ctx.arc(x, y, rr, 0, 7); ctx.fill();
       ctx.strokeStyle = big ? '#f97316' : '#b45309'; ctx.lineWidth = big ? 4 : 2; ctx.beginPath(); ctx.arc(x, y, rr * 1.35, 0, 7); ctx.stroke();
       if (big) { ctx.fillStyle = '#fde68a'; ctx.beginPath(); ctx.arc(x, y, rr * .45, 0, 7); ctx.fill(); }
+    } else if (f.kind === 'puff') { // маленькая мягкая вспышка
+      const b = clamp((now - f.t0) / 700, 0, 1); if (b >= 1) continue;
+      ctx.globalAlpha = (1 - b) * .55; ctx.fillStyle = '#fdba74';
+      ctx.beginPath(); ctx.arc(x, y, Math.max(3, 1.1 * z) * (.6 + b * .8), 0, 7); ctx.fill();
     } else if (f.kind === 'landing') {
       ctx.globalAlpha = 1 - a; ctx.font = '700 18px Rubik, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillStyle = col; ctx.fillText('▼', x, y - 30 * (1 - a));
@@ -2142,23 +2146,38 @@ function finishLasso() {
   const side = ED.side, inR = new Uint8Array(N), region = [];
   rasterPolys([[pts.map(([u, v]) => [LON(u), LAT(v)])]], k => { if (land(k) && owner[k] !== side && !inR[k]) { inR[k] = 1; region.push(k); } });
   if (!region.length) { toast('В обведённой области нечего захватывать.'); requestDraw(); return; }
-  // порядок захвата: от своих позиций вглубь (волна расходится по области)
-  const order = new Int32Array(region.length); let t = 0, h = 0;
-  const seen = new Uint8Array(N);
-  for (const k of region) if (nbOwner(k, side)) { seen[k] = 1; order[t++] = k; }
-  if (!t) {
-    let best = region[0], bd = 1e9;
-    for (const k of region) { const d = Math.hypot(k % COLS - pts[0][0], ((k / COLS) | 0) - pts[0][1]); if (d < bd) { bd = d; best = k; } }
-    seen[best] = 1; order[t++] = best;
+  // порядок захвата: ровная волна от своих позиций вглубь. Дистанция «по-шахматному» (8 соседей, диагональ √2),
+  // плюс мягкий крупный шум — фронт идёт ровной дугой с небольшими выступами, без рваных ромбов.
+  let i0 = COLS, i1 = 0, j0 = ROWS, j1 = 0;
+  for (const k of region) { const i = k % COLS, j = (k / COLS) | 0; if (i < i0) i0 = i; if (i > i1) i1 = i; if (j < j0) j0 = j; if (j > j1) j1 = j; }
+  i0 = Math.max(0, i0 - 1); j0 = Math.max(0, j0 - 1); i1 = Math.min(COLS - 1, i1 + 1); j1 = Math.min(ROWS - 1, j1 + 1);
+  const bw = i1 - i0 + 1, bh = j1 - j0 + 1, D = new Float32Array(bw * bh).fill(1e9), D2 = 1.4142;
+  for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) { const k = j * COLS + i; if (land(k) && owner[k] === side) D[(j - j0) * bw + i - i0] = 0; }
+  let seeded = false; for (let q = 0; q < D.length; q++) if (D[q] === 0) { seeded = true; break; }
+  if (!seeded) { const [su, sv] = pts[0], q = clamp(Math.round(sv) - j0, 0, bh - 1) * bw + clamp(Math.round(su) - i0, 0, bw - 1); D[q] = 0; }
+  const open = q => { const k = (j0 + (q / bw | 0)) * COLS + i0 + q % bw; return inR[k] || D[q] === 0; };
+  for (let pass = 0; pass < 3; pass++) {
+    for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) {
+      const q = y * bw + x; if (!open(q) || D[q] === 0) continue; let d = D[q];
+      if (x > 0) d = Math.min(d, D[q - 1] + 1);
+      if (y > 0) { d = Math.min(d, D[q - bw] + 1); if (x > 0) d = Math.min(d, D[q - bw - 1] + D2); if (x < bw - 1) d = Math.min(d, D[q - bw + 1] + D2); }
+      D[q] = d;
+    }
+    for (let y = bh - 1; y >= 0; y--) for (let x = bw - 1; x >= 0; x--) {
+      const q = y * bw + x; if (!open(q) || D[q] === 0) continue; let d = D[q];
+      if (x < bw - 1) d = Math.min(d, D[q + 1] + 1);
+      if (y < bh - 1) { d = Math.min(d, D[q + bw] + 1); if (x < bw - 1) d = Math.min(d, D[q + bw + 1] + D2); if (x > 0) d = Math.min(d, D[q + bw - 1] + D2); }
+      D[q] = d;
+    }
   }
-  while (h < t) {
-    const k = order[h++], i = k % COLS;
-    const nb = [i > 0 ? k - 1 : -1, i < COLS - 1 ? k + 1 : -1, k >= COLS ? k - COLS : -1, k < N - COLS ? k + COLS : -1];
-    if (Math.random() < .5) nb.reverse();
-    for (const n of nb) if (n >= 0 && inR[n] && !seen[n]) { seen[n] = 1; order[t++] = n; }
+  const ph1 = Math.random() * 6.3, ph2 = Math.random() * 6.3, key = new Float32Array(N);
+  let far = 0; for (const k of region) { const d = D[(((k / COLS) | 0) - j0) * bw + k % COLS - i0]; if (d < 1e8 && d > far) far = d; }
+  for (const k of region) {
+    const i = k % COLS, j = (k / COLS) | 0; let d = D[(j - j0) * bw + i - i0];
+    if (d >= 1e8) d = far + Math.hypot(i - pts[0][0], j - pts[0][1]) * .5; // отрезанные кусочки — в самом конце
+    key[k] = d + 2.2 * Math.sin(i * .09 + ph1) * Math.sin(j * .11 + ph2);
   }
-  const rest = region.filter(k => !seen[k]).sort((a, b) => Math.hypot(a % COLS - pts[0][0], ((a / COLS) | 0) - pts[0][1]) - Math.hypot(b % COLS - pts[0][0], ((b / COLS) | 0) - pts[0][1]));
-  for (const k of rest) order[t++] = k;
+  const order = Int32Array.from(region).sort((a, b) => key[a] - key[b]), t = order.length;
   let km = 0; for (const k of region) km += rowKm2[(k / COLS) | 0];
   ATK = { phase: 'choose', side, cells: order, total: t, km, pts };
   document.getElementById('side').classList.remove('min');
@@ -2189,7 +2208,9 @@ function atkLoop(t) {
   const A = ATK; if (!A || (A.phase !== 'go' && A.phase !== 'wait')) return;
   const dt = Math.min(100, t - A.last); A.last = t;
   if (A.phase === 'go') {
-    A.acc += dt / (WEAPONS[A.weapon].dur / SET.aspeed) * A.per;
+    // плавный разгон в начале волны и торможение в конце
+    const wp = (A.idx - (A.waveEnd - A.per)) / A.per, ease = clamp(Math.min(wp, 1 - wp) * 4, .3, 1);
+    A.acc += dt / (WEAPONS[A.weapon].dur / SET.aspeed) * A.per * ease * 1.25;
     let n = Math.floor(A.acc); A.acc -= n;
     const list = [];
     while (n-- > 0 && A.idx < A.waveEnd) {
@@ -2199,9 +2220,9 @@ function atkLoop(t) {
     if (A.recent.length > 500) A.recent.splice(0, A.recent.length - 500);
     paintCells(list);
     const ahead = () => A.cells[Math.min(A.total - 1, A.idx + Math.floor(Math.random() * Math.min(A.per * .35, 600)))];
-    if (A.weapon === 'art' && t - A.lastFx > 130) { A.lastFx = t; fxAdd('strike', ahead(), A.side); fxStart(); }
-    if (A.weapon === 'fpv' && t - A.lastFx > 260) { A.lastFx = t; fxAdd('strike', ahead(), A.side); fxStart(); }
-    if (t - A.lastContour > 450) { A.lastContour = t; buildContour(); mapDirty = true; }
+    // взрывов мало и они маленькие — только редкие вспышки впереди волны
+    if ((A.weapon === 'art' || A.weapon === 'fpv') && t - A.lastFx > (A.weapon === 'art' ? 900 : 1300)) { A.lastFx = t; fxAdd('puff', ahead(), A.side); fxStart(); }
+    if (t - A.lastContour > 180 && list.length) { A.lastContour = t; buildContour(); mapDirty = true; }
     // свои дивизии двигаются за наступающей волной
     const R0 = A.recent.length;
     if (R0) A.divs.forEach((u, i) => {
@@ -2210,8 +2231,8 @@ function atkLoop(t) {
     });
     if (t - A.lastPush > 300) { A.lastPush = t; sbuPush(A.side); }
     if (A.idx >= A.waveEnd) {
-      buildContour();
       sbuPush(A.side);
+      if (A.idx < A.total) recompute(false); // волна встала — обновить линию фронта и отряды на ней
       if (A.idx >= A.total) {
         const km = A.taken; ATK = null; recompute(); renderSide();
         toast(`Наступление завершено: захвачено ${fmt(km)} км².`); return;
@@ -2224,56 +2245,47 @@ function atkLoop(t) {
   draw();
   requestAnimationFrame(atkLoop);
 }
-function drawWeapon(w, x, y, col, fill) {
-  ctx.strokeStyle = col; ctx.fillStyle = fill; ctx.lineWidth = 1.6;
-  if (w === 'tank') {
-    ctx.beginPath(); ctx.roundRect(x - 9, y - 4, 18, 9, 4); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.arc(x - 1, y - 4, 3.5, Math.PI, 0); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(x + 2, y - 5); ctx.lineTo(x + 11, y - 8); ctx.stroke();
-  } else if (w === 'fpv') {
-    ctx.beginPath(); ctx.moveTo(x - 6, y - 6); ctx.lineTo(x + 6, y + 6); ctx.moveTo(x + 6, y - 6); ctx.lineTo(x - 6, y + 6); ctx.stroke();
-    for (const [a, b] of [[-6, -6], [6, -6], [-6, 6], [6, 6]]) { ctx.beginPath(); ctx.arc(x + a, y + b, 3, 0, 7); ctx.fill(); ctx.stroke(); }
-  } else if (w === 'art') {
-    ctx.beginPath(); ctx.arc(x - 2, y + 3, 4, 0, 7); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(x - 2, y + 3); ctx.lineTo(x + 10, y - 7); ctx.lineWidth = 3; ctx.stroke(); ctx.lineWidth = 1.6;
-    ctx.beginPath(); ctx.moveTo(x - 2, y + 3); ctx.lineTo(x - 11, y + 7); ctx.stroke();
-  } else { // пехота
-    ctx.fillRect(x - 6, y - 4, 12, 8); ctx.strokeRect(x - 6, y - 4, 12, 8);
-    ctx.beginPath(); ctx.moveTo(x - 6, y - 4); ctx.lineTo(x + 6, y + 4); ctx.moveTo(x + 6, y - 4); ctx.lineTo(x - 6, y + 4); ctx.stroke();
-  }
-}
 function drawAttack() {
   const z = view.z, now = performance.now();
-  const poly = LASSO ? LASSO.pts : ATK && ATK.phase === 'choose' ? ATK.pts : null;
+  const poly = LASSO ? LASSO.pts : ATK ? ATK.pts : null;
   if (poly && poly.length > 1) {
-    const col = SIDE[LASSO ? ED.side : ATK.side].color;
-    ctx.beginPath(); poly.forEach(([u, v], i) => i ? ctx.lineTo(sx(u), sy(v)) : ctx.moveTo(sx(u), sy(v)));
-    if (!LASSO) ctx.closePath();
-    ctx.fillStyle = col + '22'; ctx.fill();
-    ctx.setLineDash([7, 5]); ctx.lineDashOffset = -now / 40; ctx.strokeStyle = col; ctx.lineWidth = 2.5; ctx.stroke(); ctx.setLineDash([]);
+    const sd = LASSO ? ED.side : ATK.side, col = SIDE[sd].color, done = ATK && ATK.phase !== 'choose';
+    const path = new Path2D(); poly.forEach(([u, v], i) => i ? path.lineTo(sx(u), sy(v)) : path.moveTo(sx(u), sy(v)));
+    if (!LASSO) {
+      path.closePath();
+      // выбранная территория — штриховка косыми линиями (медленно ползёт), пока идёт наступление
+      ctx.save(); ctx.clip(path);
+      ctx.fillStyle = col + '1f'; ctx.fill(path);
+      let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+      for (const [u, v] of poly) { const X = sx(u), Y = sy(v); if (X < x0) x0 = X; if (X > x1) x1 = X; if (Y < y0) y0 = Y; if (Y > y1) y1 = Y; }
+      const step = 12, off = (now / 90) % step, h = y1 - y0;
+      ctx.strokeStyle = sd === UA ? '#93c5fd' : '#fca5a5'; ctx.globalAlpha = done ? .38 : .55; ctx.lineWidth = 1.4; ctx.beginPath();
+      for (let c = x0 - h - step + off; c < x1 + step; c += step) { ctx.moveTo(c, y1); ctx.lineTo(c + h, y0); }
+      ctx.stroke(); ctx.globalAlpha = 1; ctx.restore();
+    } else { ctx.fillStyle = col + '22'; ctx.fill(path); }
+    ctx.setLineDash([9, 6]); ctx.lineDashOffset = -now / 40;
+    ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 4.5; ctx.stroke(path);
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.2; ctx.stroke(path); ctx.setLineDash([]);
   }
   const A = ATK; if (!A || A.phase === 'choose') return;
-  // значки на острие: оружие и пехота за ним
+  // значки на острие: круглые значки оружия и пехоты, плавно скользят за волной
   const used = new Set(), pts = [];
-  for (let i = A.recent.length - 1; i >= 0 && pts.length < 16; i--) {
-    const k = A.recent[i], key = ((k % COLS) / 10 | 0) + ',' + (((k / COLS) | 0) / 10 | 0);
+  for (let i = A.recent.length - 1; i >= 0 && pts.length < 10; i--) {
+    const k = A.recent[i], key = ((k % COLS) / 14 | 0) + ',' + (((k / COLS) | 0) / 14 | 0);
     if (used.has(key)) continue; used.add(key); pts.push(k);
   }
-  const col = A.side === UA ? '#1e40af' : '#991b1b', fill = A.side === UA ? '#dbeafe' : '#fee2e2';
+  A.tips = A.tips || [];
+  const col = A.side === UA ? '#1d4ed8' : '#b91c1c';
+  const size = clamp(14 + z * 1.6, 20, 34), kind = A.weapon === 'fpv' ? 'recon' : A.weapon === 'art' ? 'arty' : 'tank';
   let cx = 0, cy = 0;
   pts.forEach((k, i) => {
-    const bob = A.phase === 'go' ? Math.sin(now / 160 + i) * 1.5 : 0;
-    const x = sx(k % COLS + .5), y = sy(((k / COLS) | 0) + .5) + bob;
+    const tu = k % COLS + .5, tv = ((k / COLS) | 0) + .5, tp = A.tips[i] || (A.tips[i] = { u: tu, v: tv });
+    const f = A.phase === 'go' ? .08 : .2; tp.u += (tu - tp.u) * f; tp.v += (tv - tp.v) * f;
+    const x = sx(tp.u), y = sy(tp.v);
     cx += x; cy += y;
-    drawWeapon('inf', x - 10, y + 9, col, fill);
-    drawWeapon(A.weapon, x, y, col, fill);
+    drawNato('inf', A.side, x - size * .55, y + size * .45, size * .8);
+    drawNato(kind, A.side, x, y, size);
   });
-  if (A.weapon === 'fpv' && A.phase === 'go') { // дроны летят впереди
-    for (let i = 0; i < 6; i++) {
-      const k = A.cells[Math.min(A.total - 1, A.idx + ((i * 97 + Math.floor(now / 300)) % Math.max(1, Math.min(A.per * .3, 400))))];
-      drawWeapon('fpv', sx(k % COLS + .5), sy(((k / COLS) | 0) + .5) - 6, col, fill);
-    }
-  }
   if (A.phase === 'wait' && pts.length) {
     cx /= pts.length; cy /= pts.length;
     const txt = `Нужна ${A.wave + 1}-я волна: ${WEAPONS[A.weapon].name} ➜`;
