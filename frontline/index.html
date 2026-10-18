@@ -2282,8 +2282,54 @@ function startAtk(weapon) {
   const waves = wavesFor(ATK.km, weapon), per = Math.ceil(ATK.total / waves);
   Object.assign(ATK, { phase: 'go', weapon, waves, wave: 1, per, waveEnd: Math.min(ATK.total, per), idx: 0, acc: 0, recent: [], lastFx: 0, lastContour: 0, last: performance.now(), taken: 0, lastPush: 0 });
   sbuJoin(ATK);
+  atkTroops(ATK);
   if (ATK.divs.length) toast(`В наступление идут: ${ATK.divs.map(u => u.n).slice(0, 3).join(', ')}${ATK.divs.length > 3 ? ' и ещё ' + (ATK.divs.length - 3) : ''}`);
   renderSide(); requestAnimationFrame(atkLoop);
+}
+// Войска наступают спокойно: у каждого отряда своя прямая «полоса» от исходной позиции к дальнему краю области,
+// и он идёт по ней ровным шагом — но только по уже занятой земле. Встала волна — встал и отряд.
+function atkTroops(A) {
+  const C = A.cells, T = A.total, M = clamp(Math.round(Math.sqrt(A.km) / 7), 5, 12);
+  const pick = (a, b, n) => { const out = []; for (let i = 0; i < n; i++) out.push(C[Math.min(T - 1, a + Math.floor((b - a) * (i + .5) / n))]); return out; };
+  // концы полос: в дальней трети области, разнесены друг от друга (выбор самых удалённых точек)
+  const far = pick(Math.floor(T * .7), T, Math.min(400, Math.ceil(T * .3))), ends = [];
+  if (far.length) ends.push(far[(Math.random() * far.length) | 0]);
+  while (ends.length < M && ends.length < far.length) {
+    let best = far[0], bd = -1;
+    for (const k of far) { let d = 1e9; for (const e of ends) d = Math.min(d, cellDist(k, e)); if (d > bd) { bd = d; best = k; } }
+    ends.push(best);
+  }
+  const near = pick(0, Math.max(1, Math.floor(T * .06)), Math.min(300, Math.max(1, Math.floor(T * .06))));
+  const lane = (u0, v0, e) => ({ su: u0, sv: v0, eu: e % COLS + .5, ev: ((e / COLS) | 0) + .5, t: 0, tmax: 0, u: u0, v: v0 });
+  A.troops = ends.map(e => { let s0 = near[0], bd = 1e9; for (const k of near) { const d = cellDist(k, e); if (d < bd) { bd = d; s0 = k; } } return lane(s0 % COLS + .5, ((s0 / COLS) | 0) + .5, e); });
+  // дивизии-участники идут к ближайшему концу полосы от своего места
+  A.divLanes = A.divs.map(d => { let e0 = ends[0], bd = 1e9; for (const e of ends) { const q = Math.hypot(e % COLS - d.u, ((e / COLS) | 0) - d.v); if (q < bd) { bd = q; e0 = e; } } return lane(d.u, d.v, e0); });
+  // рой FPV: дроны летают от отрядов вперёд, за линию фронта, и возвращаются
+  A.drones = A.weapon === 'fpv' ? Array.from({ length: Math.min(36, A.troops.length * 4) }, (_, i) => ({ i: i % A.troops.length, t0: -Math.random() * 1600, dur: 1300 + Math.random() * 900, k: -1, off: Math.random() * 6.28 })) : [];
+}
+function laneStep(L, side, dt, speed) {
+  // насколько далеко по полосе уже занята земля
+  const len = Math.hypot(L.eu - L.su, L.ev - L.sv) || 1, st = .6 / len;
+  let tm = L.tmax;
+  for (let n = 0; n < 12 && tm < 1; n++) {
+    const q = Math.min(1, tm + st), k = cellAt(L.su + (L.eu - L.su) * q, L.sv + (L.ev - L.sv) * q);
+    if (k < 0 || owner[k] !== side) break; tm = q;
+  }
+  L.tmax = tm;
+  const lag = .9 / len; // держатся чуть позади самой линии фронта
+  const goal = Math.max(L.t, tm - lag);
+  L.t = Math.min(goal, L.t + speed * dt / 1000 / len);
+  L.u = L.su + (L.eu - L.su) * L.t; L.v = L.sv + (L.ev - L.sv) * L.t;
+}
+function atkMove(A, dt, t) {
+  if (!A.troops) return;
+  const speed = A.weapon === 'tank' ? 7 : A.weapon === 'fpv' ? 5.5 : 4.5; // клеток в секунду — спокойный шаг
+  for (const L of A.troops) laneStep(L, A.side, dt, speed * SET.aspeed);
+  (A.divLanes || []).forEach((L, i) => { laneStep(L, A.side, dt, speed * .8 * SET.aspeed); const d = A.divs[i]; if (d) { d.u = L.u; d.v = L.v; } });
+  for (const d of A.drones || []) if (t - d.t0 > d.dur) { // новый вылет: цель — ещё не занятая земля впереди
+    d.t0 = t; d.dur = 1300 + Math.random() * 900;
+    d.k = A.phase === 'go' ? A.cells[Math.min(A.total - 1, A.idx + Math.floor(Math.random() * Math.min(A.per * .3, 500)))] : -1;
+  }
 }
 function sendWave() {
   if (!ATK || ATK.phase !== 'wait') return;
@@ -2310,12 +2356,6 @@ function atkLoop(t) {
     // взрывов мало и они маленькие — только редкие вспышки впереди волны
     if ((A.weapon === 'art' || A.weapon === 'fpv') && t - A.lastFx > (A.weapon === 'art' ? 900 : 1300)) { A.lastFx = t; fxAdd('puff', ahead(), A.side); fxStart(); }
     if (t - A.lastContour > 180 && list.length) { A.lastContour = t; buildContour(); mapDirty = true; }
-    // свои дивизии двигаются за наступающей волной
-    const R0 = A.recent.length;
-    if (R0) A.divs.forEach((u, i) => {
-      const k = A.recent[R0 - 1 - ((i * 53) % Math.min(R0, 300))], tu = k % COLS + .5, tv = ((k / COLS) | 0) + .5, f = Math.min(1, dt / 500);
-      u.u += (tu - u.u) * f; u.v += (tv - u.v) * f;
-    });
     if (t - A.lastPush > 300) { A.lastPush = t; sbuPush(A.side); }
     if (A.idx >= A.waveEnd) {
       sbuPush(A.side);
@@ -2329,6 +2369,7 @@ function atkLoop(t) {
     }
     if (ATK && ATK.phase === 'go' && $('atkProg')) $('atkProg').textContent = Math.round(A.idx / A.total * 100) + '%';
   }
+  if (ATK) atkMove(ATK, dt, t);
   draw();
   requestAnimationFrame(atkLoop);
 }
@@ -2355,24 +2396,29 @@ function drawAttack() {
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.2; ctx.stroke(path); ctx.setLineDash([]);
   }
   const A = ATK; if (!A || A.phase === 'choose') return;
-  // значки на острие: круглые значки оружия и пехоты, плавно скользят за волной
-  const used = new Set(), pts = [];
-  for (let i = A.recent.length - 1; i >= 0 && pts.length < 10; i--) {
-    const k = A.recent[i], key = ((k % COLS) / 14 | 0) + ',' + (((k / COLS) | 0) / 14 | 0);
-    if (used.has(key)) continue; used.add(key); pts.push(k);
-  }
-  A.tips = A.tips || [];
+  // отряды на острие: идут ровно по своим полосам
   const col = A.side === UA ? '#1d4ed8' : '#b91c1c';
-  const size = clamp(14 + z * 1.6, 20, 34), kind = A.weapon === 'fpv' ? 'recon' : A.weapon === 'art' ? 'arty' : 'tank';
+  const size = clamp(14 + z * 1.6, 20, 34), kind = A.weapon === 'fpv' ? 'inf' : A.weapon === 'art' ? 'arty' : 'tank';
+  const pts = A.troops || [];
   let cx = 0, cy = 0;
-  pts.forEach((k, i) => {
-    const tu = k % COLS + .5, tv = ((k / COLS) | 0) + .5, tp = A.tips[i] || (A.tips[i] = { u: tu, v: tv });
-    const f = A.phase === 'go' ? .08 : .2; tp.u += (tu - tp.u) * f; tp.v += (tv - tp.v) * f;
-    const x = sx(tp.u), y = sy(tp.v);
+  pts.forEach(L => {
+    const x = sx(L.u), y = sy(L.v), dx = L.eu - L.su, dy = L.ev - L.sv, dl = Math.hypot(dx, dy) || 1;
     cx += x; cy += y;
-    drawNato('inf', A.side, x - size * .55, y + size * .45, size * .8);
+    // пехота идёт следом, чуть сзади по направлению движения
+    drawNato('inf', A.side, x - dx / dl * size * .7, y - dy / dl * size * .7, size * .78);
     drawNato(kind, A.side, x, y, size);
   });
+  // рой FPV-дронов: много маленьких дронов летают вперёд и обратно
+  for (const d of A.drones || []) {
+    const L = pts[d.i]; if (!L) continue;
+    const p = clamp((now - d.t0) / d.dur, 0, 1);
+    let tu, tv;
+    if (d.k >= 0) { tu = d.k % COLS + .5; tv = ((d.k / COLS) | 0) + .5; } else { tu = L.u + (L.eu - L.su) * .03; tv = L.v + (L.ev - L.sv) * .03; }
+    const f = Math.sin(Math.PI * p); // туда и обратно
+    const wob = Math.sin(now / 260 + d.off) * 4;
+    const x = sx(L.u + (tu - L.u) * f) + wob, y = sy(L.v + (tv - L.v) * f) + Math.cos(now / 300 + d.off) * 3;
+    drawNato('recon', A.side, x, y, Math.max(11, size * .5));
+  }
   if (A.phase === 'wait' && pts.length) {
     cx /= pts.length; cy /= pts.length;
     const txt = `Нужна ${A.wave + 1}-я волна: ${WEAPONS[A.weapon].name} ➜`;
