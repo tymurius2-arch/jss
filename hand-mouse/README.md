@@ -4,7 +4,7 @@
 
 ## Установка
 
-Нужен Python 3.9–3.12.
+Работает с новыми версиями Python (включая 3.13 и 3.14). При первом запуске скрипт сам скачает модель руки (~8 МБ).
 
 ```bash
 pip install -r requirements.txt
@@ -32,7 +32,7 @@ python hand_mouse.py
 
 ## Настройки
 
-В начале `hand_mouse.py`: `SMOOTHING` (плавность), `PINCH_THRESHOLD` (чувствительность щипка),
+В начале `hand_mouse.py`: `SMOOTHING` (плавность), `DEAD_ZONE` (защита от дрожи), `PINCH_THRESHOLD` (чувствительность щипка),
 `FRAME_MARGIN` (размер рамки), `CAMERA_INDEX` (если камер несколько).
 
 ## Частые проблемы
@@ -40,5 +40,4 @@ python hand_mouse.py
 - **macOS:** разреши терминалу доступ к камере и к «Универсальному доступу»
   (Настройки → Конфиденциальность и безопасность), иначе курсор не будет двигаться.
 - **Linux:** нужна сессия X11 (на Wayland pyautogui не управляет мышью).
-- **`module 'mediapipe' has no attribute 'solutions'`:** поставь версию из requirements:
-  `pip install mediapipe==0.10.14`.
+- **Курсор дрожит:** увеличь `SMOOTHING` или `DEAD_ZONE` в начале скрипта.

@@ -13,10 +13,13 @@
 """
 
 import math
+import os
 import time
+import urllib.request
 
 import cv2
 import mediapipe as mp
+from mediapipe.tasks.python import BaseOptions, vision
 import numpy as np
 import pyautogui
 
@@ -24,11 +27,16 @@ import pyautogui
 CAMERA_INDEX = 0        # номер камеры (0 — встроенная)
 CAM_W, CAM_H = 640, 480
 FRAME_MARGIN = 100      # отступ рамки: рука в рамке = весь экран
-SMOOTHING = 5           # больше = плавнее, но медленнее
+SMOOTHING = 7           # больше = плавнее, но медленнее
+DEAD_ZONE = 8           # дрожь меньше стольких пикселей экрана игнорируется
 PINCH_THRESHOLD = 0.35  # насколько близко пальцы для щипка (доля размера ладони)
 CLICK_COOLDOWN = 0.3    # секунды между кликами
 DRAG_HOLD_TIME = 0.4    # сколько держать щипок, чтобы начать перетаскивание
 SCROLL_SPEED = 3
+
+MODEL_URL = ("https://storage.googleapis.com/mediapipe-models/hand_landmarker/"
+             "hand_landmarker/float16/latest/hand_landmarker.task")
+MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "hand_landmarker.task")
 
 pyautogui.FAILSAFE = True
 pyautogui.PAUSE = 0
@@ -50,6 +58,29 @@ def finger_up(pts, tip, pip):
     return pts[tip][1] < pts[pip][1]
 
 
+def load_model():
+    # модель руки (~8 МБ) скачивается один раз и лежит рядом со скриптом
+    if not os.path.exists(MODEL_PATH):
+        print("Скачиваю модель руки (один раз)...")
+        urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)
+    options = vision.HandLandmarkerOptions(
+        base_options=BaseOptions(model_asset_path=MODEL_PATH),
+        running_mode=vision.RunningMode.VIDEO,
+        num_hands=1,
+        min_hand_detection_confidence=0.7,
+        min_hand_presence_confidence=0.6,
+        min_tracking_confidence=0.6,
+    )
+    return vision.HandLandmarker.create_from_options(options)
+
+
+def draw_hand(frame, pts):
+    for c in vision.HandLandmarksConnections.HAND_CONNECTIONS:
+        cv2.line(frame, pts[c.start], pts[c.end], (255, 255, 255), 2)
+    for p in pts:
+        cv2.circle(frame, p, 4, (0, 128, 255), cv2.FILLED)
+
+
 def main():
     screen_w, screen_h = pyautogui.size()
 
@@ -60,13 +91,9 @@ def main():
         print("Не удалось открыть камеру. Попробуй CAMERA_INDEX = 1")
         return
 
-    hands = mp.solutions.hands.Hands(
-        max_num_hands=1,
-        model_complexity=0,
-        min_detection_confidence=0.7,
-        min_tracking_confidence=0.6,
-    )
-    draw = mp.solutions.drawing_utils
+    hands = load_model()
+    start_time = time.time()
+    last_ts = -1
 
     prev_x, prev_y = pyautogui.position()
     last_click = 0.0
@@ -85,16 +112,20 @@ def main():
 
         frame = cv2.flip(frame, 1)  # зеркально, чтобы было естественно
         h, w = frame.shape[:2]
-        result = hands.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        ts = max(int((time.time() - start_time) * 1000), last_ts + 1)
+        last_ts = ts
+        result = hands.detect_for_video(
+            mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb), ts)
 
         cv2.rectangle(frame, (FRAME_MARGIN, FRAME_MARGIN),
                       (w - FRAME_MARGIN, h - FRAME_MARGIN), (255, 0, 255), 2)
         status = "Рука не найдена"
 
-        if result.multi_hand_landmarks:
-            hand = result.multi_hand_landmarks[0]
-            draw.draw_landmarks(frame, hand, mp.solutions.hands.HAND_CONNECTIONS)
-            pts = [(int(lm.x * w), int(lm.y * h)) for lm in hand.landmark]
+        if result.hand_landmarks:
+            hand = result.hand_landmarks[0]
+            pts = [(int(lm.x * w), int(lm.y * h)) for lm in hand]
+            draw_hand(frame, pts)
 
             palm = max(dist(pts[WRIST], pts[MIDDLE_MCP]), 1)
             index_pinch = dist(pts[THUMB_TIP], pts[INDEX_TIP]) / palm
@@ -126,8 +157,10 @@ def main():
                 sy = np.interp(iy, (FRAME_MARGIN, h - FRAME_MARGIN), (0, screen_h - 1))
                 cur_x = prev_x + (sx - prev_x) / SMOOTHING
                 cur_y = prev_y + (sy - prev_y) / SMOOTHING
-                pyautogui.moveTo(cur_x, cur_y)
-                prev_x, prev_y = cur_x, cur_y
+                # мелкие подрагивания руки не двигают курсор
+                if math.hypot(sx - prev_x, sy - prev_y) > DEAD_ZONE:
+                    pyautogui.moveTo(cur_x, cur_y)
+                    prev_x, prev_y = cur_x, cur_y
                 status = "Курсор"
 
                 # --- Левый клик / перетаскивание ---
