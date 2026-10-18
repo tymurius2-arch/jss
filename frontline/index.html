@@ -79,6 +79,11 @@
   .tabs button.on { background: #24324a; border-color: #4b6a9b; }
   .tabs.grid { display: grid; grid-template-columns: 1fr 1fr; }
   .tabs.grid3 { display: grid; grid-template-columns: 1fr 1.25fr 1.15fr; }
+  .tabs.grid4 { display: grid; grid-template-columns: 1fr 1fr; }
+  .pbar { display: grid; grid-template-columns: 112px 1fr 40px; gap: 8px; align-items: center; font-size: 12.5px; margin: 4px 0; }
+  .pbar i { display: block; height: 7px; border-radius: 4px; background: #2a3546; overflow: hidden; } .pbar i b { display: block; height: 100%; border-radius: 4px; }
+  .tgt { display: grid; grid-template-columns: 26px 1fr auto; gap: 8px; align-items: center; padding: 7px 8px; border: 1px solid var(--line); border-radius: 10px; margin: 5px 0; background: var(--panel-2); }
+  .tgt small { display: block; color: var(--muted); } .tgt.off { opacity: .55; } .tgt .ic { font-size: 17px; text-align: center; }
   .drow { display: flex; gap: 10px; align-items: center; text-align: left; width: 100%; padding: 7px 8px; margin-bottom: 5px; border-radius: 9px; border: 1px solid var(--line); background: var(--panel-2); }
   .drow small { display: block; color: var(--muted); font-size: 11.5px; }
   .op .drow { border: 0; background: none; padding: 0; margin-bottom: 8px; }
@@ -227,7 +232,7 @@
   <span class="sw" style="background:#5e5650"></span>Серая зона<br>
   <span class="sw" style="background:#2a56a8"></span>Отбито ВСУ за игру<br>
   <span class="sw" style="background:#b01a18"></span>Занято РФ за игру<br>
-  ✈ аэродром · ⚓ порт · ● войска
+  ✈ аэродром · ⚓ порт · ● войска<br>⬡ заводы, НПЗ, арсеналы, ТЭС
 </div>
 <div id="credit">Линия фронта: <a href="https://deepstatemap.live" target="_blank" rel="noopener">DeepStateMAP.live</a> <span id="credDate"></span> · Карта: Natural Earth</div>
 
@@ -333,7 +338,40 @@ const ASSETS = [
   ['port', 'Бердянск', 46.75, 36.8], ['port', 'Мариуполь', 47.08, 37.56], ['port', 'Ейск', 46.71, 38.27], ['port', 'Таганрог', 47.2, 38.95],
   ['port', 'Одесса', 46.49, 30.74], ['port', 'Черноморск', 46.3, 30.66], ['port', 'Южный', 46.62, 31.02], ['port', 'Николаев', 46.95, 31.99],
   ['port', 'Очаков', 46.61, 31.54], ['port', 'Херсон', 46.63, 32.6],
-].map(([type, name, lat, lon], id) => ({ id, type, name, lat, lon, u: U(lon), v: V(lat), k: cellAt(U(lon), V(lat)) }));
+  // Стратегические объекты в глубине: заводы, НПЗ, арсеналы, ТЭС. [тип, название, широта, долгота, чей, вес]
+  ['tankf', 'Брянск', 53.25, 34.35, 2, 1], ['tankf', 'Арзамас', 55.39, 43.84, 2, 1], ['tankf', 'Санкт-Петербург', 59.85, 30.42, 2, 1], ['tankf', 'Ростов-на-Дону', 47.26, 39.65, 2, .7],
+  ['ammo', 'Котовск', 52.59, 41.51, 2, 1], ['ammo', 'Дзержинск', 56.24, 43.4, 2, 1], ['ammo', 'Казань', 55.85, 49.08, 2, 1], ['ammo', 'Новомосковск', 54.03, 38.29, 2, .7],
+  ['drone', 'Таганрог', 47.23, 38.87, 2, 1], ['drone', 'Ступино', 54.9, 38.08, 2, 1], ['drone', 'Курск', 51.71, 36.12, 2, .6],
+  ['npz', 'Рязань', 54.6, 39.8, 2, 1], ['npz', 'Саратов', 51.5, 46.0, 2, 1], ['npz', 'Волгоград', 48.5, 44.5, 2, 1], ['npz', 'Туапсе', 44.1, 39.08, 2, 1],
+  ['npz', 'Новошахтинск', 47.8, 39.9, 2, .7], ['npz', 'Афипский', 44.9, 38.8, 2, .8], ['npz', 'Кстово', 56.15, 44.2, 2, 1], ['npz', 'Ярославль', 57.56, 39.8, 2, 1],
+  ['depot', 'Торопец', 56.48, 31.6, 2, 1], ['depot', 'Тихорецк', 45.85, 40.12, 2, 1], ['depot', 'Котлубань', 49.0, 44.1, 2, 1], ['depot', 'Джанкой', 45.72, 34.38, 2, .8], ['depot', 'Луганск', 48.57, 39.3, 2, .8],
+  ['power', 'Новочеркасск', 47.4, 40.2, 2, 1], ['power', 'Шатура', 55.58, 39.55, 2, 1], ['power', 'Кашира', 54.85, 38.25, 2, 1],
+  ['tankf', 'Харьков', 49.95, 36.38, 1, 1], ['tankf', 'Житомир', 50.27, 28.67, 1, 1], ['tankf', 'Львов', 49.84, 24.0, 1, 1], ['tankf', 'Киев', 50.47, 30.6, 1, 1],
+  ['ammo', 'Шостка', 51.86, 33.48, 1, 1], ['ammo', 'Павлоград', 48.52, 35.88, 1, 1], ['ammo', 'Киев', 50.42, 30.45, 1, 1],
+  ['drone', 'Киев', 50.38, 30.52, 1, 1], ['drone', 'Днепр', 48.44, 35.0, 1, 1], ['drone', 'Львов', 49.8, 24.06, 1, 1], ['drone', 'Винница', 49.23, 28.5, 1, .7],
+  ['npz', 'Кременчуг', 49.08, 33.42, 1, 1], ['npz', 'Шебелинка', 49.43, 36.52, 1, .8], ['npz', 'Дрогобыч', 49.35, 23.5, 1, .6],
+  ['depot', 'Калиновка', 49.45, 28.52, 1, 1], ['depot', 'Балаклея', 49.45, 36.85, 1, .8], ['depot', 'Павлоград', 48.55, 35.85, 1, .8], ['depot', 'Ичня', 50.86, 32.39, 1, .8],
+  ['power', 'Бурштын', 49.2, 24.66, 1, 1], ['power', 'Триполье', 50.12, 30.75, 1, 1], ['power', 'Змиев', 49.59, 36.35, 1, 1], ['power', 'Ладыжин', 48.68, 29.25, 1, 1],
+].map(([type, name, lat, lon, home, w], id) => ({ id, type, name, lat, lon, home: home || 0, w: w || 0, u: U(lon), v: V(lat), k: cellAt(U(lon), V(lat)) }));
+const STRAT = {
+  tankf: { n: 'Бронетанковый завод', ic: '🏭', what: 'танки и БМП: пополнение танковых и механизированных дивизий' },
+  ammo: { n: 'Завод боеприпасов', ic: '💣', what: 'снаряды и боеспособность дивизий' },
+  drone: { n: 'Завод дронов', ic: '🛸', what: 'FPV и ударные дроны' },
+  npz: { n: 'НПЗ', ic: '🛢️', what: 'топливо: сила танков в бою и доход' },
+  depot: { n: 'Арсенал', ic: '📦', what: 'склады: удар сразу уничтожает запасы и бьёт по дивизиям в 150 км' },
+  power: { n: 'ТЭС', ic: '⚡️', what: 'энергетика: всё производство и доход' },
+};
+const isStrat = a => !!STRAT[a.type];
+const assetLabel = a => a.type === 'air' ? 'аэродром' : a.type === 'port' ? 'порт' : STRAT[a.type].n;
+// доля работающих объектов этого типа у стороны (свои, не выведенные из строя и не захваченные), 0…1
+function prod(side, type) {
+  if (!S || !S.off) return 1;
+  let tot = 0, ok = 0;
+  for (const a of ASSETS) if (a.type === type && a.home === side) { tot += a.w; if (a.k >= 0 && owner[a.k] === side && !assetOff(a)) ok += a.w; }
+  return tot ? ok / tot : 1;
+}
+const powerMul = side => .7 + .3 * prod(side, 'power');
+const fuelMul = side => .45 + .55 * prod(side, 'npz');
 
 /* ================= Растеризация ================= */
 function rasterPolys(polys, cb) {
@@ -702,12 +740,12 @@ function refreshMenuSrc() {
 }
 const DIFF = { easy: { p: 1.15, ai: .78, name: 'Лёгкая' }, normal: { p: 1, ai: 1, name: 'Обычная' }, hard: { p: .92, ai: 1.3, name: 'Тяжёлая' } };
 const INCOME = {
-  1: { p: 4500, arm: 20, sh: 42000, dr: 16000, air: 1, heli: 1, kab: 25, msl: 12, bek: 6 },
-  2: { p: 7000, arm: 45, sh: 65000, dr: 12000, air: 2, heli: 2, kab: 140, msl: 22, bek: 1 },
+  1: { p: 4500, arm: 20, sh: 42000, dr: 16000, air: 1, heli: 1, kab: 25, msl: 18, bek: 6 },
+  2: { p: 7000, arm: 45, sh: 65000, dr: 12000, air: 2, heli: 2, kab: 140, msl: 26, bek: 1 },
 };
 function newSide(s) {
   return s === UA
-    ? { gar: 300000, res: 26000, arm: 140, sh: 140000, dr: 50000, air: 30, heli: 24, kab: 60, msl: 40, ships: 2, lships: 1, bek: 25, superCd: 0, morale: 1, lossP: 0, lossA: 0, km: 0, gold: 500, econ: 0, dord: 0, mob: 0, sanc: 0 }
+    ? { gar: 300000, res: 26000, arm: 140, sh: 140000, dr: 50000, air: 30, heli: 24, kab: 60, msl: 60, ships: 2, lships: 1, bek: 25, superCd: 0, morale: 1, lossP: 0, lossA: 0, km: 0, gold: 500, econ: 0, dord: 0, mob: 0, sanc: 0 }
     : { gar: 420000, res: 42000, arm: 280, sh: 260000, dr: 36000, air: 70, heli: 60, kab: 500, msl: 90, ships: 14, lships: 5, bek: 4, superCd: 0, morale: 1, lossP: 0, lossA: 0, km: 0, gold: 700, econ: 0, dord: 0, mob: 0, sanc: 0 };
 }
 function startGame(mode, player, keepMap) {
@@ -778,7 +816,8 @@ function nbOwner(n, A) {
 }
 function attackPower(op, dv) {
   dv = dv || opDivs(op.side, op.k);
-  return ((op.inf || 0) + (op.arm || 0) * 20 + (op.sh || 0) * .04 + (op.dr || 0) * .12 + (op.air || 0) * 45) * season(S.date).k * S.sides[op.side].morale + divAtt(op.side, dv) * season(S.date).k;
+  const fuel = fuelMul(op.side); // без топлива танки стоят
+  return ((op.inf || 0) + (op.arm || 0) * 20 * fuel + (op.sh || 0) * .04 + (op.dr || 0) * .12 + (op.air || 0) * 45) * season(S.date).k * S.sides[op.side].morale + divAtt(op.side, dv) * season(S.date).k * (.75 + .25 * fuel);
 }
 function defensePower(op, info, consume) {
   const E = 3 - op.side, se = S.sides[E];
@@ -972,7 +1011,9 @@ function weekly(rep) {
   for (const side of [UA, RU]) {
     const s = S.sides[side], inc = INCOME[side];
     const m = S.mode === 'campaign' ? (side === S.player ? DIFF[S.diff].p : DIFF[S.diff].ai) : 1;
-    s.gar += inc.p * m * .5; s.res += inc.p * m * .5; s.arm += inc.arm * m; s.sh += inc.sh * m; s.dr += inc.dr * m;
+    // заводы, НПЗ и ТЭС в тылу определяют, сколько техники, снарядов и дронов приходит за неделю
+    const pw = powerMul(side);
+    s.gar += inc.p * m * .5; s.res += inc.p * m * .5; s.arm += inc.arm * m * prod(side, 'tankf') * pw; s.sh += inc.sh * m * prod(side, 'ammo') * pw; s.dr += inc.dr * m * prod(side, 'drone') * pw;
     for (const key of ['air', 'heli', 'kab', 'msl', 'bek']) s[key] += Math.round(inc[key] * m);
     s.gar = Math.round(s.gar * .997);
     economyTurn(side, rep);
@@ -1105,7 +1146,22 @@ function resolveStrike(op, rep) {
   const a = nearestAsset(op.k, null, x => assetOwner(x) === E, 5);
   const inter = Math.round(op.msl * rnd(.2, .6)), hitN = op.msl - inter;
   let txt;
-  if (a && hitN > 0) {
+  if (a && hitN > 0 && isStrat(a)) {
+    const weeks = clamp(2 + Math.floor(hitN / 5), 2, 8), was = prod(E, a.type);
+    S.off[a.id] = Math.max(S.off[a.id] || 0, S.turn + 1 + weeks);
+    let extra = '';
+    if (a.type === 'depot') {
+      const sh = Math.min(se.sh, 30000 + hitN * 4000), dr = Math.min(se.dr, hitN * 800); se.sh -= sh; se.dr -= dr;
+      let nd = 0; for (const d of sideDivs(E)) if (kmBetween(d.k, a.k) < 150) { d.org = Math.max(0, d.org - 25); nd++; }
+      extra = ` Детонация складов: −${fmt(sh)} снарядов, −${fmt(dr)} дронов${nd ? `, ${nd} див. рядом теряют боеспособность` : ''}.`;
+    } else if (a.type === 'tankf') { const t = Math.min(se.arm, hitN); se.arm -= t; extra = ` Уничтожено ${t} ед. техники в цехах.`; }
+    else if (a.type === 'ammo') { const t = Math.min(se.sh, hitN * 1500); se.sh -= t; extra = ` Потеряно ${fmt(t)} снарядов.`; }
+    else if (a.type === 'drone') { const t = Math.min(se.dr, hitN * 600); se.dr -= t; extra = ` Потеряно ${fmt(t)} дронов.`; }
+    else if (a.type === 'npz') { se.gold = Math.max(0, se.gold - 60); }
+    else if (a.type === 'power') se.morale = Math.max(.85, se.morale - .02);
+    const now = prod(E, a.type);
+    txt = `${SIDE[A].short}: ракетный удар — ${STRAT[a.type].n} «${a.name}». Сбито ${inter} из ${op.msl}, объект выведен из строя на ${weeksW(weeks)}.${extra} ${STRAT[a.type].n.split(' ')[0] === 'НПЗ' ? 'Топливо' : 'Производство'} ${SIDE[E].short}: ${Math.round(was * 100)}% → ${Math.round(now * 100)}%.`;
+  } else if (a && hitN > 0) {
     const weeks = Math.min(5, 1 + Math.floor(hitN / 6));
     S.off[a.id] = Math.max(S.off[a.id] || 0, S.turn + 1 + weeks);
     let extra = '';
@@ -1128,7 +1184,7 @@ function resolveSuper(op, rep) {
   const kill = Math.round(rnd(1500, 3000)), sh = Math.min(se.sh, 40000);
   se.gar = Math.max(20000, se.gar - kill); se.lossP += kill; se.sh -= sh; se.morale = Math.max(.85, se.morale - .03);
   fxAdd('super', op.k, A);
-  say(rep, A, `${SIDE[A].short}: ${SUPER_NAME[A]} по ${a ? (a.type === 'air' ? 'аэродрому' : 'порту') + ' «' + a.name + '» (выведен из строя на 6 нед.)' : 'району ' + placeName(op.k)} — потери противника ~${fmt(kill)} чел., укрепления уничтожены, мораль −3%.`);
+  say(rep, A, `${SIDE[A].short}: ${SUPER_NAME[A]} по ${a ? assetLabel(a) + ' «' + a.name + '» (выведен из строя на 6 нед.)' : 'району ' + placeName(op.k)} — потери противника ~${fmt(kill)} чел., укрепления уничтожены, мораль −3%.`);
 }
 function resolveLanding(op, rep, naval) {
   const A = op.side, E = 3 - A, sa = S.sides[A], se = S.sides[E], where = placeName(op.k);
@@ -1180,7 +1236,8 @@ function aiSupport(side) {
   const pick = arr => arr[(Math.random() * arr.length) | 0];
   for (let n = 0; n < (sd.msl > 150 ? 3 : sd.msl > 50 ? 2 : 1); n++) {
     if (sd.msl < 8 || Math.random() > .6) break;
-    const tg = ASSETS.filter(a => assetOwner(a) === E && !assetOff(a) && !S.aiOrders.some(o => o.k === a.k));
+    let tg = ASSETS.filter(a => assetOwner(a) === E && !assetOff(a) && !S.aiOrders.some(o => o.k === a.k));
+    if (Math.random() < .6) { const st = tg.filter(isStrat); if (st.length) tg = st; }
     if (tg.length) S.aiOrders.push(commitOp({ side, k: pick(tg).k, type: 'strike', msl: Math.min(Math.floor(sd.msl * .3), 30) }));
   }
   if (sd.superCd <= S.turn && Math.random() < .3) {
@@ -1292,10 +1349,14 @@ function divBuy(side, t, k) {
   return d;
 }
 const reinfCost = () => 0; // дивизии бесплатные
+// Пополнение бесплатное, но зависит от заводов в тылу: разбиты бронетанковые заводы — танковым дивизиям нечем пополняться.
 function divReinf(side, d) {
   if (d.str >= 99.5) return 'Дивизия укомплектована';
-  d.str = 100; d.org = Math.max(d.org, 50);
-  return null;
+  const armored = d.t === 'tank' || d.t === 'mech';
+  const add = 75 * powerMul(side) * (armored ? prod(side, 'tankf') : .5 + .5 * prod(side, 'ammo'));
+  if (add < 4) return armored ? 'Бронетанковые заводы разрушены — пополнять дивизию нечем' : 'Заводы боеприпасов разрушены — пополнять нечем';
+  d.str = Math.min(100, d.str + add); d.org = Math.max(d.org, 50 * (.5 + .5 * prod(side, 'ammo')));
+  return add < 60 ? `Пополнена частично (+${Math.round(add)}%): заводы в тылу повреждены` : null;
 }
 function divDisband(side, d) {
   S.divs[side] = S.divs[side].filter(x => x !== d);
@@ -1326,7 +1387,7 @@ const ownedCities = side => CITIES.reduce((a, c) => a + (c.k >= 0 && owner[c.k] 
 function income(side) {
   const sd = S.sides[side];
   const base = (side === UA ? 230 : 330) + 2.5 * ownedCities(side);
-  return Math.round(base * (1 + .12 * sd.econ) * (sd.sanc > 0 ? .75 : 1));
+  return Math.round(base * (1 + .12 * sd.econ) * (sd.sanc > 0 ? .75 : 1) * (.6 + .4 * prod(side, 'power')) * (.8 + .2 * prod(side, 'npz')));
 }
 const upkeep = () => 0; // дивизии бесплатные — без содержания
 function economyTurn(side, rep) {
@@ -1669,12 +1730,17 @@ function drawAssets() {
     const o = owner[a.k], off = assetOff(a);
     const col = off ? '#6b7280' : o === UA ? '#60a5fa' : o === RU ? '#f87171' : '#a8a29e';
     ctx.fillStyle = '#0f151d'; ctx.strokeStyle = col; ctx.lineWidth = 2;
-    ctx.beginPath(); a.type === 'air' ? ctx.arc(x, y, 8, 0, 7) : ctx.rect(x - 8, y - 8, 16, 16); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = col; ctx.font = '600 11px Rubik, sans-serif'; ctx.fillText(a.type === 'air' ? '✈' : '⚓', x, y + 1);
+    if (isStrat(a)) { // завод / НПЗ / арсенал / ТЭС — шестиугольник со значком
+      ctx.beginPath(); for (let i = 0; i < 6; i++) { const t = Math.PI / 3 * i + Math.PI / 6; ctx.lineTo(x + Math.cos(t) * 10.5, y + Math.sin(t) * 10.5); } ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.globalAlpha = off ? .45 : 1; ctx.font = '11px sans-serif'; ctx.fillText(STRAT[a.type].ic, x, y + 1); ctx.globalAlpha = 1;
+    } else {
+      ctx.beginPath(); a.type === 'air' ? ctx.arc(x, y, 8, 0, 7) : ctx.rect(x - 8, y - 8, 16, 16); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = col; ctx.font = '600 11px Rubik, sans-serif'; ctx.fillText(a.type === 'air' ? '✈' : '⚓', x, y + 1);
+    }
     if (off) { ctx.strokeStyle = '#e5e7eb'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x - 7, y - 7); ctx.lineTo(x + 7, y + 7); ctx.stroke(); }
-    if (z > 4) {
+    if (z > 4 || (isStrat(a) && z > 1.6)) {
       ctx.font = '500 10.5px Rubik, sans-serif'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(8,12,18,.9)';
-      const label = (a.type === 'air' ? 'аэр. ' : 'порт ') + a.name + (off ? ' (выведен из строя)' : '');
+      const label = (a.type === 'air' ? 'аэр. ' : a.type === 'port' ? 'порт ' : STRAT[a.type].n + ' · ') + a.name + (off ? ` (не работает ещё ${S.off[a.id] - S.turn} нед.)` : '');
       ctx.strokeText(label, x, y + 16); ctx.fillStyle = '#d6dde8'; ctx.fillText(label, x, y + 16);
     }
   }
@@ -1698,6 +1764,7 @@ function placeUnits() {
       const h = hash(k + side * 7919);
       let type = UTYPES[h % UTYPES.length], row = 0;
       if (h % 11 === 0) { type = 'arty'; row = 1; } else if (h % 17 === 0) { type = 'aa'; row = 1; }
+      if ((type === 'tank' || type === 'mech') && (h >>> 8) % 100 >= 100 * prod(side, 'tankf') * fuelMul(side) / .99) type = 'inf'; // заводы разбиты — техники на фронте меньше
       if (S.turn > 0 && changed[k] >= S.turn && owner0[k] !== side) type = 'tank';
       const i = k % COLS; let dx = 0, dy = 0; // в сторону противника — значок стоит сразу за линией, в своём тылу
       const en = n => owner[n] !== side && owner[n] !== 0;
@@ -2505,8 +2572,9 @@ function renderSide() {
   } else {
     h += `<h2><span class="flag ${SIDE[p].flag}"></span>Вы командуете: ${SIDE[p].short}</h2>`;
     const tab = S.tab || 'orders';
-    h += `<div class="tabs grid3">${[['orders', '➜ Приказы'], ['divs', `🎖 Дивизии (${sideDivs(p).length})`], ['econ', '💰 Экономика']].map(([k, n]) => `<button data-tab="${k}" class="${tab === k ? 'on' : ''}">${n}</button>`).join('')}</div>`;
+    h += `<div class="tabs grid4">${[['orders', '➜ Приказы'], ['divs', `🎖 Дивизии (${sideDivs(p).length})`], ['deep', '🎯 Удары вглубь'], ['econ', '💰 Экономика']].map(([k, n]) => `<button data-tab="${k}" class="${tab === k ? 'on' : ''}">${n}</button>`).join('')}</div>`;
     if (tab === 'divs') h += divPanel() + endBtn();
+    else if (tab === 'deep') h += deepPanel() + endBtn();
     else if (tab === 'econ') h += econPanel() + endBtn();
     else {
     h += sideRes(p, false);
@@ -2557,6 +2625,37 @@ function divPanel() {
   return h;
 }
 const supCol = q => q >= .85 ? '#34d399' : q >= .5 ? '#fbbf24' : '#f87171';
+function prodBars(side) {
+  const row = (n, v) => { const c = v > .75 ? '#34d399' : v > .4 ? '#fbbf24' : '#f87171'; return `<div class="pbar"><span>${n}</span><i><b style="width:${Math.round(v * 100)}%;background:${c}"></b></i><b style="color:${c}">${Math.round(v * 100)}%</b></div>`; };
+  const pw = powerMul(side);
+  return row('Танки и БМП', prod(side, 'tankf') * pw) + row('Снаряды', prod(side, 'ammo') * pw) + row('Дроны', prod(side, 'drone') * pw) + row('Топливо', prod(side, 'npz')) + row('Энергетика', prod(side, 'power'));
+}
+function deepPanel() {
+  const p = S.player, E = 3 - p, sd = S.sides[p];
+  const list = ASSETS.filter(a => isStrat(a) && a.home === E && a.k >= 0);
+  const st = a => owner[a.k] !== E ? '<b class="up">захвачен</b>' : assetOff(a) ? `не работает ещё ${S.off[a.id] - S.turn} нед.` : 'работает';
+  let h = `<div class="stat"><small class="muted">Ваши ракеты</small><div class="big">🚀 ${fmt(sd.msl)}</div><small>+${INCOME[p].msl} в неделю · часть собьёт ПВО</small></div>
+    <div class="hint">Подбитые танки противнику привозят снова — пока работают его заводы. Бейте ракетами по заводам, НПЗ, арсеналам и ТЭС в глубине: меньше техники, снарядов и топлива — легче прорвать фронт. Объект выходит из строя на 2–8 недель, потом его чинят.</div>
+    <h3>Производство ${SIDE[E].short}</h3>${prodBars(E)}
+    <h3>Цели</h3>`;
+  for (const t of Object.keys(STRAT)) {
+    const items = list.filter(a => a.type === t); if (!items.length) continue;
+    h += `<div class="hint" style="margin:10px 0 2px"><b>${STRAT[t].ic} ${STRAT[t].n}</b> — ${STRAT[t].what}</div>`;
+    h += items.map(a => `<div class="tgt ${owner[a.k] !== E || assetOff(a) ? 'off' : ''}"><span class="ic">${STRAT[t].ic}</span><div>${a.name}<small>${st(a)}</small></div>
+      ${owner[a.k] === E && !S.over ? `<button class="btn" data-strike="${a.id}">🚀 Удар</button>` : ''}</div>`).join('');
+  }
+  h += `<h3>Ваше производство</h3>${prodBars(p)}`;
+  return h;
+}
+function strikeAt(a) {
+  const sd = S.sides[S.player];
+  if (S.orders.some(o => o.k === a.k && o.type === 'strike')) return toast('По этой цели уже есть приказ на эту неделю.');
+  const c = opCheck('strike', a.k, S.player); if (!c.ok) return toast(c.why);
+  S.tab = 'orders'; S.sel = { k: a.k, dir: [0, -1] };
+  S.draft = { type: 'strike', inf: 0, arm: 0, sh: 0, dr: 0, air: 0, kab: 60, msl: Math.min(sd.msl, 12), bek: 10, hinf: 800, ninf: 1500 };
+  flyTo(a.k); renderSide(); requestDraw();
+  const opEl = document.querySelector('#sideBody .op'); if (opEl) opEl.scrollIntoView({ block: 'nearest' });
+}
 function econPanel() {
   const s = S.player, sd = S.sides[s], inc = income(s), up = upkeep(s), mob = MOB[sd.mob];
   let h = `<div class="stat"><small class="muted">Казна</small><div class="big">${fmt(sd.gold)}</div>
@@ -2569,6 +2668,7 @@ function econPanel() {
       <button data-up="econ" ${sd.econ >= 5 || sd.gold < upCost(s, 'econ') ? 'disabled' : ''}>📈 Экономика · ур. ${sd.econ}/5<br><small class="muted">+12% дохода за уровень · ${sd.econ >= 5 ? 'максимум' : 'улучшить за ' + upCost(s, 'econ')}</small></button>
       <button data-up="dord" ${sd.dord >= 5 || sd.gold < upCost(s, 'dord') ? 'disabled' : ''}>🏭 Оборонный заказ · ур. ${sd.dord}/5<br><small class="muted">+8% к силе дивизий за уровень · ${sd.dord >= 5 ? 'максимум' : 'улучшить за ' + upCost(s, 'dord')}</small></button>
     </div>
+    <h3>Производство (заводы, НПЗ, ТЭС)</h3>${prodBars(s)}<div class="hint">Падает, когда противник бьёт ракетами по вашим объектам в тылу или захватывает их.</div>
     <h3>Окружения</h3>`;
   const mine = S.pockets && S.pockets[s] || [], en = S.pockets && S.pockets[3 - s] || [];
   h += mine.map((p, i) => `<div class="pk bad">⚠ Ваш котёл №${i + 1} · ${placeName(p.k)}<small>${fmt(p.n * rowKm2[(p.k / COLS) | 0])} км² · снабжение 0% · оборона ${Math.max(0, 100 - 25 * p.cut)}% · ходов в окружении: ${p.cut}</small><button class="btn" data-fly="${p.k}">Показать</button></div>`).join('')
@@ -2620,7 +2720,7 @@ function opHint() {
     case 'attack': return 'Снаряды и дроны, оставленные на складе, работают на оборону. Сначала ударьте КАБами — наступать будет легче.';
     case 'fort': return 'Окопы и опорные пункты в круге (до 3 уровней) и 1 500 бойцов из резерва в гарнизон. Наступать на укрепления намного дороже.';
     case 'kab': return `Вылет с аэродрома «${c.af ? c.af.name : '?'}». Разрушает укрепления в радиусе ~9 км и на эту неделю ослабляет оборону для ваших наступлений рядом (−20%).`;
-    case 'strike': return (c.tgt ? `Цель: ${c.tgt.type === 'air' ? 'аэродром' : 'порт'} «${c.tgt.name}» — выйдет из строя на 1–5 недель.` : 'Удар по тылам: склады снарядов и укрепления. Нажмите рядом с аэродромом или портом противника, чтобы ударить по нему.') + ' Часть ракет собьёт ПВО.';
+    case 'strike': return (c.tgt ? (isStrat(c.tgt) ? `Цель: ${STRAT[c.tgt.type].n} «${c.tgt.name}» (${STRAT[c.tgt.type].what}) — выйдет из строя на 2–8 недель, чем больше ракет, тем дольше.` : `Цель: ${assetLabel(c.tgt)} «${c.tgt.name}» — выйдет из строя на 1–5 недель.`) : 'Удар по тылам: склады снарядов и укрепления. Нажмите рядом с заводом, НПЗ, арсеналом, аэродромом или портом противника — или выберите цель во вкладке «🎯 Удары вглубь».') + ' Часть ракет собьёт ПВО.';
     case 'super': return `Мощнейший удар: уничтожает укрепления в радиусе ~9 км${c.tgt ? `, выводит «${c.tgt.name}» из строя на 6 недель` : ''}, бьёт по морали противника. Потом перезарядка ${SUPER_CD[S.player]} недель.`;
     case 'heli': return `Вертолётов: ${Math.ceil(d.hinf / 150)} из ${sd.heli}. Плацдарм в тылу держится 2 недели — пробейтесь к нему наступлением, иначе он попадёт в котёл. Чем глубже, тем больше потерь от ПВО.`;
     case 'naval': return `Из порта «${c.port ? c.port.name : '?'}». Десантных кораблей: ${Math.ceil(d.ninf / 1000)} из ${sd.lships}. Их может потопить флот и морские дроны противника.`;
@@ -2669,6 +2769,7 @@ function bindSide() {
   b.querySelectorAll('[data-mob]').forEach(el => el.onclick = () => { S.sides[S.player].mob = +el.dataset.mob; renderSide(); });
   b.querySelectorAll('[data-up]').forEach(el => el.onclick = () => { const e = upgrade(S.player, el.dataset.up); if (e) toast(e); renderSide(); });
   b.querySelectorAll('[data-fly]').forEach(el => el.onclick = () => flyTo(+el.dataset.fly));
+  b.querySelectorAll('[data-strike]').forEach(el => el.onclick = () => strikeAt(ASSETS[+el.dataset.strike]));
   const selD = () => sideDivs(S.player).find(x => x.id === S.dsel);
   if ($('dBuy')) $('dBuy').onclick = () => { S.dmode = S.dmode === 'place' ? '' : 'place'; renderSide(); if (S.dmode) toast('Нажмите на свою территорию со снабжением — там сформируется дивизия.'); };
   if ($('dBack')) $('dBack').onclick = () => { S.dsel = null; S.dmode = ''; S.droute = null; renderSide(); requestDraw(); };
