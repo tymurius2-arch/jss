@@ -810,6 +810,30 @@ function localInfo(k, A) {
   let enc = 0; for (const n of cand) enc += encDef(n);
   return { cand, en, gr, own, fAvg: en ? fs / en : 0, uAvg: en ? us / en : 0, dir, encAvg: cand.length ? enc / cand.length : 1 };
 }
+// Наступление по лассо: район задан многоугольником (в координатах сетки). Клетки района считаются один раз и кэшируются.
+const AREA_CACHE = new WeakMap();
+function areaCells(area) {
+  let c = AREA_CACHE.get(area); if (c) return c;
+  const set = new Set();
+  rasterPolys([[area.pts.map(([u, v]) => [LON(u), LAT(v)])]], k => { if (land(k)) set.add(k); });
+  c = { set }; AREA_CACHE.set(area, c); return c;
+}
+function areaInfo(op) {
+  const A = op.side, E = 3 - A, { set } = areaCells(op.area);
+  const cand = []; let fs = 0, us = 0, en = 0, gr = 0, eu = 0, ev = 0, ou = 0, ov = 0;
+  for (const n of set) {
+    const o = owner[n]; if (o === A || !uaRu(n) && o !== E && o !== GREY) continue;
+    const i = n % COLS, j = (n / COLS) | 0;
+    if (o === E) { en++; fs += fort[n]; us += urban[n] ? 1 : 0; } else if (o === GREY) gr++; else continue;
+    eu += i; ev += j;
+    if (nbOwner(n, A)) { cand.push(n); ou += i; ov += j; }
+  }
+  const ne = en + gr;
+  const dir = cand.length && ne ? [eu / ne - ou / cand.length, ev / ne - ov / cand.length] : [0, -1];
+  let enc = 0; for (const n of cand) enc += encDef(n);
+  return { cand, en, gr, own: cand.length, fAvg: en ? fs / en : 0, uAvg: en ? us / en : 0, dir, encAvg: cand.length ? enc / cand.length : 1, area: true, size: ne };
+}
+const opInfo = op => op.area ? areaInfo(op) : localInfo(op.k, op.side);
 function nbOwner(n, A) {
   const i = n % COLS;
   return (i > 0 && owner[n - 1] === A) || (i < COLS - 1 && owner[n + 1] === A) || (n >= COLS && owner[n - COLS] === A) || (n < N - COLS && owner[n + COLS] === A);
@@ -835,20 +859,21 @@ function cellCost(k) {
 }
 function avgCellKm2(k) { return rowKm2[(k / COLS) | 0]; }
 function estimate(op) {
-  const info = localInfo(op.k, op.side);
+  const info = opInfo(op);
   if (!info.cand.length) return { ok: false, info };
   const dv = opDivs(op.side, op.k);
   const P = attackPower(op, dv), D = defensePower(op, info, false), r = P / D;
   let cost = 0, n = 0;
   for (const k of info.cand) { cost += cellCost(k); n++; }
-  const km = budgetOf(r) / Math.max(.5, cost / n) * avgCellKm2(op.k);
+  let km = budgetOf(r) / Math.max(.5, cost / n) * avgCellKm2(op.k);
+  if (info.area) km = Math.min(km, info.size * avgCellKm2(op.k)); // дальше обведённого района войска не идут
   const ch = clamp((1.18 - 1 / r) / .36, 0, 1); // шанс продвижения с учётом разброса ±18%
   const own = owner[op.k] === op.side ? op.k : nearOwn(op.k, op.side); // снабжение — у своих позиций рядом с целью
   return { ok: true, info, r, km, dv, ch, q: own >= 0 ? supplyAt(op.side, own) : 0 };
 }
 function resolveAttack(op, rep) {
   const A = op.side, E = 3 - A, sa = S.sides[A], se = S.sides[E];
-  const info = localInfo(op.k, A);
+  const info = opInfo(op);
   const where = placeName(op.k);
   if (!info.cand.length) {
     refund(op);
@@ -859,7 +884,8 @@ function resolveAttack(op, rep) {
   let budget = budgetOf(r);
   const took = [];
   const ci = op.k % COLS, cj = (op.k / COLS) | 0;
-  const inDisk = n => { const di = n % COLS - ci, dj = ((n / COLS) | 0) - cj; return di * di + dj * dj <= R * R; };
+  const aSet = op.area ? areaCells(op.area).set : null, Ra = aSet ? Math.max(R, Math.sqrt(info.size / Math.PI) * 1.4) : R;
+  const inDisk = aSet ? n => aSet.has(n) : n => { const di = n % COLS - ci, dj = ((n / COLS) | 0) - cj; return di * di + dj * dj <= R * R; };
   const cand = info.cand.slice(), seen = new Set(cand);
   let taken = 0, km = 0;
   while (budget > 0 && cand.length) {
@@ -870,7 +896,7 @@ function resolveAttack(op, rep) {
       let na = 0; const i = n % COLS;
       if (i > 0 && owner[n - 1] === A) na++; if (i < COLS - 1 && owner[n + 1] === A) na++;
       if (n >= COLS && owner[n - COLS] === A) na++; if (n < N - COLS && owner[n + COLS] === A) na++;
-      const pr = Math.sqrt(di * di + dj * dj) / R * 3 + cellCost(n) * .8 - na * .8 + Math.random() * 1.6;
+      const pr = Math.sqrt(di * di + dj * dj) / Ra * 3 + cellCost(n) * .8 - na * .8 + Math.random() * 1.6;
       if (pr < bp) { bp = pr; bi = t; }
     }
     const n = cand[bi]; cand.splice(bi, 1);
@@ -1073,7 +1099,7 @@ function opCheck(type, k, side) {
   if (k < 0 || !land(k)) return { ok: false, why: 'Нужна суша' };
   switch (type) {
     case 'attack': case 'fort': {
-      const info = localInfo(k, side);
+      const info = type === 'attack' && S.sel && S.sel.area && S.sel.k === k ? areaInfo({ side, k, area: S.sel.area }) : localInfo(k, side);
       if (!info.cand.length || !info.own) return { ok: false, why: 'Нужно место у линии фронта' };
       if (type === 'fort' && sd.res < 1500) return { ok: false, why: 'Нужно 1 500 чел. резерва' };
       return { ok: true, info };
@@ -1631,7 +1657,7 @@ function draw() {
   if (Math.abs(s - 1) < 1e-9) { x0 = Math.round(x0); y0 = Math.round(y0); }
   cache.style.transform = `translate(${x0}px,${y0}px) scale(${s})`;
   // верхний слой: только то, что движется (приказы, вспышки, лассо, атака)
-  const dyn = (S && (S.orders.length || S.sel || (S.divs && (S.divs[1].length || S.divs[2].length)) || (S.sbu && S.sbu.length))) || FX.length || RULER.a != null || (S && S.mode === 'op') || (S && S.mode === 'editor' && (ATK || LASSO || (ED.tool === 'brush' && hoverPt)));
+  const dyn = (S && (S.orders.length || S.sel || LASSO || (S.divs && (S.divs[1].length || S.divs[2].length)) || (S.sbu && S.sbu.length))) || FX.length || RULER.a != null || (S && S.mode === 'op') || (S && S.mode === 'editor' && (ATK || LASSO || (ED.tool === 'brush' && hoverPt)));
   if (!dyn && !overlayUsed) return;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.clearRect(0, 0, W, H);
   overlayUsed = !!dyn;
@@ -1642,6 +1668,7 @@ function draw() {
   drawFx();
   drawRuler();
   if (S && S.mode === 'editor') drawAttack();
+  if (S && S.mode === 'campaign' && LASSO) drawCampLasso();
   if (S && S.mode === 'op') drawOp();
   if (S && S.mode === 'editor' && ED.tool === 'brush' && hoverPt) {
     ctx.strokeStyle = '#f3f4f6'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(hoverPt.x, hoverPt.y, ED.size * z, 0, 7); ctx.stroke();
@@ -1692,17 +1719,38 @@ function drawMap() {
   if (layers.assets) drawAssets();
   if (layers.cities) drawCities();
 }
+function hatchArea(pts, col, alpha, now) {
+  const path = new Path2D(); pts.forEach(([u, v], i) => i ? path.lineTo(sx(u), sy(v)) : path.moveTo(sx(u), sy(v))); path.closePath();
+  ctx.save(); ctx.clip(path);
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  for (const [u, v] of pts) { const X = sx(u), Y = sy(v); if (X < x0) x0 = X; if (X > x1) x1 = X; if (Y < y0) y0 = Y; if (Y > y1) y1 = Y; }
+  const step = 12, off = (now / 90) % step, h = y1 - y0;
+  ctx.strokeStyle = col; ctx.globalAlpha = alpha; ctx.lineWidth = 1.4; ctx.beginPath();
+  for (let c = x0 - h - step + off; c < x1 + step; c += step) { ctx.moveTo(c, y1); ctx.lineTo(c + h, y0); }
+  ctx.stroke(); ctx.globalAlpha = 1; ctx.restore();
+  ctx.setLineDash([9, 6]); ctx.lineDashOffset = -now / 40;
+  ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 4; ctx.stroke(path);
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke(path); ctx.setLineDash([]);
+}
+function drawCampLasso() {
+  const col = SIDE[S.player].color;
+  ctx.beginPath(); LASSO.pts.forEach(([u, v], i) => i ? ctx.lineTo(sx(u), sy(v)) : ctx.moveTo(sx(u), sy(v)));
+  ctx.fillStyle = col + '22'; ctx.fill();
+  ctx.setLineDash([7, 5]); ctx.lineDashOffset = -performance.now() / 40; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.stroke(); ctx.setLineDash([]);
+}
 function drawOrders() {
   const z = view.z;
   const all = S.orders.map(o => [o, false]);
-  if (S.sel) all.push([{ side: S.player, k: S.sel.k, type: (S.draft || {}).type || 'attack', dir: S.sel.dir }, true]);
+  if (S.sel) all.push([{ side: S.player, k: S.sel.k, type: (S.draft || {}).type || 'attack', dir: S.sel.dir, area: S.sel.area }, true]);
+  const now = performance.now();
+  for (const [o, sel] of all) if (o.area && o.type === 'attack') hatchArea(o.area.pts, o.side === UA ? '#93c5fd' : '#fca5a5', sel ? .55 : .4, now);
   for (const [o, sel] of all) {
     const u = o.k % COLS + .5, v = ((o.k / COLS) | 0) + .5, x = sx(u), y = sy(v);
     const rc = o.type === 'attack' || o.type === 'fort' ? R : o.type === 'kab' || o.type === 'super' ? 4 : o.type === 'bek' ? 3 : 2.5;
     const r = Math.max(10, rc * z), col = SIDE[o.side].color;
     ctx.strokeStyle = col; ctx.lineWidth = sel ? 2.5 : 2; ctx.setLineDash(sel || o.type !== 'attack' ? [6, 4] : []);
     ctx.fillStyle = o.type === 'fort' ? 'rgba(250,204,21,.18)' : o.type === 'attack' ? (sel ? 'rgba(255,255,255,.18)' : 'rgba(255,255,255,.1)') : 'rgba(255,140,0,.16)';
-    ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); ctx.stroke(); ctx.setLineDash([]);
+    if (!(o.area && o.type === 'attack')) { ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); ctx.stroke(); } ctx.setLineDash([]);
     if (o.type === 'attack' && o.dir) drawArrow(x, y, o.dir, Math.max(18, r * .9), col, Math.max(4, z * .9), 1);
     else if (o.type !== 'attack') {
       ctx.font = '15px Rubik, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#f3f4f6';
@@ -1902,11 +1950,12 @@ cv.addEventListener('pointerdown', e => {
   INR.run = false; ZA.run = false;
   if (ptrs.size === 1) {
     const ed = S && S.mode === 'editor' && e.button === 0;
-    const paint = ed && ED.tool === 'brush', lasso = ed && ED.tool === 'lasso' && !(ATK && ATK.phase === 'go') && !RULER.on;
+    const cl = S && S.mode === 'campaign' && !S.over && S.lassoOn && e.button === 0 && !RULER.on; // наступление по лассо в кампании
+    const paint = ed && ED.tool === 'brush', lasso = cl || (ed && ED.tool === 'lasso' && !(ATK && ATK.phase === 'go') && !RULER.on);
     const unit = ed && ED.tool === 'units' ? sbuAt(e.clientX, e.clientY) : null;
     drag = { x: e.clientX, y: e.clientY, u: view.u, v: view.v, moved: 0, paint, lasso, unit, hist: [[e.clientX, e.clientY, performance.now()]] };
     if (paint) { stopAtk(); pushUndo(); paintAt(e.clientX, e.clientY); }
-    if (lasso) { if (ATK && ATK.phase === 'choose') { ATK = null; renderSide(); } LASSO = { pts: [[toU(e.clientX), toV(e.clientY)]] }; }
+    if (lasso) { if (!cl && ATK && ATK.phase === 'choose') { ATK = null; renderSide(); } LASSO = { pts: [[toU(e.clientX), toV(e.clientY)]] }; }
   } else if (ptrs.size === 2) {
     if (drag && drag.paint) recompute();
     drag = null; LASSO = null;
@@ -1947,7 +1996,7 @@ const endPtr = e => {
     if (drag.paint) recompute();
     else if (drag.unit) { ED.usel = drag.unit.id; renderSide(); requestDraw(); saveSoon(); }
     else if (drag.moved < 7) { LASSO = null; onTap(e.clientX, e.clientY); }
-    else if (drag.lasso) finishLasso();
+    else if (drag.lasso) S.mode === 'campaign' ? finishCampLasso() : finishLasso();
     else if (!drag.paint) { // скорость за последние ~80 мс — для инерции
       const now = performance.now(), h = drag.hist.filter(p => now - p[2] < 90);
       if (h.length >= 2) {
@@ -2227,6 +2276,30 @@ const WEAPONS = {
   art: { name: 'Артиллерия', icon: '💥', cap: 2100, dur: 4600, hint: 'медленно, с огневым валом' },
 };
 const wavesFor = (km, w) => km < 250 ? 1 : Math.max(2, Math.ceil(Math.sqrt(km / WEAPONS[w].cap) * 1.5));
+function finishCampLasso() {
+  const pts = LASSO && LASSO.pts; LASSO = null;
+  if (!pts || pts.length < 6) { requestDraw(); return; }
+  const side = S.player, area = { pts: pts.map(([u, v]) => [Math.round(u * 10) / 10, Math.round(v * 10) / 10]) };
+  const info = areaInfo({ side, area });
+  if (!info.size) { toast('В обведённом районе нет позиций противника.'); requestDraw(); return; }
+  if (!info.cand.length) { toast('Район должен касаться ваших позиций у линии фронта.'); requestDraw(); return; }
+  // точка приказа — участок на линии соприкосновения ближе всего к середине района
+  let cu = 0, cv = 0, n = 0; for (const k of areaCells(area).set) if (owner[k] !== side) { cu += k % COLS; cv += (k / COLS) | 0; n++; }
+  cu /= n; cv /= n;
+  let k0 = info.cand[0], bd = 1e9; for (const k of info.cand) { const d = Math.hypot(k % COLS - cu, ((k / COLS) | 0) - cv); if (d < bd) { bd = d; k0 = k; } }
+  if (S.orders.some(o => o.type === 'attack' && cellDist(o.k, k0) < 3)) { toast('Здесь уже есть приказ. Отмените его или обведите другой район.'); requestDraw(); return; }
+  const sd = S.sides[side];
+  S.tab = 'orders'; S.sel = { k: k0, dir: info.dir, area };
+  S.draft = {
+    type: 'attack',
+    inf: Math.floor(Math.min(sd.res, Math.max(2000, sd.res * .5)) / 100) * 100, arm: Math.floor(sd.arm * .4),
+    sh: Math.floor(sd.sh * .35 / 1000) * 1000, dr: Math.floor(sd.dr * .35 / 500) * 500, air: Math.floor(sd.air * .2),
+    kab: 60, msl: 10, bek: 10, hinf: 800, ninf: 1500,
+  };
+  document.getElementById('side').classList.remove('min');
+  renderSide(); requestDraw();
+  const opEl = document.querySelector('#sideBody .op'); if (opEl) opEl.scrollIntoView({ block: 'nearest' });
+}
 function finishLasso() {
   const pts = LASSO && LASSO.pts; LASSO = null;
   if (!pts || pts.length < 6) { requestDraw(); return; }
@@ -2632,6 +2705,8 @@ function renderSide() {
     if (S.over) h += `<div class="est">Игра окончена. Начните новую через «Меню».</div>`;
     else if (S.sel) h += opPanel();
     else h += `<div class="hint" style="margin-top:12px">Нажмите на карту у линии фронта, чтобы отдать приказ: наступление или укрепление обороны.</div>`;
+    if (!S.over) h += `<button class="btn ${S.lassoOn ? 'primary' : ''}" id="bCLasso" style="width:100%;margin-top:8px">➰ Наступление по лассо${S.lassoOn ? ' — обведите район на карте' : ''}</button>
+      ${S.lassoOn ? '<div class="hint">Обведите мышью или пальцем район, куда пойдут войска (он должен касаться вашей линии фронта). Карта двигается правой кнопкой мыши или двумя пальцами.</div>' : ''}`;
     h += quickBox();
     h += `<h3>Приказы на эту неделю (${S.orders.length})</h3><ul class="orders">${S.orders.map((o, i) =>
       `<li><span>${opDesc(o)}</span><button data-cancel="${i}" title="Отменить">✕</button></li>`).join('') || '<li class="muted">Пока нет приказов</li>'}</ul>` + endBtn();
@@ -2779,15 +2854,16 @@ function opDesc(o) {
   const what = { attack: `${fmt(o.inf)} чел., ${o.arm} техн., ${fmt(o.sh)} снар., ${fmt(o.dr)} дронов${o.air ? ', ' + o.air + ' самол.' : ''}`,
     fort: `${fmt(o.inf)} чел.`, kab: `${fmt(o.kab)} КАБов`, strike: `${o.msl} ракет`, super: SUPER_NAME[o.side],
     heli: `${fmt(o.inf)} чел., ${o.heli} вертолётов`, naval: `${fmt(o.inf)} чел., ${o.lships} кораблей`, bek: `${o.bek} морских дронов` }[o.type];
-  return `${n.icon} ${o.type === 'super' ? SUPER_NAME[o.side] : n.name} · ${placeName(o.k)}<br><small class="muted">${what}</small>`;
+  return `${n.icon} ${o.type === 'super' ? SUPER_NAME[o.side] : n.name}${o.area ? ' по лассо' : ''} · ${placeName(o.k)}<br><small class="muted">${what}</small>`;
 }
 function updateEstimate() {
   const el = $('est'); if (!el) return;
-  const d = S.draft, op = { side: S.player, k: S.sel.k, inf: d.inf, arm: d.arm, sh: d.sh, dr: d.dr, air: d.air };
+  const d = S.draft, op = { side: S.player, k: S.sel.k, inf: d.inf, arm: d.arm, sh: d.sh, dr: d.dr, air: d.air, area: d.type === 'attack' ? S.sel.area : null };
   const e = estimate(op);
   if (!e.ok) { el.textContent = 'Нет соприкосновения с противником.'; return; }
   const r = e.r, ch = e.ch, col = ch >= .6 ? '#34d399' : ch >= .35 ? '#fbbf24' : '#f87171';
   el.innerHTML = `<b>⚔ План наступления</b>
+    ${e.info.area ? `<div class="prow"><span>Обведённый район</span><b>${fmt(e.info.size * avgCellKm2(S.sel.k))} км²</b></div>` : ''}
     <div class="prow"><span>Силы атакующих</span><b>${e.dv.att.length} див. + ${fmt(d.inf)} чел.</b></div>
     <div class="prow"><span>Силы обороняющихся</span><b>${e.dv.def.length} див. + гарнизон</b></div>
     <div class="prow"><span>Снабжение</span><b style="color:${supCol(e.q)}">${Math.round(e.q * 100)}%</b></div>
@@ -2807,6 +2883,7 @@ function bindSide() {
   b.querySelectorAll('.op input[type=range]').forEach(el => el.oninput = () => { S.draft[el.dataset.k] = +el.value; $('o_' + el.dataset.k).textContent = fmt(+el.value); updateEstimate(); if ($('opHint')) $('opHint').innerHTML = opHint(); });
   if ($('est')) updateEstimate();
   if ($('bAdd')) $('bAdd').onclick = addOrder;
+  if ($('bCLasso')) $('bCLasso').onclick = () => { S.lassoOn = !S.lassoOn; LASSO = null; renderSide(); if (S.lassoOn) toast('Обведите на карте район наступления'); };
   if ($('bSelX')) $('bSelX').onclick = () => { S.sel = null; renderSide(); requestDraw(); };
   if ($('bEnd')) $('bEnd').onclick = () => endTurn();
   b.querySelectorAll('[data-tab]').forEach(el => el.onclick = () => { S.tab = el.dataset.tab; S.dmode = ''; S.droute = null; renderSide(); requestDraw(); });
@@ -2832,7 +2909,7 @@ function addOrder() {
   const d = S.draft, k = S.sel.k, t = d.type, side = S.player;
   const c = opCheck(t, k, side); if (!c.ok) return toast(c.why);
   const op = { side, k, type: t };
-  if (t === 'attack') { if (d.inf < 300 && !opDivs(side, k).att.length) return toast('Для наступления нужно хотя бы 300 бойцов или дивизия рядом.'); Object.assign(op, { inf: d.inf, arm: d.arm, sh: d.sh, dr: d.dr, air: d.air, dir: S.sel.dir }); }
+  if (t === 'attack') { if (d.inf < 300 && !opDivs(side, k).att.length) return toast('Для наступления нужно хотя бы 300 бойцов или дивизия рядом.'); Object.assign(op, { inf: d.inf, arm: d.arm, sh: d.sh, dr: d.dr, air: d.air, dir: S.sel.dir }); if (S.sel.area) op.area = S.sel.area; }
   else if (t === 'fort') op.inf = 1500;
   else if (t === 'kab') op.kab = d.kab;
   else if (t === 'strike') op.msl = d.msl;
