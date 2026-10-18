@@ -29,8 +29,10 @@
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
   html, body { height: 100%; margin: 0; overflow: hidden; }
-  body { background: var(--bg); color: var(--ink); font: 14px/1.4 var(--body); -webkit-tap-highlight-color: transparent; }
+  body { background: #a9c4d4; color: var(--ink); font: 14px/1.4 var(--body); -webkit-tap-highlight-color: transparent; }
   canvas#map { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+  /* готовая карта: двигается и масштабируется видеокартой, без перерисовки */
+  canvas#mapc { position: fixed; left: 0; top: 0; transform-origin: 0 0; pointer-events: none; will-change: transform; }
   canvas#map.paint { cursor: crosshair; }
   button { font: inherit; color: inherit; cursor: pointer; }
   a { color: #93c5fd; }
@@ -147,6 +149,7 @@
 </style>
 </head>
 <body>
+<canvas id="mapc"></canvas>
 <canvas id="map"></canvas>
 
 <div id="top">
@@ -399,14 +402,15 @@ function initForts() {
 /* ================= Расчёт состояния ================= */
 const frontList = { 1: [], 2: [] };
 function computeFront() {
-  frontList[1] = []; frontList[2] = [];
+  const f1 = [], f2 = [];
   isFront.fill(0);
   for (let k = 0; k < N; k++) {
     const o = owner[k]; if (o !== UA && o !== RU) continue;
-    const i = k % COLS;
-    const t = (n) => { const m = owner[n]; return m !== 0 && m !== o; };
-    if ((i > 0 && t(k - 1)) || (i < COLS - 1 && t(k + 1)) || (k >= COLS && t(k - COLS)) || (k < N - COLS && t(k + COLS))) { isFront[k] = 1; frontList[o].push(k); }
+    const i = k % COLS; let m;
+    if ((i > 0 && (m = owner[k - 1]) && m !== o) || (i < COLS - 1 && (m = owner[k + 1]) && m !== o) ||
+        (k >= COLS && (m = owner[k - COLS]) && m !== o) || (k < N - COLS && (m = owner[k + COLS]) && m !== o)) { isFront[k] = 1; (o === UA ? f1 : f2).push(k); }
   }
+  frontList[1] = f1; frontList[2] = f2;
 }
 const Q = new Int32Array(N);
 function computeDist() {
@@ -415,8 +419,11 @@ function computeDist() {
   for (let k = 0; k < N; k++) if (isFront[k]) { distF[k] = 0; Q[t++] = k; }
   while (h < t) {
     const k = Q[h++], d = distF[k] + 1, i = k % COLS;
-    const go = n => { if (land(n) && distF[n] > d) { distF[n] = d; Q[t++] = n; } };
-    if (i > 0) go(k - 1); if (i < COLS - 1) go(k + 1); if (k >= COLS) go(k - COLS); if (k < N - COLS) go(k + COLS);
+    let n;
+    if (i > 0 && country[n = k - 1] && distF[n] > d) { distF[n] = d; Q[t++] = n; }
+    if (i < COLS - 1 && country[n = k + 1] && distF[n] > d) { distF[n] = d; Q[t++] = n; }
+    if (k >= COLS && country[n = k - COLS] && distF[n] > d) { distF[n] = d; Q[t++] = n; }
+    if (k < N - COLS && country[n = k + COLS] && distF[n] > d) { distF[n] = d; Q[t++] = n; }
   }
 }
 
@@ -426,37 +433,41 @@ let frontPath = new Path2D(), fortPath = { 1: new Path2D(), 2: new Path2D() };
 function buildContour() {
   let h = 0, t = 0;
   for (let k = 0; k < N; k++) {
-    const o = land(k) ? owner[k] : 0;
-    field[k] = o === UA ? 0 : (o === RU || o === GREY) ? 1 : -1;
-    if (field[k] >= 0) Q[t++] = k;
+    const o = country[k] ? owner[k] : 0;
+    const f = o === UA ? 0 : (o === RU || o === GREY) ? 1 : -1;
+    field[k] = f; if (f >= 0) Q[t++] = k;
   }
   while (h < t) { // вода и нейтральные клетки берут значение ближайшей суши — чтобы линия не шла по побережью
     const k = Q[h++], f = field[k], i = k % COLS;
-    const go = n => { if (field[n] < 0) { field[n] = f; Q[t++] = n; } };
-    if (i > 0) go(k - 1); if (i < COLS - 1) go(k + 1); if (k >= COLS) go(k - COLS); if (k < N - COLS) go(k + COLS);
+    let n;
+    if (i > 0 && field[n = k - 1] < 0) { field[n] = f; Q[t++] = n; }
+    if (i < COLS - 1 && field[n = k + 1] < 0) { field[n] = f; Q[t++] = n; }
+    if (k >= COLS && field[n = k - COLS] < 0) { field[n] = f; Q[t++] = n; }
+    if (k < N - COLS && field[n = k + COLS] < 0) { field[n] = f; Q[t++] = n; }
   }
-  const p = new Path2D();
-  const seg = (x1, y1, x2, y2) => { p.moveTo(x1, y1); p.lineTo(x2, y2); };
+  // отрезки изолинии (marching squares) в полуклетках: целые координаты удобно сшивать
+  const seg = [];
+  const add = (x1, y1, x2, y2) => seg.push(x1, y1, x2, y2);
   for (let j = 0; j < ROWS - 1; j++) for (let i = 0; i < COLS - 1; i++) {
     const k = j * COLS + i;
     const c = field[k] * 8 + field[k + 1] * 4 + field[k + COLS + 1] * 2 + field[k + COLS];
     if (c === 0 || c === 15) continue;
-    let l0 = false, l1 = false; // рисуем только там, где на суше встречаются обе стороны (иначе линии уходят в море)
-    for (const n of [k, k + 1, k + COLS, k + COLS + 1]) if (land(n) && owner[n]) { if (owner[n] === UA) l0 = true; else l1 = true; }
+    let l0 = false, l1 = false; // только там, где на суше встречаются обе стороны (иначе линии уходят в море)
+    for (const n of [k, k + 1, k + COLS, k + COLS + 1]) if (country[n] && owner[n]) { if (owner[n] === UA) l0 = true; else l1 = true; }
     if (!l0 || !l1) continue;
-    const T = [i + 1, j + .5], Rr = [i + 1.5, j + 1], B = [i + 1, j + 1.5], L = [i + .5, j + 1];
+    const Tx = 2 * i + 2, Ty = 2 * j + 1, Rx = 2 * i + 3, Ry = 2 * j + 2, Bx = 2 * i + 2, By = 2 * j + 3, Lx = 2 * i + 1, Ly = 2 * j + 2;
     switch (c) {
-      case 1: case 14: seg(...L, ...B); break;
-      case 2: case 13: seg(...B, ...Rr); break;
-      case 3: case 12: seg(...L, ...Rr); break;
-      case 4: case 11: seg(...T, ...Rr); break;
-      case 6: case 9: seg(...T, ...B); break;
-      case 7: case 8: seg(...L, ...T); break;
-      case 5: seg(...L, ...T); seg(...B, ...Rr); break;
-      case 10: seg(...L, ...B); seg(...T, ...Rr); break;
+      case 1: case 14: add(Lx, Ly, Bx, By); break;
+      case 2: case 13: add(Bx, By, Rx, Ry); break;
+      case 3: case 12: add(Lx, Ly, Rx, Ry); break;
+      case 4: case 11: add(Tx, Ty, Rx, Ry); break;
+      case 6: case 9: add(Tx, Ty, Bx, By); break;
+      case 7: case 8: add(Lx, Ly, Tx, Ty); break;
+      case 5: add(Lx, Ly, Tx, Ty); add(Bx, By, Rx, Ry); break;
+      case 10: add(Lx, Ly, Bx, By); add(Tx, Ty, Rx, Ry); break;
     }
   }
-  frontPath = p;
+  frontPath = smoothLines(seg);
   const fp = { 1: new Path2D(), 2: new Path2D() };
   for (let k = 0; k < N; k++) {
     const f = fort[k], o = owner[k]; if (!f || (o !== UA && o !== RU)) continue;
@@ -466,12 +477,63 @@ function buildContour() {
   }
   fortPath = fp;
 }
+// Сшивает отрезки в ломаные и сглаживает их (Чайкин), чтобы линия фронта шла плавно, а не лесенкой
+function smoothLines(seg) {
+  const n = seg.length / 4, key = (x, y) => x * 4096 + y, adj = new Map(), used = new Uint8Array(n);
+  for (let s = 0; s < n; s++) for (const e of [0, 2]) {
+    const kk = key(seg[s * 4 + e], seg[s * 4 + e + 1]); const l = adj.get(kk); l ? l.push(s) : adj.set(kk, [s]);
+  }
+  const walk = (s0, x, y, out) => { // идёт от точки (x, y), пока есть продолжение
+    for (;;) {
+      const l = adj.get(key(x, y)); let nx = -1;
+      if (l) for (const s of l) if (!used[s]) { nx = s; break; }
+      if (nx < 0) return;
+      used[nx] = 1;
+      const b = nx * 4, other = seg[b] === x && seg[b + 1] === y ? 2 : 0;
+      x = seg[b + other]; y = seg[b + other + 1]; out.push(x, y);
+    }
+  };
+  const p = new Path2D();
+  for (let s = 0; s < n; s++) {
+    if (used[s]) continue; used[s] = 1;
+    const b = s * 4, fwd = [seg[b], seg[b + 1], seg[b + 2], seg[b + 3]], back = [];
+    walk(s, seg[b + 2], seg[b + 3], fwd);
+    walk(s, seg[b], seg[b + 1], back);
+    let pts = [];
+    for (let i = back.length - 2; i >= 0; i -= 2) pts.push([back[i] / 2, back[i + 1] / 2]);
+    for (let i = 0; i < fwd.length; i += 2) pts.push([fwd[i] / 2, fwd[i + 1] / 2]);
+    const closed = pts.length > 3 && pts[0][0] === pts[pts.length - 1][0] && pts[0][1] === pts[pts.length - 1][1];
+    for (let it = 0; it < 2 && pts.length > 2; it++) {
+      const o = [], m = pts.length;
+      if (!closed) o.push(pts[0]);
+      for (let a = 0; a < m - 1; a++) {
+        const P0 = pts[a], P1 = pts[a + 1];
+        o.push([P0[0] * .75 + P1[0] * .25, P0[1] * .75 + P1[1] * .25], [P0[0] * .25 + P1[0] * .75, P0[1] * .25 + P1[1] * .75]);
+      }
+      if (closed) o.push(o[0]); else o.push(pts[m - 1]);
+      pts = o;
+    }
+    p.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i++) p.lineTo(pts[i][0], pts[i][1]);
+  }
+  return p;
+}
 
 const off = document.createElement('canvas'); off.width = COLS; off.height = ROWS;
 const offCtx = off.getContext('2d');
 const img = offCtx.createImageData(COLS, ROWS);
 function cellColor(k, d, cur, showCh) {
-  const c = country[k], o = owner[k], o0 = owner0[k], p = k * 4;
+  const p = k * 4;
+  if (!country[k]) { // вода у берега берёт цвет соседней суши — заливка ровно доходит до береговой линии
+    const i = k % COLS; let n = -1;
+    if (i > 0 && country[k - 1] && owner[k - 1]) n = k - 1;
+    else if (i < COLS - 1 && country[k + 1] && owner[k + 1]) n = k + 1;
+    else if (k >= COLS && country[k - COLS] && owner[k - COLS]) n = k - COLS;
+    else if (k < N - COLS && country[k + COLS] && owner[k + COLS]) n = k + COLS;
+    if (n < 0) { d[p] = d[p + 1] = d[p + 2] = d[p + 3] = 0; return; }
+    k = n;
+  }
+  const c = country[k], o = owner[k], o0 = owner0[k];
   let r = 0, g = 0, b = 0, a = 0;
   const recent = cur > 0 && changed[k] === cur;
   if (c && o) {
@@ -498,8 +560,17 @@ function paintCells(list) {
   if (!list.length) return;
   const d = img.data, cur = S ? S.turn : 0;
   let i0 = COLS, i1 = 0, j0 = ROWS, j1 = 0;
-  for (const k of list) { cellColor(k, d, cur, layers.changes); const i = k % COLS, j = (k / COLS) | 0; if (i < i0) i0 = i; if (i > i1) i1 = i; if (j < j0) j0 = j; if (j > j1) j1 = j; }
+  for (const k of list) {
+    const i = k % COLS, j = (k / COLS) | 0;
+    cellColor(k, d, cur, layers.changes);
+    if (i > 0 && !country[k - 1]) cellColor(k - 1, d, cur, layers.changes);
+    if (i < COLS - 1 && !country[k + 1]) cellColor(k + 1, d, cur, layers.changes);
+    if (k >= COLS && !country[k - COLS]) cellColor(k - COLS, d, cur, layers.changes);
+    if (k < N - COLS && !country[k + COLS]) cellColor(k + COLS, d, cur, layers.changes);
+    if (i - 1 < i0) i0 = Math.max(0, i - 1); if (i + 1 > i1) i1 = Math.min(COLS - 1, i + 1); if (j - 1 < j0) j0 = Math.max(0, j - 1); if (j + 1 > j1) j1 = Math.min(ROWS - 1, j + 1);
+  }
   offCtx.putImageData(img, 0, 0, i0, j0, i1 - i0 + 1, j1 - j0 + 1);
+  mapDirty = true;
 }
 
 let STATS = null, STATS0 = null;
@@ -517,7 +588,7 @@ function recompute(full = true) {
   if (full) computeDist();
   buildContour(); buildImage(); placeUnits();
   STATS = computeStats();
-  requestDraw();
+  invalidate();
 }
 
 /* ================= Состояние игры ================= */
@@ -1156,15 +1227,31 @@ function checkEnd(rep) {
 }
 
 /* ================= Отрисовка ================= */
-const cv = document.getElementById('map'), ctx = cv.getContext('2d');
+const cv = document.getElementById('map'); let ctx = cv.getContext('2d');
 let W = 0, H = 0, DPR = 1;
 const view = { u: U(36), v: V(48.6), z: 2.4 };
 const layers = { forts: true, cities: true, rivers: true, admin: true, changes: true, units: true, assets: true };
 let drawQueued = false;
 function requestDraw() { if (!drawQueued) { drawQueued = true; requestAnimationFrame(draw); } }
+/* Кэш карты: подложка, территории, линия фронта, города рисуются один раз в запасной холст (с полями по краям).
+   При перетаскивании и зуме кадр — это просто сдвиг/масштаб готовой картинки, а чёткая перерисовка — когда движение остановилось. */
+const cache = document.getElementById('mapc'), cctx = cache.getContext('2d');
+let overlayUsed = true, CV = null, mapDirty = true, lastInput = 0, lastRender = 0, settleT = 0, dirtyT = 0;
+const MARGIN = .18;
+function invalidate() { mapDirty = true; requestDraw(); }
+function touchInput() { lastInput = performance.now(); clearTimeout(settleT); settleT = setTimeout(requestDraw, 170); }
+function renderCache() {
+  const dpr = Math.min(DPR, 2), cw = Math.ceil(W * (1 + 2 * MARGIN)), ch = Math.ceil(H * (1 + 2 * MARGIN));
+  if (cache.width !== Math.round(cw * dpr) || cache.height !== Math.round(ch * dpr)) { cache.width = Math.round(cw * dpr); cache.height = Math.round(ch * dpr); cache.style.width = cw + 'px'; cache.style.height = ch + 'px'; }
+  const saved = [ctx, W, H, DPR];
+  ctx = cctx; W = cw; H = ch; DPR = dpr;
+  try { drawMap(); } finally { [ctx, W, H, DPR] = saved; }
+  CV = { u: view.u, v: view.v, z: view.z, cw, ch };
+  mapDirty = false; lastRender = performance.now();
+}
 function resize() {
   DPR = Math.min(2, window.devicePixelRatio || 1); W = innerWidth; H = innerHeight;
-  cv.width = W * DPR; cv.height = H * DPR; requestDraw();
+  cv.width = W * DPR; cv.height = H * DPR; invalidate();
 }
 function ringsPath(path, polys) {
   for (const poly of polys) for (const ring of poly) {
@@ -1194,6 +1281,36 @@ const sx = u => (u - view.u) * view.z + W / 2, sy = v => (v - view.v) * view.z +
 const toU = x => (x - W / 2) / view.z + view.u, toV = y => (y - H / 2) / view.z + view.v;
 function draw() {
   drawQueued = false;
+  const now = performance.now(), z = view.z, interacting = now - lastInput < 160;
+  let ok = !!CV;
+  if (ok) {
+    const s = z / CV.z, x0 = sx(CV.u) - CV.cw / 2 * s, y0 = sy(CV.v) - CV.ch / 2 * s;
+    const covered = x0 <= 1 && y0 <= 1 && x0 + CV.cw * s >= W - 1 && y0 + CV.ch * s >= H - 1, exact = Math.abs(s - 1) < 1e-9;
+    if (interacting) { if (!covered && now - lastRender > 250) ok = false; }
+    else if (!exact || !covered) ok = false;
+    else if (mapDirty) {
+      if (now - lastRender >= 90) ok = false;
+      else if (!dirtyT) dirtyT = setTimeout(() => { dirtyT = 0; requestDraw(); }, 95);
+    }
+  }
+  if (!ok) renderCache();
+  const s = z / CV.z; let x0 = sx(CV.u) - CV.cw / 2 * s, y0 = sy(CV.v) - CV.ch / 2 * s;
+  if (Math.abs(s - 1) < 1e-9) { x0 = Math.round(x0); y0 = Math.round(y0); }
+  cache.style.transform = `translate(${x0}px,${y0}px) scale(${s})`;
+  // верхний слой: только то, что движется (приказы, вспышки, лассо, атака)
+  const dyn = (S && (S.orders.length || S.sel)) || FX.length || (S && S.mode === 'editor' && (ATK || LASSO || (ED.tool === 'brush' && hoverPt)));
+  if (!dyn && !overlayUsed) return;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.clearRect(0, 0, W, H);
+  overlayUsed = !!dyn;
+  if (!dyn) return;
+  if (S) drawOrders();
+  drawFx();
+  if (S && S.mode === 'editor') drawAttack();
+  if (S && S.mode === 'editor' && ED.tool === 'brush' && hoverPt) {
+    ctx.strokeStyle = '#111'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(hoverPt.x, hoverPt.y, ED.size * z, 0, 7); ctx.stroke();
+  }
+}
+function drawMap() {
   const z = view.z;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.fillStyle = '#a9c4d4'; ctx.fillRect(0, 0, W, H);
@@ -1215,7 +1332,7 @@ function draw() {
   ctx.fillStyle = '#a9c4d4'; ctx.fill(P.lakes);
   // слой контроля территорий
   ctx.save(); ctx.clip(P.land);
-  ctx.imageSmoothingEnabled = z < 14; ctx.drawImage(off, 0, 0);
+  ctx.imageSmoothingEnabled = true; ctx.drawImage(off, 0, 0);
   ctx.restore();
   ctx.lineJoin = 'round'; ctx.lineCap = 'round';
   if (layers.admin) { ctx.strokeStyle = 'rgba(90,90,100,.45)'; ctx.lineWidth = .9 / z; ctx.setLineDash([4 / z, 3 / z]); ctx.stroke(P.adm); ctx.setLineDash([]); }
@@ -1236,13 +1353,7 @@ function draw() {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   if (layers.units && S && z >= 3.5) drawUnits();
   if (layers.assets) drawAssets();
-  if (S) drawOrders();
   if (layers.cities) drawCities();
-  drawFx();
-  if (S && S.mode === 'editor') drawAttack();
-  if (S && S.mode === 'editor' && ED.tool === 'brush' && hoverPt) {
-    ctx.strokeStyle = '#111'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(hoverPt.x, hoverPt.y, ED.size * z, 0, 7); ctx.stroke();
-  }
 }
 function drawOrders() {
   const z = view.z;
@@ -1402,6 +1513,28 @@ function zoomAt(x, y, f) {
   clampView(); requestDraw();
 }
 function clampView() { view.u = clamp(view.u, U(-25), U(66)); view.v = clamp(view.v, V(72), V(33)); }
+// Плавный зум колесом: масштаб догоняет цель за несколько кадров
+const ZA = { target: 0, x: 0, y: 0, run: false };
+function smoothZoom(x, y, f) {
+  ZA.target = clamp((ZA.run ? ZA.target : view.z) * f, .22, 60); ZA.x = x; ZA.y = y;
+  if (!ZA.run) { ZA.run = true; requestAnimationFrame(zoomStep); }
+}
+function zoomStep() {
+  const r = ZA.target / view.z;
+  touchInput();
+  if (Math.abs(r - 1) < .003) { zoomAt(ZA.x, ZA.y, r); ZA.run = false; return; }
+  zoomAt(ZA.x, ZA.y, Math.pow(r, .3));
+  requestAnimationFrame(zoomStep);
+}
+// Инерция: карта продолжает скользить после того, как отпустили
+const INR = { vx: 0, vy: 0, run: false, last: 0 };
+function inertiaStep(t) {
+  const dt = Math.min(40, t - INR.last); INR.last = t;
+  view.u -= INR.vx * dt / view.z; view.v -= INR.vy * dt / view.z; clampView();
+  const k = Math.pow(.93, dt / 16); INR.vx *= k; INR.vy *= k;
+  touchInput(); requestDraw();
+  if (Math.hypot(INR.vx, INR.vy) > .02 && INR.run) requestAnimationFrame(inertiaStep); else INR.run = false;
+}
 
 /* ================= Ввод ================= */
 const ptrs = new Map(); let drag = null, pinch = null, hoverPt = null;
@@ -1410,10 +1543,11 @@ cv.addEventListener('contextmenu', e => e.preventDefault());
 cv.addEventListener('pointerdown', e => {
   cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
   closeLayers();
+  INR.run = false; ZA.run = false;
   if (ptrs.size === 1) {
     const ed = S && S.mode === 'editor' && e.button === 0;
     const paint = ed && ED.tool === 'brush', lasso = ed && ED.tool === 'lasso' && !(ATK && ATK.phase === 'go');
-    drag = { x: e.clientX, y: e.clientY, u: view.u, v: view.v, moved: 0, paint, lasso };
+    drag = { x: e.clientX, y: e.clientY, u: view.u, v: view.v, moved: 0, paint, lasso, hist: [[e.clientX, e.clientY, performance.now()]] };
     if (paint) { stopAtk(); pushUndo(); paintAt(e.clientX, e.clientY); }
     if (lasso) { if (ATK && ATK.phase === 'choose') { ATK = null; renderSide(); } LASSO = { pts: [[toU(e.clientX), toV(e.clientY)]] }; }
   } else if (ptrs.size === 2) {
@@ -1431,7 +1565,7 @@ cv.addEventListener('pointermove', e => {
     const d = Math.hypot(a.x - b.x, a.y - b.y), cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2;
     const wu = (pinch.cx - W / 2) / pinch.z + pinch.u, wv = (pinch.cy - H / 2) / pinch.z + pinch.v;
     view.z = clamp(pinch.z * d / pinch.d, .22, 60);
-    view.u = wu - (cx - W / 2) / view.z; view.v = wv - (cy - H / 2) / view.z; clampView(); requestDraw(); return;
+    view.u = wu - (cx - W / 2) / view.z; view.v = wv - (cy - H / 2) / view.z; clampView(); touchInput(); requestDraw(); return;
   }
   if (drag) {
     drag.moved = Math.max(drag.moved, Math.hypot(e.clientX - drag.x, e.clientY - drag.y));
@@ -1441,7 +1575,8 @@ cv.addEventListener('pointermove', e => {
       if (Math.hypot(u - last[0], v - last[1]) * view.z > 4) { LASSO.pts.push([u, v]); requestDraw(); }
       return;
     }
-    view.u = drag.u - (e.clientX - drag.x) / view.z; view.v = drag.v - (e.clientY - drag.y) / view.z; clampView(); requestDraw();
+    view.u = drag.u - (e.clientX - drag.x) / view.z; view.v = drag.v - (e.clientY - drag.y) / view.z; clampView(); touchInput(); requestDraw();
+    drag.hist.push([e.clientX, e.clientY, performance.now()]); if (drag.hist.length > 6) drag.hist.shift();
     tip.style.display = 'none'; return;
   }
   if (e.pointerType === 'mouse') showTip(e.clientX, e.clientY);
@@ -1454,13 +1589,21 @@ const endPtr = e => {
     if (drag.paint) recompute();
     else if (drag.moved < 7) { LASSO = null; onTap(e.clientX, e.clientY); }
     else if (drag.lasso) finishLasso();
+    else if (!drag.paint) { // скорость за последние ~80 мс — для инерции
+      const now = performance.now(), h = drag.hist.filter(p => now - p[2] < 90);
+      if (h.length >= 2) {
+        const a = h[0], b = h[h.length - 1], dt = Math.max(8, b[2] - a[2]);
+        INR.vx = (b[0] - a[0]) / dt; INR.vy = (b[1] - a[1]) / dt;
+        if (Math.hypot(INR.vx, INR.vy) > .25) { INR.run = true; INR.last = now; requestAnimationFrame(inertiaStep); }
+      }
+    }
     drag = null;
   }
   if (ptrs.size < 2) pinch = null;
 };
 cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr);
 cv.addEventListener('pointerleave', () => { tip.style.display = 'none'; hoverPt = null; if (S && S.mode === 'editor') requestDraw(); });
-cv.addEventListener('wheel', e => { e.preventDefault(); zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * .0016)); }, { passive: false });
+cv.addEventListener('wheel', e => { e.preventDefault(); touchInput(); smoothZoom(e.clientX, e.clientY, Math.exp(-clamp(e.deltaY * (e.deltaMode === 1 ? 33 : 1), -300, 300) * .0018)); }, { passive: false });
 addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
   if (e.key === 'Enter' && S && S.mode !== 'editor' && document.getElementById('modal').hidden) endTurn();
@@ -1615,7 +1758,7 @@ function atkLoop(t) {
     const ahead = () => A.cells[Math.min(A.total - 1, A.idx + Math.floor(Math.random() * Math.min(A.per * .35, 600)))];
     if (A.weapon === 'art' && t - A.lastFx > 130) { A.lastFx = t; fxAdd('strike', ahead(), A.side); fxStart(); }
     if (A.weapon === 'fpv' && t - A.lastFx > 260) { A.lastFx = t; fxAdd('strike', ahead(), A.side); fxStart(); }
-    if (t - A.lastContour > 450) { A.lastContour = t; buildContour(); }
+    if (t - A.lastContour > 450) { A.lastContour = t; buildContour(); mapDirty = true; }
     if (A.idx >= A.waveEnd) {
       buildContour();
       if (A.idx >= A.total) {
@@ -2040,7 +2183,7 @@ async function boot() {
   $('bMenu').onclick = showMenu;
   $('bPause').onclick = () => { RT.paused = !RT.paused; renderClock(); };
   $('bLayers').onclick = () => { $('layers').hidden = !$('layers').hidden; };
-  document.querySelectorAll('#layers input').forEach(el => el.onchange = () => { layers[el.dataset.l] = el.checked; if (el.dataset.l === 'changes') buildImage(); requestDraw(); });
+  document.querySelectorAll('#layers input').forEach(el => el.onchange = () => { layers[el.dataset.l] = el.checked; if (el.dataset.l === 'changes') buildImage(); invalidate(); });
   $('grab').onclick = () => $('side').classList.toggle('min');
   // встроенный снимок сразу, чтобы карта не была пустой
   const emb = GEO.front;
@@ -2059,7 +2202,7 @@ async function boot() {
   refreshMenuSrc();
 }
 function closeLayers() { $('layers').hidden = true; }
-window.__game = { get S() { return S; }, get ATK() { return ATK; }, ASSETS, owner, country, fort, endTurn, startGame, computeStats, CITIES, cellAt, U, V, COLS, ROWS, localInfo, view, requestDraw, get STATS() { return STATS; } };
+window.__game = { get S() { return S; }, get ATK() { return ATK; }, draw, recompute, layers, touch: touchInput, invalidate, forceRender: () => { renderCache(); draw(); }, ASSETS, owner, country, fort, endTurn, startGame, computeStats, CITIES, cellAt, U, V, COLS, ROWS, localInfo, view, requestDraw, get STATS() { return STATS; } };
 boot();
 </script>
 </body>
