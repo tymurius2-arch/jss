@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PODIL DRAGONS — нерухомість і реконструкція в Києві</title>
+<meta name="description" content="Продаж квартир, будинків і комерційних площ у Києві та реконструкція будівель. Архітектор Микола Вихарєв.">
+<meta name="theme-color" content="#C8102E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%23C8102E'/%3E%3Ctext x='32' y='46' font-size='40' text-anchor='middle' fill='%23FBF5EA' font-family='serif'%3E%E9%BE%8D%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Manrope:wght@400;500;600;700&family=Playfair+Display:wght@600;700;800&display=swap">
+<link rel="stylesheet" href="styles.css">
+<script>
+  // Тема, мова і анімації застосовуються до першого малювання, щоб нічого не блимало.
+  (function () {
+    var s = {};
+    try { s = JSON.parse(localStorage.getItem("pd.settings") || "{}"); } catch (e) {}
+    var d = document.documentElement;
+    if (s.theme === "dark" || s.theme === "light") d.dataset.theme = s.theme;
+    d.dataset.motion = s.motion === "off" || (!s.motion && matchMedia("(prefers-reduced-motion: reduce)").matches) ? "off" : "on";
+    d.lang = s.lang === "en" ? "en" : "uk";
+  })();
+</script>
+</head>
+<body>
+<a class="skip" href="#app">Skip</a>
+
+<header class="topbar" id="topbar">
+  <div class="topbar-in">
+    <a class="brand" href="#/home" aria-label="PODIL DRAGONS">
+      <span class="seal" aria-hidden="true">龍</span>
+      <span class="brand-text">PODIL <b>DRAGONS</b></span>
+    </a>
+    <nav class="nav" id="nav" aria-label="Main">
+      <a href="#/home" data-route="home" data-i18n="nav.home">Головна</a>
+      <a href="#/sale" data-route="sale" data-i18n="nav.sale">Продаж</a>
+      <a href="#/reconstruction" data-route="reconstruction" data-i18n="nav.reconstruction">Реконструкція</a>
+      <a href="#/about" data-route="about" data-i18n="nav.about">Про нас</a>
+      <a href="#/contacts" data-route="contacts" data-i18n="nav.contacts">Контакти</a>
+      <a href="#/settings" data-route="settings" data-i18n="nav.settings">Налаштування</a>
+      <span class="nav-ink" id="navInk" aria-hidden="true"></span>
+      <button class="btn btn-red nav-cta" type="button" data-action="open-form" data-i18n="cta.list">Виставити об'єкт</button>
+    </nav>
+    <div class="top-actions">
+      <a class="icon-btn fav-link" href="#/sale?fav=1" data-i18n-title="nav.favorites" title="Обране">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-9.3-9.2C1.5 8 3.6 4.5 7.1 4.5c2 0 3.6 1.1 4.9 2.8 1.3-1.7 2.9-2.8 4.9-2.8 3.5 0 5.6 3.5 4.4 6.8-1.8 4.6-9.3 9.2-9.3 9.2z"/></svg>
+        <span class="badge" id="favCount" hidden>0</span>
+      </a>
+      <button class="lang-btn" id="langQuick" type="button" aria-label="Language">EN</button>
+      <button class="btn btn-red btn-sm hide-sm" type="button" data-action="open-form" data-i18n="cta.list">Виставити об'єкт</button>
+      <button class="icon-btn burger" id="burger" type="button" aria-expanded="false" aria-controls="nav" data-i18n-title="nav.menu" title="Меню">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+  <div class="meander" aria-hidden="true"></div>
+</header>
+
+<main id="app">
+
+  <!-- ГОЛОВНА -->
+  <section class="page" data-page="home">
+    <div class="hero">
+      <div class="clouds" aria-hidden="true">
+        <svg class="cloud c1" viewBox="0 0 160 60"><use href="#cloud"/></svg>
+        <svg class="cloud c2" viewBox="0 0 160 60"><use href="#cloud"/></svg>
+        <svg class="cloud c3" viewBox="0 0 160 60"><use href="#cloud"/></svg>
+        <svg class="cloud c4" viewBox="0 0 160 60"><use href="#cloud"/></svg>
+      </div>
+      <div class="couplet couplet-l" aria-hidden="true">飞龙在天</div>
+      <div class="couplet couplet-r" aria-hidden="true">安居乐业</div>
+      <div class="hero-head">
+        <p class="eyebrow reveal" data-i18n="hero.eyebrow">Нерухомість Києва · Архітектура · Реконструкція</p>
+        <h1 class="hero-title" aria-label="PODIL DRAGONS">
+          <span class="ht-line"><span>PODIL</span></span>
+          <span class="ht-line"><span>DRAGONS</span></span>
+        </h1>
+      </div>
+      <div class="dragon-wrap">
+        <svg class="dragon" id="dragon" role="img" aria-label="Red dragon"></svg>
+      </div>
+      <div class="hero-foot">
+        <p class="hero-sub reveal" data-i18n="hero.sub"></p>
+        <div class="hero-cta reveal">
+          <a class="btn btn-red" href="#/sale" data-i18n="cta.browse">Дивитись об'єкти</a>
+          <button class="btn btn-ghost" type="button" data-action="open-form" data-i18n="cta.list">Виставити об'єкт</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="strip">
+      <div class="wrap strip-in">
+        <div class="strip-item reveal"><span class="strip-ic">京</span><div><b data-i18n="strip.1"></b><span data-i18n="strip.1s"></span></div></div>
+        <div class="strip-item reveal"><span class="strip-ic">匠</span><div><b data-i18n="strip.2"></b><span data-i18n="strip.2s"></span></div></div>
+        <div class="strip-item reveal"><span class="strip-ic">家</span><div><b data-i18n="strip.3"></b><span data-i18n="strip.3s"></span></div></div>
+      </div>
+    </div>
+
+    <section class="wrap section">
+      <div class="section-head reveal">
+        <h2 data-i18n="home.featured"></h2>
+        <p data-i18n="home.featuredSub"></p>
+      </div>
+      <div class="grid" id="featured"></div>
+      <div class="center reveal"><a class="btn btn-ghost" href="#/sale" data-i18n="cta.all"></a></div>
+    </section>
+
+    <section class="wrap section why">
+      <div class="why-text reveal">
+        <h2 data-i18n="home.why"></h2>
+        <p data-i18n="home.whyText"></p>
+      </div>
+      <div class="why-cards">
+        <article class="feature reveal"><span class="feature-num">壹</span><h3 data-i18n="home.w1"></h3><p data-i18n="home.w1s"></p></article>
+        <article class="feature reveal"><span class="feature-num">贰</span><h3 data-i18n="home.w2"></h3><p data-i18n="home.w2s"></p></article>
+        <article class="feature reveal"><span class="feature-num">叁</span><h3 data-i18n="home.w3"></h3><p data-i18n="home.w3s"></p></article>
+      </div>
+    </section>
+
+    <section class="quote-band">
+      <div class="wrap quote-in reveal">
+        <span class="quote-mark" aria-hidden="true">“</span>
+        <blockquote data-i18n="home.quote"></blockquote>
+        <cite data-i18n="home.quoteBy"></cite>
+      </div>
+    </section>
+
+    <section class="wrap section">
+      <div class="cta-card reveal">
+        <div>
+          <h2 data-i18n="home.ctaTitle"></h2>
+          <p data-i18n="home.ctaText"></p>
+        </div>
+        <button class="btn btn-paper" type="button" data-action="open-form" data-i18n="cta.list"></button>
+        <span class="cta-glyph" aria-hidden="true">售</span>
+      </div>
+    </section>
+  </section>
+
+  <!-- ПРОДАЖ -->
+  <section class="page" data-page="sale" hidden>
+    <div class="page-hero">
+      <div class="wrap">
+        <h1 class="reveal" data-i18n="sale.title"></h1>
+        <p class="reveal" data-i18n="sale.sub"></p>
+      </div>
+      <span class="page-glyph" aria-hidden="true">售</span>
+    </div>
+    <div class="wrap">
+      <div class="type-tabs reveal" id="typeTabs" role="tablist"></div>
+      <form class="filters reveal" id="filters" autocomplete="off">
+        <label class="f-search">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+          <input type="search" name="q" data-i18n-ph="f.search">
+        </label>
+        <label><span data-i18n="f.district"></span><select name="district" id="fDistrict"></select></label>
+        <label><span data-i18n="f.priceMin"></span><input type="number" name="pmin" min="0" step="1000" inputmode="numeric"></label>
+        <label><span data-i18n="f.priceMax"></span><input type="number" name="pmax" min="0" step="1000" inputmode="numeric"></label>
+        <label><span data-i18n="f.areaMin"></span><input type="number" name="amin" min="0" inputmode="numeric"></label>
+        <label><span data-i18n="f.rooms"></span>
+          <select name="rooms"><option value="" data-i18n="f.any"></option><option>1</option><option>2</option><option>3</option><option value="4">4+</option></select>
+        </label>
+        <label><span data-i18n="f.sort"></span>
+          <select name="sort">
+            <option value="new" data-i18n="sort.new"></option>
+            <option value="pa" data-i18n="sort.priceAsc"></option>
+            <option value="pd" data-i18n="sort.priceDesc"></option>
+            <option value="area" data-i18n="sort.area"></option>
+          </select>
+        </label>
+        <label class="check"><input type="checkbox" name="fav"><span data-i18n="f.onlyFav"></span></label>
+        <button class="btn btn-ghost btn-sm" type="reset" data-i18n="f.reset"></button>
+      </form>
+      <div class="results-bar">
+        <p id="found" aria-live="polite"></p>
+        <button class="btn btn-red btn-sm" type="button" data-action="open-form" data-i18n="cta.list"></button>
+      </div>
+      <div class="grid" id="listings"></div>
+      <div class="empty" id="empty" hidden>
+        <span class="empty-glyph" aria-hidden="true">空</span>
+        <h3 data-i18n="sale.empty"></h3>
+        <p data-i18n="sale.emptyHint"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- РЕКОНСТРУКЦІЯ -->
+  <section class="page" data-page="reconstruction" hidden>
+    <div class="page-hero">
+      <div class="wrap">
+        <h1 class="reveal" data-i18n="rec.title"></h1>
+        <p class="reveal lead" data-i18n="rec.sub"></p>
+      </div>
+      <span class="page-glyph" aria-hidden="true">建</span>
+    </div>
+    <div class="wrap section">
+      <div class="services">
+        <article class="service reveal"><svg viewBox="0 0 48 48"><use href="#ic-survey"/></svg><h3 data-i18n="rec.s1"></h3><p data-i18n="rec.s1s"></p></article>
+        <article class="service reveal"><svg viewBox="0 0 48 48"><use href="#ic-concept"/></svg><h3 data-i18n="rec.s2"></h3><p data-i18n="rec.s2s"></p></article>
+        <article class="service reveal"><svg viewBox="0 0 48 48"><use href="#ic-docs"/></svg><h3 data-i18n="rec.s3"></h3><p data-i18n="rec.s3s"></p></article>
+        <article class="service reveal"><svg viewBox="0 0 48 48"><use href="#ic-stamp"/></svg><h3 data-i18n="rec.s4"></h3><p data-i18n="rec.s4s"></p></article>
+        <article class="service reveal"><svg viewBox="0 0 48 48"><use href="#ic-eye"/></svg><h3 data-i18n="rec.s5"></h3><p data-i18n="rec.s5s"></p></article>
+        <article class="service reveal"><svg viewBox="0 0 48 48"><use href="#ic-facade"/></svg><h3 data-i18n="rec.s6"></h3><p data-i18n="rec.s6s"></p></article>
+      </div>
+    </div>
+    <div class="wrap section">
+      <h2 class="reveal" data-i18n="rec.process"></h2>
+      <ol class="steps">
+        <li class="reveal"><b data-i18n="rec.p1"></b><span data-i18n="rec.p1s"></span></li>
+        <li class="reveal"><b data-i18n="rec.p2"></b><span data-i18n="rec.p2s"></span></li>
+        <li class="reveal"><b data-i18n="rec.p3"></b><span data-i18n="rec.p3s"></span></li>
+        <li class="reveal"><b data-i18n="rec.p4"></b><span data-i18n="rec.p4s"></span></li>
+        <li class="reveal"><b data-i18n="rec.p5"></b><span data-i18n="rec.p5s"></span></li>
+      </ol>
+    </div>
+    <div class="wrap section">
+      <div class="cta-card reveal">
+        <div><h2 data-i18n="rec.buy"></h2><p data-i18n="rec.buyText"></p></div>
+        <a class="btn btn-paper" href="#/contacts" data-i18n="cta.consult"></a>
+        <span class="cta-glyph" aria-hidden="true">匠</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ПРО НАС -->
+  <section class="page" data-page="about" hidden>
+    <div class="page-hero">
+      <div class="wrap">
+        <h1 class="reveal" data-i18n="about.title"></h1>
+      </div>
+      <span class="page-glyph" aria-hidden="true">龍</span>
+    </div>
+    <div class="wrap section about">
+      <div class="portrait reveal">
+        <div class="portrait-seal"><span>М</span><span>建</span><span>築</span><span>В</span></div>
+        <div class="portrait-cap">
+          <b data-i18n="about.name"></b>
+          <span data-i18n="about.role"></span>
+        </div>
+      </div>
+      <div class="about-text">
+        <p class="lead reveal" data-i18n="about.p1"></p>
+        <p class="reveal" data-i18n="about.p2"></p>
+        <p class="reveal" data-i18n="about.p3"></p>
+        <h2 class="reveal" data-i18n="about.projects"></h2>
+        <article class="project reveal">
+          <svg viewBox="0 0 120 80" aria-hidden="true"><use href="#ic-tower"/></svg>
+          <div><h3 data-i18n="about.kp"></h3><p data-i18n="about.kpS"></p></div>
+        </article>
+      </div>
+    </div>
+    <div class="wrap section">
+      <h2 class="reveal" data-i18n="about.values"></h2>
+      <div class="why-cards three">
+        <article class="feature reveal"><span class="feature-num">诚</span><h3 data-i18n="about.v1"></h3><p data-i18n="about.v1s"></p></article>
+        <article class="feature reveal"><span class="feature-num">城</span><h3 data-i18n="about.v2"></h3><p data-i18n="about.v2s"></p></article>
+        <article class="feature reveal"><span class="feature-num">精</span><h3 data-i18n="about.v3"></h3><p data-i18n="about.v3s"></p></article>
+      </div>
+    </div>
+  </section>
+
+  <!-- КОНТАКТИ -->
+  <section class="page" data-page="contacts" hidden>
+    <div class="page-hero">
+      <div class="wrap">
+        <h1 class="reveal" data-i18n="contacts.title"></h1>
+        <p class="reveal" data-i18n="contacts.sub"></p>
+      </div>
+      <span class="page-glyph" aria-hidden="true">信</span>
+    </div>
+    <div class="wrap section contacts">
+      <div class="contact-list">
+        <a class="contact-item reveal" id="cPhone" href="#"><svg viewBox="0 0 24 24"><use href="#ic-phone"/></svg><div><span data-i18n="contacts.phone"></span><b></b></div></a>
+        <a class="contact-item reveal" id="cEmail" href="#"><svg viewBox="0 0 24 24"><use href="#ic-mail"/></svg><div><span data-i18n="contacts.email"></span><b></b></div></a>
+        <div class="contact-item reveal"><svg viewBox="0 0 24 24"><use href="#ic-pin"/></svg><div><span data-i18n="contacts.address"></span><b data-i18n="contacts.addressV"></b></div></div>
+        <div class="contact-item reveal"><svg viewBox="0 0 24 24"><use href="#ic-clock"/></svg><div><span data-i18n="contacts.hours"></span><b data-i18n="contacts.hoursV"></b></div></div>
+      </div>
+      <form class="card-form reveal" id="contactForm">
+        <h2 data-i18n="contacts.form"></h2>
+        <label><span data-i18n="contacts.name"></span><input name="name" required maxlength="80"></label>
+        <label><span data-i18n="contacts.phoneF"></span><input name="reach" required maxlength="80"></label>
+        <label><span data-i18n="contacts.topic"></span>
+          <select name="topic">
+            <option data-i18n="contacts.t1"></option><option data-i18n="contacts.t2"></option>
+            <option data-i18n="contacts.t3"></option><option data-i18n="contacts.t4"></option>
+          </select>
+        </label>
+        <label><span data-i18n="contacts.msg"></span><textarea name="msg" rows="5" maxlength="2000"></textarea></label>
+        <button class="btn btn-red" type="submit" data-i18n="contacts.send"></button>
+      </form>
+    </div>
+  </section>
+
+  <!-- НАЛАШТУВАННЯ -->
+  <section class="page" data-page="settings" hidden>
+    <div class="page-hero">
+      <div class="wrap">
+        <h1 class="reveal" data-i18n="set.title"></h1>
+        <p class="reveal" data-i18n="set.sub"></p>
+      </div>
+      <span class="page-glyph" aria-hidden="true">設</span>
+    </div>
+    <div class="wrap section settings">
+      <div class="set-row reveal">
+        <div><h3 data-i18n="set.lang"></h3><p data-i18n="set.langS"></p></div>
+        <div class="seg" data-setting="lang">
+          <button type="button" data-value="uk">Українська</button>
+          <button type="button" data-value="en">English</button>
+        </div>
+      </div>
+      <div class="set-row reveal">
+        <div><h3 data-i18n="set.currency"></h3><p data-i18n="set.currencyS"></p></div>
+        <div class="set-col">
+          <div class="seg" data-setting="currency">
+            <button type="button" data-value="USD">$ USD</button>
+            <button type="button" data-value="UAH">₴ UAH</button>
+            <button type="button" data-value="EUR">€ EUR</button>
+          </div>
+          <div class="rates">
+            <label><span data-i18n="set.rate"></span><input type="number" id="rateUah" min="1" step="0.01"> ₴</label>
+            <label><span data-i18n="set.rateEur"></span><input type="number" id="rateEur" min="0.1" step="0.01"> $</label>
+          </div>
+        </div>
+      </div>
+      <div class="set-row reveal">
+        <div><h3 data-i18n="set.theme"></h3><p data-i18n="set.themeS"></p></div>
+        <div class="seg" data-setting="theme">
+          <button type="button" data-value="light" data-i18n="set.light"></button>
+          <button type="button" data-value="dark" data-i18n="set.dark"></button>
+          <button type="button" data-value="auto" data-i18n="set.auto"></button>
+        </div>
+      </div>
+      <div class="set-row reveal">
+        <div><h3 data-i18n="set.motion"></h3><p data-i18n="set.motionS"></p></div>
+        <div class="seg" data-setting="motion">
+          <button type="button" data-value="on" data-i18n="set.on"></button>
+          <button type="button" data-value="off" data-i18n="set.off"></button>
+        </div>
+      </div>
+      <div class="set-row reveal">
+        <div><h3 data-i18n="set.demo"></h3><p data-i18n="set.demoS"></p></div>
+        <div class="seg" data-setting="demo">
+          <button type="button" data-value="on" data-i18n="set.on"></button>
+          <button type="button" data-value="off" data-i18n="set.off"></button>
+        </div>
+      </div>
+      <div class="set-row reveal">
+        <div><h3 data-i18n="set.data"></h3><p data-i18n="set.dataS"></p></div>
+        <div class="set-btns">
+          <button class="btn btn-ghost btn-sm" type="button" id="clearFav" data-i18n="set.clearFav"></button>
+          <button class="btn btn-ghost btn-sm danger" type="button" id="clearMine" data-i18n="set.clearMine"></button>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="meander" aria-hidden="true"></div>
+  <div class="wrap footer-in">
+    <div class="footer-brand">
+      <span class="seal seal-lg" aria-hidden="true">龍</span>
+      <div><b>PODIL DRAGONS</b><span data-i18n="footer.tag"></span></div>
+    </div>
+    <nav class="footer-nav">
+      <a href="#/sale" data-i18n="nav.sale"></a>
+      <a href="#/reconstruction" data-i18n="nav.reconstruction"></a>
+      <a href="#/about" data-i18n="nav.about"></a>
+      <a href="#/contacts" data-i18n="nav.contacts"></a>
+      <a href="#/settings" data-i18n="nav.settings"></a>
+    </nav>
+    <div class="footer-meta">
+      <span>© <span id="year"></span> PODIL DRAGONS. <span data-i18n="footer.rights"></span></span>
+      <button class="link-btn" type="button" id="toTop" data-i18n="footer.top"></button>
+    </div>
+  </div>
+</footer>
+
+<!-- Вікно оголошення -->
+<div class="modal" id="detail" hidden>
+  <div class="modal-back" data-close></div>
+  <div class="modal-card modal-wide" role="dialog" aria-modal="true" aria-labelledby="dTitle">
+    <button class="icon-btn modal-x" type="button" data-close data-i18n-title="d.close" title="Закрити">✕</button>
+    <div class="detail" id="detailBody"></div>
+  </div>
+</div>
+
+<!-- Форма нового оголошення -->
+<div class="modal" id="formModal" hidden>
+  <div class="modal-back" data-close></div>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="fTitle">
+    <button class="icon-btn modal-x" type="button" data-close data-i18n-title="d.close" title="Закрити">✕</button>
+    <form id="listForm" class="list-form" novalidate>
+      <h2 id="fTitle" data-i18n="form.title"></h2>
+      <p class="muted" data-i18n="form.sub"></p>
+      <fieldset class="type-pick">
+        <legend data-i18n="form.type"></legend>
+        <label><input type="radio" name="type" value="apartment" checked><span><svg viewBox="0 0 48 48"><use href="#ic-apartment"/></svg><b data-i18n="type.apartment"></b></span></label>
+        <label><input type="radio" name="type" value="house"><span><svg viewBox="0 0 48 48"><use href="#ic-house"/></svg><b data-i18n="type.house"></b></span></label>
+        <label><input type="radio" name="type" value="commercial"><span><svg viewBox="0 0 48 48"><use href="#ic-commercial"/></svg><b data-i18n="type.commercial"></b></span></label>
+      </fieldset>
+      <label class="full"><span data-i18n="form.name"></span><input name="title" required maxlength="120" data-i18n-ph="form.namePh"></label>
+      <div class="row2">
+        <label><span data-i18n="form.district"></span><select name="district" id="formDistrict" required></select></label>
+        <label><span data-i18n="form.address"></span><input name="address" maxlength="120" data-i18n-ph="form.addressPh"></label>
+      </div>
+      <div class="row3">
+        <label><span data-i18n="form.price"></span><input name="price" type="number" min="1" required inputmode="numeric"></label>
+        <label><span data-i18n="form.area"></span><input name="area" type="number" min="1" step="0.1" required inputmode="decimal"></label>
+        <label class="rooms-field"><span data-i18n="form.rooms"></span><input name="rooms" type="number" min="1" max="30" inputmode="numeric"></label>
+      </div>
+      <div class="row3">
+        <label class="floor-field"><span data-i18n="form.floor"></span><input name="floor" type="number" min="-2" max="100" inputmode="numeric"></label>
+        <label><span data-i18n="form.floors"></span><input name="floors" type="number" min="1" max="100" inputmode="numeric"></label>
+        <label><span data-i18n="form.year"></span><input name="year" type="number" min="1700" max="2100" inputmode="numeric"></label>
+      </div>
+      <label class="full"><span data-i18n="form.desc"></span><textarea name="desc" rows="4" maxlength="3000" data-i18n-ph="form.descPh"></textarea></label>
+      <div class="full">
+        <span class="label-text" data-i18n="form.photos"></span>
+        <label class="drop" id="drop">
+          <input type="file" accept="image/*" multiple id="photoInput">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16l4-4 3 3 5-5 4 4M4 20h16M12 4v8M8 8l4-4 4 4"/></svg>
+          <span data-i18n="form.photosHint"></span>
+        </label>
+        <div class="thumbs" id="thumbs"></div>
+      </div>
+      <div class="row2">
+        <label><span data-i18n="form.contactName"></span><input name="contact" required maxlength="80" autocomplete="name"></label>
+        <label><span data-i18n="form.phone"></span><input name="phone" type="tel" required maxlength="30" autocomplete="tel" placeholder="+380"></label>
+      </div>
+      <label class="check full"><input type="checkbox" name="kyiv" required><span data-i18n="form.kyiv"></span></label>
+      <p class="form-err" id="formErr" role="alert"></p>
+      <div class="form-actions">
+        <button class="btn btn-ghost" type="button" data-close data-i18n="form.cancel"></button>
+        <button class="btn btn-red" type="submit" data-i18n="form.submit"></button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="page-curtain" aria-hidden="true"></div>
+
+<!-- Іконки і візерунки -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="cloud" viewBox="0 0 160 60">
+      <path fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"
+        d="M8 52 H152 M26 52 a18 18 0 1 1 26 -16 a16 16 0 1 1 30 -10 a18 18 0 1 1 32 12 a14 14 0 1 1 22 14 M44 40 a8 8 0 1 0 -8 -8 M88 28 a8 8 0 1 0 -6 -10 M118 40 a7 7 0 1 1 6 -10"/>
+    </symbol>
+    <symbol id="ic-apartment" viewBox="0 0 48 48"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" d="M10 42V8h20v34M30 18h8v24M6 42h36M15 14h4M21 14h4M15 21h4M21 21h4M15 28h4M21 28h4M17 42v-7h6v7M33 24h2M33 30h2M33 36h2"/></symbol>
+    <symbol id="ic-house" viewBox="0 0 48 48"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" d="M4 22L24 7l20 15M8 19v23h32V19M20 42V30h8v12M4 42h40M6 22c6 0 10-2 18-9 8 7 12 9 18 9"/></symbol>
+    <symbol id="ic-commercial" viewBox="0 0 48 48"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" d="M6 18l4-10h28l4 10M6 18c0 3 2 5 6 5s6-2 6-5c0 3 2 5 6 5s6-2 6-5c0 3 2 5 6 5s6-2 6-5M9 23v19h30V23M14 42V30h8v12M27 30h7v6h-7zM4 42h40"/></symbol>
+    <symbol id="ic-survey" viewBox="0 0 48 48"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" d="M8 40V12l12-6 12 6v8M8 40h16M14 16h0M14 24h0M14 32h0"/><circle cx="32" cy="30" r="8" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M38 36l6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
+    <symbol id="ic-concept" viewBox="0 0 48 48"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" d="M6 40L30 8l6 4L12 44l-7 1zM26 14l6 4M38 30h6M38 38h6M30 44h14"/></symbol>
+    <symbol id="ic-docs" viewBox="0 0 48 48"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" d="M10 4h20l8 8v32H10zM30 4v8h8M16 20h16M16 27h16M16 34h10"/></symbol>
+    <symbol id="ic-stamp" viewBox="0 0 48 48"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" d="M18 6h12v8c0 4 6 6 6 12H12c0-6 6-8 6-12zM8 26h32v8H8zM8 42h32"/></symbol>
+    <symbol id="ic-eye" viewBox="0 0 48 48"><path fill="none" stroke="currentColor" stroke-width="2.4" d="M4 24s8-14 20-14 20 14 20 14-8 14-20 14S4 24 4 24z"/><circle cx="24" cy="24" r="6" fill="none" stroke="currentColor" stroke-width="2.4"/></symbol>
+    <symbol id="ic-facade" viewBox="0 0 48 48"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" d="M4 16L24 6l20 10M8 16h32M8 42h32M4 46h40M11 20v18M19 20v18M29 20v18M37 20v18"/></symbol>
+    <symbol id="ic-tower" viewBox="0 0 120 80"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M4 76h112M18 76V36h22v40M40 76V14h40v62M80 76V30h22v46M48 22h24M48 30h24M48 38h24M48 46h24M48 54h24M48 62h24M24 44h10M24 52h10M24 60h10M86 38h10M86 46h10M86 54h10M86 62h10M56 76v-8h8v8M60 14V6"/></symbol>
+    <symbol id="ic-phone" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M5 3h4l2 5-2.5 1.5a11 11 0 0 0 6 6L16 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 5a2 2 0 0 1 2-2"/></symbol>
+    <symbol id="ic-mail" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M3 5h18v14H3zM3 6l9 7 9-7"/></symbol>
+    <symbol id="ic-pin" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" d="M12 22s-7-7-7-12a7 7 0 0 1 14 0c0 5-7 12-7 12z"/><circle cx="12" cy="10" r="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+    <symbol id="ic-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M12 7v5l3 2"/></symbol>
+  </defs>
+</svg>
+
+<script src="i18n.js"></script>
+<script src="dragon.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
