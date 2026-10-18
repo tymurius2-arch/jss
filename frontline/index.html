@@ -79,10 +79,17 @@
   .tabs button.on { background: #24324a; border-color: #4b6a9b; }
   .tabs.grid { display: grid; grid-template-columns: 1fr 1fr; }
   .tabs.grid3 { display: grid; grid-template-columns: 1fr 1.25fr 1.15fr; }
+  .tabs.grid4 { display: grid; grid-template-columns: 1fr 1fr; }
+  .pbar { display: grid; grid-template-columns: 112px 1fr 40px; gap: 8px; align-items: center; font-size: 12.5px; margin: 4px 0; }
+  .pbar i { display: block; height: 7px; border-radius: 4px; background: #2a3546; overflow: hidden; } .pbar i b { display: block; height: 100%; border-radius: 4px; }
+  .tgt { display: grid; grid-template-columns: 26px 1fr auto; gap: 8px; align-items: center; padding: 7px 8px; border: 1px solid var(--line); border-radius: 10px; margin: 5px 0; background: var(--panel-2); }
+  .tgt small { display: block; color: var(--muted); } .tgt.off { opacity: .55; } .tgt .ic { font-size: 17px; text-align: center; }
   .drow { display: flex; gap: 10px; align-items: center; text-align: left; width: 100%; padding: 7px 8px; margin-bottom: 5px; border-radius: 9px; border: 1px solid var(--line); background: var(--panel-2); }
   .drow small { display: block; color: var(--muted); font-size: 11.5px; }
   .op .drow { border: 0; background: none; padding: 0; margin-bottom: 8px; }
   svg.nato { width: 34px; height: 34px; flex: none; }
+  .ammo { display: flex; gap: 5px; flex-wrap: wrap; } .ammo i { width: 18px; height: 8px; border-radius: 4px; background: #2a3546; } .ammo i.on { background: #facc15; }
+  .modes button b svg.nato { width: 22px; height: 22px; vertical-align: middle; }
   .tools button svg.nato { width: 22px; height: 22px; vertical-align: middle; }
   label.bar { display: block; font-size: 12.5px; margin: 6px 0; }
   label.bar progress { display: block; width: 100%; height: 8px; accent-color: #60a5fa; }
@@ -225,7 +232,7 @@
   <span class="sw" style="background:#5e5650"></span>Серая зона<br>
   <span class="sw" style="background:#2a56a8"></span>Отбито ВСУ за игру<br>
   <span class="sw" style="background:#b01a18"></span>Занято РФ за игру<br>
-  ✈ аэродром · ⚓ порт · ● войска
+  ✈ аэродром · ⚓ порт · ● войска<br>⬡ заводы, НПЗ, арсеналы, ТЭС
 </div>
 <div id="credit">Линия фронта: <a href="https://deepstatemap.live" target="_blank" rel="noopener">DeepStateMAP.live</a> <span id="credDate"></span> · Карта: Natural Earth</div>
 
@@ -331,7 +338,40 @@ const ASSETS = [
   ['port', 'Бердянск', 46.75, 36.8], ['port', 'Мариуполь', 47.08, 37.56], ['port', 'Ейск', 46.71, 38.27], ['port', 'Таганрог', 47.2, 38.95],
   ['port', 'Одесса', 46.49, 30.74], ['port', 'Черноморск', 46.3, 30.66], ['port', 'Южный', 46.62, 31.02], ['port', 'Николаев', 46.95, 31.99],
   ['port', 'Очаков', 46.61, 31.54], ['port', 'Херсон', 46.63, 32.6],
-].map(([type, name, lat, lon], id) => ({ id, type, name, lat, lon, u: U(lon), v: V(lat), k: cellAt(U(lon), V(lat)) }));
+  // Стратегические объекты в глубине: заводы, НПЗ, арсеналы, ТЭС. [тип, название, широта, долгота, чей, вес]
+  ['tankf', 'Брянск', 53.25, 34.35, 2, 1], ['tankf', 'Арзамас', 55.39, 43.84, 2, 1], ['tankf', 'Санкт-Петербург', 59.85, 30.42, 2, 1], ['tankf', 'Ростов-на-Дону', 47.26, 39.65, 2, .7],
+  ['ammo', 'Котовск', 52.59, 41.51, 2, 1], ['ammo', 'Дзержинск', 56.24, 43.4, 2, 1], ['ammo', 'Казань', 55.85, 49.08, 2, 1], ['ammo', 'Новомосковск', 54.03, 38.29, 2, .7],
+  ['drone', 'Таганрог', 47.23, 38.87, 2, 1], ['drone', 'Ступино', 54.9, 38.08, 2, 1], ['drone', 'Курск', 51.71, 36.12, 2, .6],
+  ['npz', 'Рязань', 54.6, 39.8, 2, 1], ['npz', 'Саратов', 51.5, 46.0, 2, 1], ['npz', 'Волгоград', 48.5, 44.5, 2, 1], ['npz', 'Туапсе', 44.1, 39.08, 2, 1],
+  ['npz', 'Новошахтинск', 47.8, 39.9, 2, .7], ['npz', 'Афипский', 44.9, 38.8, 2, .8], ['npz', 'Кстово', 56.15, 44.2, 2, 1], ['npz', 'Ярославль', 57.56, 39.8, 2, 1],
+  ['depot', 'Торопец', 56.48, 31.6, 2, 1], ['depot', 'Тихорецк', 45.85, 40.12, 2, 1], ['depot', 'Котлубань', 49.0, 44.1, 2, 1], ['depot', 'Джанкой', 45.72, 34.38, 2, .8], ['depot', 'Луганск', 48.57, 39.3, 2, .8],
+  ['power', 'Новочеркасск', 47.4, 40.2, 2, 1], ['power', 'Шатура', 55.58, 39.55, 2, 1], ['power', 'Кашира', 54.85, 38.25, 2, 1],
+  ['tankf', 'Харьков', 49.95, 36.38, 1, 1], ['tankf', 'Житомир', 50.27, 28.67, 1, 1], ['tankf', 'Львов', 49.84, 24.0, 1, 1], ['tankf', 'Киев', 50.47, 30.6, 1, 1],
+  ['ammo', 'Шостка', 51.86, 33.48, 1, 1], ['ammo', 'Павлоград', 48.52, 35.88, 1, 1], ['ammo', 'Киев', 50.42, 30.45, 1, 1],
+  ['drone', 'Киев', 50.38, 30.52, 1, 1], ['drone', 'Днепр', 48.44, 35.0, 1, 1], ['drone', 'Львов', 49.8, 24.06, 1, 1], ['drone', 'Винница', 49.23, 28.5, 1, .7],
+  ['npz', 'Кременчуг', 49.08, 33.42, 1, 1], ['npz', 'Шебелинка', 49.43, 36.52, 1, .8], ['npz', 'Дрогобыч', 49.35, 23.5, 1, .6],
+  ['depot', 'Калиновка', 49.45, 28.52, 1, 1], ['depot', 'Балаклея', 49.45, 36.85, 1, .8], ['depot', 'Павлоград', 48.55, 35.85, 1, .8], ['depot', 'Ичня', 50.86, 32.39, 1, .8],
+  ['power', 'Бурштын', 49.2, 24.66, 1, 1], ['power', 'Триполье', 50.12, 30.75, 1, 1], ['power', 'Змиев', 49.59, 36.35, 1, 1], ['power', 'Ладыжин', 48.68, 29.25, 1, 1],
+].map(([type, name, lat, lon, home, w], id) => ({ id, type, name, lat, lon, home: home || 0, w: w || 0, u: U(lon), v: V(lat), k: cellAt(U(lon), V(lat)) }));
+const STRAT = {
+  tankf: { n: 'Бронетанковый завод', ic: '🏭', what: 'танки и БМП: пополнение танковых и механизированных дивизий' },
+  ammo: { n: 'Завод боеприпасов', ic: '💣', what: 'снаряды и боеспособность дивизий' },
+  drone: { n: 'Завод дронов', ic: '🛸', what: 'FPV и ударные дроны' },
+  npz: { n: 'НПЗ', ic: '🛢️', what: 'топливо: сила танков в бою и доход' },
+  depot: { n: 'Арсенал', ic: '📦', what: 'склады: удар сразу уничтожает запасы и бьёт по дивизиям в 150 км' },
+  power: { n: 'ТЭС', ic: '⚡️', what: 'энергетика: всё производство и доход' },
+};
+const isStrat = a => !!STRAT[a.type];
+const assetLabel = a => a.type === 'air' ? 'аэродром' : a.type === 'port' ? 'порт' : STRAT[a.type].n;
+// доля работающих объектов этого типа у стороны (свои, не выведенные из строя и не захваченные), 0…1
+function prod(side, type) {
+  if (!S || !S.off) return 1;
+  let tot = 0, ok = 0;
+  for (const a of ASSETS) if (a.type === type && a.home === side) { tot += a.w; if (a.k >= 0 && owner[a.k] === side && !assetOff(a)) ok += a.w; }
+  return tot ? ok / tot : 1;
+}
+const powerMul = side => .7 + .3 * prod(side, 'power');
+const fuelMul = side => .45 + .55 * prod(side, 'npz');
 
 /* ================= Растеризация ================= */
 function rasterPolys(polys, cb) {
@@ -700,12 +740,12 @@ function refreshMenuSrc() {
 }
 const DIFF = { easy: { p: 1.15, ai: .78, name: 'Лёгкая' }, normal: { p: 1, ai: 1, name: 'Обычная' }, hard: { p: .92, ai: 1.3, name: 'Тяжёлая' } };
 const INCOME = {
-  1: { p: 4500, arm: 20, sh: 42000, dr: 16000, air: 1, heli: 1, kab: 25, msl: 12, bek: 6 },
-  2: { p: 7000, arm: 45, sh: 65000, dr: 12000, air: 2, heli: 2, kab: 140, msl: 22, bek: 1 },
+  1: { p: 4500, arm: 20, sh: 42000, dr: 16000, air: 1, heli: 1, kab: 25, msl: 18, bek: 6 },
+  2: { p: 7000, arm: 45, sh: 65000, dr: 12000, air: 2, heli: 2, kab: 140, msl: 26, bek: 1 },
 };
 function newSide(s) {
   return s === UA
-    ? { gar: 300000, res: 26000, arm: 140, sh: 140000, dr: 50000, air: 30, heli: 24, kab: 60, msl: 40, ships: 2, lships: 1, bek: 25, superCd: 0, morale: 1, lossP: 0, lossA: 0, km: 0, gold: 500, econ: 0, dord: 0, mob: 0, sanc: 0 }
+    ? { gar: 300000, res: 26000, arm: 140, sh: 140000, dr: 50000, air: 30, heli: 24, kab: 60, msl: 60, ships: 2, lships: 1, bek: 25, superCd: 0, morale: 1, lossP: 0, lossA: 0, km: 0, gold: 500, econ: 0, dord: 0, mob: 0, sanc: 0 }
     : { gar: 420000, res: 42000, arm: 280, sh: 260000, dr: 36000, air: 70, heli: 60, kab: 500, msl: 90, ships: 14, lships: 5, bek: 4, superCd: 0, morale: 1, lossP: 0, lossA: 0, km: 0, gold: 700, econ: 0, dord: 0, mob: 0, sanc: 0 };
 }
 function startGame(mode, player, keepMap) {
@@ -718,15 +758,15 @@ function startGame(mode, player, keepMap) {
     mode, player, diff: MS.diff,
     turn: 0, date: +FRONT.date, sides: { 1: newSide(1), 2: newSide(2) },
     orders: [], aiOrders: [], log: [], sel: null, draft: null, over: false, threat: { 1: [], 2: [] }, obj: null,
-    off: {}, soft: [], scen: FRONT.name || '', rt: mode === 'editor' ? 0 : MS.rt,
+    off: {}, soft: [], scen: FRONT.name || '', rt: mode === 'editor' || mode === 'op' ? 0 : MS.rt,
   };
   pickObjectives();
   S.divs = { 1: [], 2: [] }; S.divId = 1; S.sbu = []; S.tab = 'orders'; S.dsel = null; S.dmode = ''; S.droute = null; S.pockets = { 1: [], 2: [] };
-  if (mode !== 'editor') { supDirty = true; computeFront(); for (const sd of [UA, RU]) startDivs(sd); }
+  if (mode === 'campaign' || mode === 'sim') { supDirty = true; computeFront(); for (const sd of [UA, RU]) startDivs(sd); }
   RT.acc = 0; RT.paused = false;
   recompute();
   STATS0 = STATS;
-  addLog(0, mode === 'editor' ? 'Свободный режим: обведите область лассо.' :
+  if (mode !== 'op') addLog(0, mode === 'editor' ? 'Свободный режим: обведите область лассо.' :
     `Старт: ${FRONT.name ? FRONT.name : FRONT.src === 'hist' ? 'архивная линия фронта DeepState на ' + dateStr(FRONT.date) : 'линия фронта DeepState на ' + dateStr(FRONT.date)}. ${mode === 'sim' ? 'ИИ против ИИ.' : 'Вы командуете: ' + SIDE[player].short + '.'}`, 'ev');
   closeModal(); renderAll();
   if (mode === 'editor') { ED.undo = []; ATK = null; LASSO = null; sbuAuto(); } // дивизии сразу стоят на фронте
@@ -776,7 +816,8 @@ function nbOwner(n, A) {
 }
 function attackPower(op, dv) {
   dv = dv || opDivs(op.side, op.k);
-  return ((op.inf || 0) + (op.arm || 0) * 20 + (op.sh || 0) * .04 + (op.dr || 0) * .12 + (op.air || 0) * 45) * season(S.date).k * S.sides[op.side].morale + divAtt(op.side, dv) * season(S.date).k;
+  const fuel = fuelMul(op.side); // без топлива танки стоят
+  return ((op.inf || 0) + (op.arm || 0) * 20 * fuel + (op.sh || 0) * .04 + (op.dr || 0) * .12 + (op.air || 0) * 45) * season(S.date).k * S.sides[op.side].morale + divAtt(op.side, dv) * season(S.date).k * (.75 + .25 * fuel);
 }
 function defensePower(op, info, consume) {
   const E = 3 - op.side, se = S.sides[E];
@@ -970,7 +1011,9 @@ function weekly(rep) {
   for (const side of [UA, RU]) {
     const s = S.sides[side], inc = INCOME[side];
     const m = S.mode === 'campaign' ? (side === S.player ? DIFF[S.diff].p : DIFF[S.diff].ai) : 1;
-    s.gar += inc.p * m * .5; s.res += inc.p * m * .5; s.arm += inc.arm * m; s.sh += inc.sh * m; s.dr += inc.dr * m;
+    // заводы, НПЗ и ТЭС в тылу определяют, сколько техники, снарядов и дронов приходит за неделю
+    const pw = powerMul(side);
+    s.gar += inc.p * m * .5; s.res += inc.p * m * .5; s.arm += inc.arm * m * prod(side, 'tankf') * pw; s.sh += inc.sh * m * prod(side, 'ammo') * pw; s.dr += inc.dr * m * prod(side, 'drone') * pw;
     for (const key of ['air', 'heli', 'kab', 'msl', 'bek']) s[key] += Math.round(inc[key] * m);
     s.gar = Math.round(s.gar * .997);
     economyTurn(side, rep);
@@ -1103,7 +1146,22 @@ function resolveStrike(op, rep) {
   const a = nearestAsset(op.k, null, x => assetOwner(x) === E, 5);
   const inter = Math.round(op.msl * rnd(.2, .6)), hitN = op.msl - inter;
   let txt;
-  if (a && hitN > 0) {
+  if (a && hitN > 0 && isStrat(a)) {
+    const weeks = clamp(2 + Math.floor(hitN / 5), 2, 8), was = prod(E, a.type);
+    S.off[a.id] = Math.max(S.off[a.id] || 0, S.turn + 1 + weeks);
+    let extra = '';
+    if (a.type === 'depot') {
+      const sh = Math.min(se.sh, 30000 + hitN * 4000), dr = Math.min(se.dr, hitN * 800); se.sh -= sh; se.dr -= dr;
+      let nd = 0; for (const d of sideDivs(E)) if (kmBetween(d.k, a.k) < 150) { d.org = Math.max(0, d.org - 25); nd++; }
+      extra = ` Детонация складов: −${fmt(sh)} снарядов, −${fmt(dr)} дронов${nd ? `, ${nd} див. рядом теряют боеспособность` : ''}.`;
+    } else if (a.type === 'tankf') { const t = Math.min(se.arm, hitN); se.arm -= t; extra = ` Уничтожено ${t} ед. техники в цехах.`; }
+    else if (a.type === 'ammo') { const t = Math.min(se.sh, hitN * 1500); se.sh -= t; extra = ` Потеряно ${fmt(t)} снарядов.`; }
+    else if (a.type === 'drone') { const t = Math.min(se.dr, hitN * 600); se.dr -= t; extra = ` Потеряно ${fmt(t)} дронов.`; }
+    else if (a.type === 'npz') { se.gold = Math.max(0, se.gold - 60); }
+    else if (a.type === 'power') se.morale = Math.max(.85, se.morale - .02);
+    const now = prod(E, a.type);
+    txt = `${SIDE[A].short}: ракетный удар — ${STRAT[a.type].n} «${a.name}». Сбито ${inter} из ${op.msl}, объект выведен из строя на ${weeksW(weeks)}.${extra} ${STRAT[a.type].n.split(' ')[0] === 'НПЗ' ? 'Топливо' : 'Производство'} ${SIDE[E].short}: ${Math.round(was * 100)}% → ${Math.round(now * 100)}%.`;
+  } else if (a && hitN > 0) {
     const weeks = Math.min(5, 1 + Math.floor(hitN / 6));
     S.off[a.id] = Math.max(S.off[a.id] || 0, S.turn + 1 + weeks);
     let extra = '';
@@ -1126,7 +1184,7 @@ function resolveSuper(op, rep) {
   const kill = Math.round(rnd(1500, 3000)), sh = Math.min(se.sh, 40000);
   se.gar = Math.max(20000, se.gar - kill); se.lossP += kill; se.sh -= sh; se.morale = Math.max(.85, se.morale - .03);
   fxAdd('super', op.k, A);
-  say(rep, A, `${SIDE[A].short}: ${SUPER_NAME[A]} по ${a ? (a.type === 'air' ? 'аэродрому' : 'порту') + ' «' + a.name + '» (выведен из строя на 6 нед.)' : 'району ' + placeName(op.k)} — потери противника ~${fmt(kill)} чел., укрепления уничтожены, мораль −3%.`);
+  say(rep, A, `${SIDE[A].short}: ${SUPER_NAME[A]} по ${a ? assetLabel(a) + ' «' + a.name + '» (выведен из строя на 6 нед.)' : 'району ' + placeName(op.k)} — потери противника ~${fmt(kill)} чел., укрепления уничтожены, мораль −3%.`);
 }
 function resolveLanding(op, rep, naval) {
   const A = op.side, E = 3 - A, sa = S.sides[A], se = S.sides[E], where = placeName(op.k);
@@ -1178,7 +1236,8 @@ function aiSupport(side) {
   const pick = arr => arr[(Math.random() * arr.length) | 0];
   for (let n = 0; n < (sd.msl > 150 ? 3 : sd.msl > 50 ? 2 : 1); n++) {
     if (sd.msl < 8 || Math.random() > .6) break;
-    const tg = ASSETS.filter(a => assetOwner(a) === E && !assetOff(a) && !S.aiOrders.some(o => o.k === a.k));
+    let tg = ASSETS.filter(a => assetOwner(a) === E && !assetOff(a) && !S.aiOrders.some(o => o.k === a.k));
+    if (Math.random() < .6) { const st = tg.filter(isStrat); if (st.length) tg = st; }
     if (tg.length) S.aiOrders.push(commitOp({ side, k: pick(tg).k, type: 'strike', msl: Math.min(Math.floor(sd.msl * .3), 30) }));
   }
   if (sd.superCd <= S.turn && Math.random() < .3) {
@@ -1290,10 +1349,14 @@ function divBuy(side, t, k) {
   return d;
 }
 const reinfCost = () => 0; // дивизии бесплатные
+// Пополнение бесплатное, но зависит от заводов в тылу: разбиты бронетанковые заводы — танковым дивизиям нечем пополняться.
 function divReinf(side, d) {
   if (d.str >= 99.5) return 'Дивизия укомплектована';
-  d.str = 100; d.org = Math.max(d.org, 50);
-  return null;
+  const armored = d.t === 'tank' || d.t === 'mech';
+  const add = 75 * powerMul(side) * (armored ? prod(side, 'tankf') : .5 + .5 * prod(side, 'ammo'));
+  if (add < 4) return armored ? 'Бронетанковые заводы разрушены — пополнять дивизию нечем' : 'Заводы боеприпасов разрушены — пополнять нечем';
+  d.str = Math.min(100, d.str + add); d.org = Math.max(d.org, 50 * (.5 + .5 * prod(side, 'ammo')));
+  return add < 60 ? `Пополнена частично (+${Math.round(add)}%): заводы в тылу повреждены` : null;
 }
 function divDisband(side, d) {
   S.divs[side] = S.divs[side].filter(x => x !== d);
@@ -1324,7 +1387,7 @@ const ownedCities = side => CITIES.reduce((a, c) => a + (c.k >= 0 && owner[c.k] 
 function income(side) {
   const sd = S.sides[side];
   const base = (side === UA ? 230 : 330) + 2.5 * ownedCities(side);
-  return Math.round(base * (1 + .12 * sd.econ) * (sd.sanc > 0 ? .75 : 1));
+  return Math.round(base * (1 + .12 * sd.econ) * (sd.sanc > 0 ? .75 : 1) * (.6 + .4 * prod(side, 'power')) * (.8 + .2 * prod(side, 'npz')));
 }
 const upkeep = () => 0; // дивизии бесплатные — без содержания
 function economyTurn(side, rep) {
@@ -1444,7 +1507,7 @@ function aiScore(side, k) {
 
 /* ================= Ход ================= */
 function endTurn(silent) {
-  if (!S || S.over || S.mode === 'editor') return;
+  if (!S || S.over || S.mode === 'editor' || S.mode === 'op') return;
   for (const side of [UA, RU]) if (S.mode === 'sim' || side !== S.player) aiPlan(side);
   S.threat = { 1: [], 2: [] };
   const ops = S.orders.concat(S.aiOrders).sort(() => Math.random() - .5);
@@ -1568,7 +1631,7 @@ function draw() {
   if (Math.abs(s - 1) < 1e-9) { x0 = Math.round(x0); y0 = Math.round(y0); }
   cache.style.transform = `translate(${x0}px,${y0}px) scale(${s})`;
   // верхний слой: только то, что движется (приказы, вспышки, лассо, атака)
-  const dyn = (S && (S.orders.length || S.sel || (S.divs && (S.divs[1].length || S.divs[2].length)) || (S.sbu && S.sbu.length))) || FX.length || RULER.a != null || (S && S.mode === 'editor' && (ATK || LASSO || (ED.tool === 'brush' && hoverPt)));
+  const dyn = (S && (S.orders.length || S.sel || (S.divs && (S.divs[1].length || S.divs[2].length)) || (S.sbu && S.sbu.length))) || FX.length || RULER.a != null || (S && S.mode === 'op') || (S && S.mode === 'editor' && (ATK || LASSO || (ED.tool === 'brush' && hoverPt)));
   if (!dyn && !overlayUsed) return;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.clearRect(0, 0, W, H);
   overlayUsed = !!dyn;
@@ -1579,6 +1642,7 @@ function draw() {
   drawFx();
   drawRuler();
   if (S && S.mode === 'editor') drawAttack();
+  if (S && S.mode === 'op') drawOp();
   if (S && S.mode === 'editor' && ED.tool === 'brush' && hoverPt) {
     ctx.strokeStyle = '#f3f4f6'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(hoverPt.x, hoverPt.y, ED.size * z, 0, 7); ctx.stroke();
   }
@@ -1624,7 +1688,7 @@ function drawMap() {
     ctx.strokeStyle = 'rgba(255,150,140,.45)'; ctx.stroke(fortPath[2]);
   }
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  if (layers.units && S && z >= 5) drawUnits();
+  if (layers.units && S && z >= 2.2) drawUnits();
   if (layers.assets) drawAssets();
   if (layers.cities) drawCities();
 }
@@ -1666,12 +1730,17 @@ function drawAssets() {
     const o = owner[a.k], off = assetOff(a);
     const col = off ? '#6b7280' : o === UA ? '#60a5fa' : o === RU ? '#f87171' : '#a8a29e';
     ctx.fillStyle = '#0f151d'; ctx.strokeStyle = col; ctx.lineWidth = 2;
-    ctx.beginPath(); a.type === 'air' ? ctx.arc(x, y, 8, 0, 7) : ctx.rect(x - 8, y - 8, 16, 16); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = col; ctx.font = '600 11px Rubik, sans-serif'; ctx.fillText(a.type === 'air' ? '✈' : '⚓', x, y + 1);
+    if (isStrat(a)) { // завод / НПЗ / арсенал / ТЭС — шестиугольник со значком
+      ctx.beginPath(); for (let i = 0; i < 6; i++) { const t = Math.PI / 3 * i + Math.PI / 6; ctx.lineTo(x + Math.cos(t) * 10.5, y + Math.sin(t) * 10.5); } ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.globalAlpha = off ? .45 : 1; ctx.font = '11px sans-serif'; ctx.fillText(STRAT[a.type].ic, x, y + 1); ctx.globalAlpha = 1;
+    } else {
+      ctx.beginPath(); a.type === 'air' ? ctx.arc(x, y, 8, 0, 7) : ctx.rect(x - 8, y - 8, 16, 16); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = col; ctx.font = '600 11px Rubik, sans-serif'; ctx.fillText(a.type === 'air' ? '✈' : '⚓', x, y + 1);
+    }
     if (off) { ctx.strokeStyle = '#e5e7eb'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x - 7, y - 7); ctx.lineTo(x + 7, y + 7); ctx.stroke(); }
-    if (z > 4) {
+    if (z > 4 || (isStrat(a) && z > 1.6)) {
       ctx.font = '500 10.5px Rubik, sans-serif'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(8,12,18,.9)';
-      const label = (a.type === 'air' ? 'аэр. ' : 'порт ') + a.name + (off ? ' (выведен из строя)' : '');
+      const label = (a.type === 'air' ? 'аэр. ' : a.type === 'port' ? 'порт ' : STRAT[a.type].n + ' · ') + a.name + (off ? ` (не работает ещё ${S.off[a.id] - S.turn} нед.)` : '');
       ctx.strokeText(label, x, y + 16); ctx.fillStyle = '#d6dde8'; ctx.fillText(label, x, y + 16);
     }
   }
@@ -1679,32 +1748,49 @@ function drawAssets() {
 // Отряды привязаны к линии фронта и двигаются вместе с ней: пехота держит рубежи, танки — на острие продвижения, FPV-операторы
 let UNITS = [];
 const hash = k => Math.imul(k, 2654435761) >>> 0;
+// Войска у фронта: плотная цепь значков прямо у линии соприкосновения (пехота, танки, БМП, дроны),
+// за ней — второй ряд (артиллерия, РСЗО). Чем крупнее масштаб, тем больше значков видно.
+const UTYPES = ['inf', 'inf', 'inf', 'tank', 'tank', 'mech', 'mech', 'recon', 'inf', 'tank'];
 function placeUnits() {
   UNITS = [];
   if (!S) return;
-  const cell = 9;
+  const cell = 2;
   for (const side of [UA, RU]) {
     const used = new Set();
     const list = frontList[side].slice().sort((a, b) => hash(a) - hash(b));
     for (const k of list) {
       const key = ((k % COLS) / cell | 0) + ',' + (((k / COLS) | 0) / cell | 0);
       if (used.has(key)) continue; used.add(key);
-      let type = hash(k) % 6 === 0 ? 'fpv' : 'inf';
+      const h = hash(k + side * 7919);
+      let type = UTYPES[h % UTYPES.length], row = 0;
+      if (h % 11 === 0) { type = 'arty'; row = 1; } else if (h % 17 === 0) { type = 'aa'; row = 1; }
+      if ((type === 'tank' || type === 'mech') && (h >>> 8) % 100 >= 100 * prod(side, 'tankf') * fuelMul(side) / .99) type = 'inf'; // заводы разбиты — техники на фронте меньше
       if (S.turn > 0 && changed[k] >= S.turn && owner0[k] !== side) type = 'tank';
-      const i = k % COLS; let dx = 0, dy = 0; // в сторону противника — чтобы сдвинуть значок в свой тыл
+      const i = k % COLS; let dx = 0, dy = 0; // в сторону противника — значок стоит сразу за линией, в своём тылу
       const en = n => owner[n] !== side && owner[n] !== 0;
       if (i > 0 && en(k - 1)) dx--; if (i < COLS - 1 && en(k + 1)) dx++; if (k >= COLS && en(k - COLS)) dy--; if (k < N - COLS && en(k + COLS)) dy++;
-      UNITS.push({ side, k, type, dx, dy });
+      if (!dx && !dy) continue;
+      UNITS.push({ side, k, type, dx, dy, row });
     }
   }
 }
+let UNIT_VIS = []; // что реально нарисовано (мировые координаты) — для попаданий в режиме оператора
+const unitSize = () => clamp(9 + view.z * 1.7, 13, 30);
 function drawUnits() {
-  const size = clamp(12 + view.z * 1.4, 18, 28);
+  const z = view.z, size = unitSize(), gap = size * .92 / z, off = size * .55 / z, now = performance.now();
+  const dead = S.op ? S.op.dead : null;
+  UNIT_VIS = [];
+  const used = new Set();
   for (const un of UNITS) {
-    const L = Math.hypot(un.dx, un.dy) || 1;
-    const x = sx(un.k % COLS + .5) - un.dx / L * 8, y = sy(((un.k / COLS) | 0) + .5) - un.dy / L * 8;
-    if (x < -20 || y < -20 || x > W + 20 || y > H + 20) continue;
-    drawNato(un.type === 'inf' ? 'inf' : un.type === 'tank' ? 'tank' : 'arty', un.side, x, y, size);
+    if (dead && dead[un.k + '_' + un.side] && now - dead[un.k + '_' + un.side] < OP_RESPAWN) continue;
+    const L = Math.hypot(un.dx, un.dy) || 1, o = off * (un.row ? 2.9 : 1);
+    const u = un.k % COLS + .5 - un.dx / L * o, v = ((un.k / COLS) | 0) + .5 - un.dy / L * o;
+    const key = un.side + ':' + Math.floor(u / gap) + ',' + Math.floor(v / gap);
+    if (used.has(key)) continue; used.add(key);
+    const x = sx(u), y = sy(v);
+    if (x < -30 || y < -30 || x > W + 30 || y > H + 30) continue;
+    drawNato(un.type, un.side, x, y, size * (un.row ? .85 : 1));
+    UNIT_VIS.push({ un, u, v });
   }
 }
 // Анимации: пульсы и «[ ! ]» на захвате, вспышки ударов, тающий пунктир плана наступления
@@ -1745,6 +1831,10 @@ function drawFx() {
       ctx.fillStyle = big ? '#fff7ed' : '#fb923c'; ctx.beginPath(); ctx.arc(x, y, rr, 0, 7); ctx.fill();
       ctx.strokeStyle = big ? '#f97316' : '#b45309'; ctx.lineWidth = big ? 4 : 2; ctx.beginPath(); ctx.arc(x, y, rr * 1.35, 0, 7); ctx.stroke();
       if (big) { ctx.fillStyle = '#fde68a'; ctx.beginPath(); ctx.arc(x, y, rr * .45, 0, 7); ctx.fill(); }
+    } else if (f.kind === 'puff') { // маленькая мягкая вспышка
+      const b = clamp((now - f.t0) / 700, 0, 1); if (b >= 1) continue;
+      ctx.globalAlpha = (1 - b) * .55; ctx.fillStyle = '#fdba74';
+      ctx.beginPath(); ctx.arc(x, y, Math.max(3, 1.1 * z) * (.6 + b * .8), 0, 7); ctx.fill();
     } else if (f.kind === 'landing') {
       ctx.globalAlpha = 1 - a; ctx.font = '700 18px Rubik, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillStyle = col; ctx.fillText('▼', x, y - 30 * (1 - a));
@@ -1888,7 +1978,7 @@ function showTip(x, y) {
   const o = owner[k];
   const who = o === UA ? 'под контролем ВСУ' : o === RU ? 'под контролем ВС РФ' : o === GREY ? 'серая зона' : 'нейтральная территория';
   let sup = '';
-  if (S && S.mode !== 'editor' && (o === UA || o === RU)) { const q = supplyAt(o, k); sup = q === 0 ? `окружение: снабжение 0%, оборона ${Math.round(encDef(k) * 100)}%` : `снабжение ${Math.round(q * 100)}%`; }
+  if (S && (S.mode === 'campaign' || S.mode === 'sim') && (o === UA || o === RU)) { const q = supplyAt(o, k); sup = q === 0 ? `окружение: снабжение 0%, оборона ${Math.round(encDef(k) * 100)}%` : `снабжение ${Math.round(q * 100)}%`; }
   const extra = [urban[k] ? 'город' : '', river[k] ? 'река' : '', fort[k] ? `укрепления ${'▮'.repeat(fort[k])}` : '', sup].filter(Boolean).join(' · ');
   tip.innerHTML = `<b>${placeName(k)}</b> — ${who}${extra ? '<br><span class="muted">' + extra + '</span>' : ''}`;
   tip.style.display = 'block';
@@ -1909,6 +1999,7 @@ function onTap(x, y) {
   }
   if (S && S.mode === 'editor' && ED.tool === 'units') { sbuPlace(toU(x), toV(y)); return; }
   if (S && S.mode === 'editor') { if (ATK && ATK.phase === 'wait' && ATK.bubble && Math.abs(x - ATK.bubble.x) < ATK.bubble.w / 2 + 6 && Math.abs(y - ATK.bubble.y) < 22) sendWave(); return; }
+  if (S && S.mode === 'op') { opClick(x, y); return; }
   if (!S || S.mode === 'editor' || S.over) return;
   const k = cellAt(toU(x), toV(y));
   if (S.mode === 'campaign' && S.dmode === 'place') {
@@ -1950,7 +2041,7 @@ function onTap(x, y) {
 // Приказ по названию города — как на стримах: «пишите, что захватить»
 const norm = t => t.toLowerCase().replace(/ё/g, 'е').replace(/[^a-zа-яіїє0-9 -]/g, '').trim();
 function quickOrder(text) {
-  if (!S || S.mode === 'editor' || S.over) return;
+  if (!S || S.mode === 'editor' || S.mode === 'op' || S.over) return;
   let t = norm(text), side = S.mode === 'campaign' ? S.player : 0;
   const m = t.match(/^(всу|уа|ua|украина|рф|вс рф|ru|россия)\s+/);
   if (m) { if (!side) side = /^(всу|уа|ua|украина)/.test(m[1]) ? UA : RU; t = t.slice(m[0].length); }
@@ -2142,23 +2233,38 @@ function finishLasso() {
   const side = ED.side, inR = new Uint8Array(N), region = [];
   rasterPolys([[pts.map(([u, v]) => [LON(u), LAT(v)])]], k => { if (land(k) && owner[k] !== side && !inR[k]) { inR[k] = 1; region.push(k); } });
   if (!region.length) { toast('В обведённой области нечего захватывать.'); requestDraw(); return; }
-  // порядок захвата: от своих позиций вглубь (волна расходится по области)
-  const order = new Int32Array(region.length); let t = 0, h = 0;
-  const seen = new Uint8Array(N);
-  for (const k of region) if (nbOwner(k, side)) { seen[k] = 1; order[t++] = k; }
-  if (!t) {
-    let best = region[0], bd = 1e9;
-    for (const k of region) { const d = Math.hypot(k % COLS - pts[0][0], ((k / COLS) | 0) - pts[0][1]); if (d < bd) { bd = d; best = k; } }
-    seen[best] = 1; order[t++] = best;
+  // порядок захвата: ровная волна от своих позиций вглубь. Дистанция «по-шахматному» (8 соседей, диагональ √2),
+  // плюс мягкий крупный шум — фронт идёт ровной дугой с небольшими выступами, без рваных ромбов.
+  let i0 = COLS, i1 = 0, j0 = ROWS, j1 = 0;
+  for (const k of region) { const i = k % COLS, j = (k / COLS) | 0; if (i < i0) i0 = i; if (i > i1) i1 = i; if (j < j0) j0 = j; if (j > j1) j1 = j; }
+  i0 = Math.max(0, i0 - 1); j0 = Math.max(0, j0 - 1); i1 = Math.min(COLS - 1, i1 + 1); j1 = Math.min(ROWS - 1, j1 + 1);
+  const bw = i1 - i0 + 1, bh = j1 - j0 + 1, D = new Float32Array(bw * bh).fill(1e9), D2 = 1.4142;
+  for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) { const k = j * COLS + i; if (land(k) && owner[k] === side) D[(j - j0) * bw + i - i0] = 0; }
+  let seeded = false; for (let q = 0; q < D.length; q++) if (D[q] === 0) { seeded = true; break; }
+  if (!seeded) { const [su, sv] = pts[0], q = clamp(Math.round(sv) - j0, 0, bh - 1) * bw + clamp(Math.round(su) - i0, 0, bw - 1); D[q] = 0; }
+  const open = q => { const k = (j0 + (q / bw | 0)) * COLS + i0 + q % bw; return inR[k] || D[q] === 0; };
+  for (let pass = 0; pass < 3; pass++) {
+    for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) {
+      const q = y * bw + x; if (!open(q) || D[q] === 0) continue; let d = D[q];
+      if (x > 0) d = Math.min(d, D[q - 1] + 1);
+      if (y > 0) { d = Math.min(d, D[q - bw] + 1); if (x > 0) d = Math.min(d, D[q - bw - 1] + D2); if (x < bw - 1) d = Math.min(d, D[q - bw + 1] + D2); }
+      D[q] = d;
+    }
+    for (let y = bh - 1; y >= 0; y--) for (let x = bw - 1; x >= 0; x--) {
+      const q = y * bw + x; if (!open(q) || D[q] === 0) continue; let d = D[q];
+      if (x < bw - 1) d = Math.min(d, D[q + 1] + 1);
+      if (y < bh - 1) { d = Math.min(d, D[q + bw] + 1); if (x < bw - 1) d = Math.min(d, D[q + bw + 1] + D2); if (x > 0) d = Math.min(d, D[q + bw - 1] + D2); }
+      D[q] = d;
+    }
   }
-  while (h < t) {
-    const k = order[h++], i = k % COLS;
-    const nb = [i > 0 ? k - 1 : -1, i < COLS - 1 ? k + 1 : -1, k >= COLS ? k - COLS : -1, k < N - COLS ? k + COLS : -1];
-    if (Math.random() < .5) nb.reverse();
-    for (const n of nb) if (n >= 0 && inR[n] && !seen[n]) { seen[n] = 1; order[t++] = n; }
+  const ph1 = Math.random() * 6.3, ph2 = Math.random() * 6.3, key = new Float32Array(N);
+  let far = 0; for (const k of region) { const d = D[(((k / COLS) | 0) - j0) * bw + k % COLS - i0]; if (d < 1e8 && d > far) far = d; }
+  for (const k of region) {
+    const i = k % COLS, j = (k / COLS) | 0; let d = D[(j - j0) * bw + i - i0];
+    if (d >= 1e8) d = far + Math.hypot(i - pts[0][0], j - pts[0][1]) * .5; // отрезанные кусочки — в самом конце
+    key[k] = d + 2.2 * Math.sin(i * .09 + ph1) * Math.sin(j * .11 + ph2);
   }
-  const rest = region.filter(k => !seen[k]).sort((a, b) => Math.hypot(a % COLS - pts[0][0], ((a / COLS) | 0) - pts[0][1]) - Math.hypot(b % COLS - pts[0][0], ((b / COLS) | 0) - pts[0][1]));
-  for (const k of rest) order[t++] = k;
+  const order = Int32Array.from(region).sort((a, b) => key[a] - key[b]), t = order.length;
   let km = 0; for (const k of region) km += rowKm2[(k / COLS) | 0];
   ATK = { phase: 'choose', side, cells: order, total: t, km, pts };
   document.getElementById('side').classList.remove('min');
@@ -2189,7 +2295,9 @@ function atkLoop(t) {
   const A = ATK; if (!A || (A.phase !== 'go' && A.phase !== 'wait')) return;
   const dt = Math.min(100, t - A.last); A.last = t;
   if (A.phase === 'go') {
-    A.acc += dt / (WEAPONS[A.weapon].dur / SET.aspeed) * A.per;
+    // плавный разгон в начале волны и торможение в конце
+    const wp = (A.idx - (A.waveEnd - A.per)) / A.per, ease = clamp(Math.min(wp, 1 - wp) * 4, .3, 1);
+    A.acc += dt / (WEAPONS[A.weapon].dur / SET.aspeed) * A.per * ease * 1.25;
     let n = Math.floor(A.acc); A.acc -= n;
     const list = [];
     while (n-- > 0 && A.idx < A.waveEnd) {
@@ -2199,9 +2307,9 @@ function atkLoop(t) {
     if (A.recent.length > 500) A.recent.splice(0, A.recent.length - 500);
     paintCells(list);
     const ahead = () => A.cells[Math.min(A.total - 1, A.idx + Math.floor(Math.random() * Math.min(A.per * .35, 600)))];
-    if (A.weapon === 'art' && t - A.lastFx > 130) { A.lastFx = t; fxAdd('strike', ahead(), A.side); fxStart(); }
-    if (A.weapon === 'fpv' && t - A.lastFx > 260) { A.lastFx = t; fxAdd('strike', ahead(), A.side); fxStart(); }
-    if (t - A.lastContour > 450) { A.lastContour = t; buildContour(); mapDirty = true; }
+    // взрывов мало и они маленькие — только редкие вспышки впереди волны
+    if ((A.weapon === 'art' || A.weapon === 'fpv') && t - A.lastFx > (A.weapon === 'art' ? 900 : 1300)) { A.lastFx = t; fxAdd('puff', ahead(), A.side); fxStart(); }
+    if (t - A.lastContour > 180 && list.length) { A.lastContour = t; buildContour(); mapDirty = true; }
     // свои дивизии двигаются за наступающей волной
     const R0 = A.recent.length;
     if (R0) A.divs.forEach((u, i) => {
@@ -2210,8 +2318,8 @@ function atkLoop(t) {
     });
     if (t - A.lastPush > 300) { A.lastPush = t; sbuPush(A.side); }
     if (A.idx >= A.waveEnd) {
-      buildContour();
       sbuPush(A.side);
+      if (A.idx < A.total) recompute(false); // волна встала — обновить линию фронта и отряды на ней
       if (A.idx >= A.total) {
         const km = A.taken; ATK = null; recompute(); renderSide();
         toast(`Наступление завершено: захвачено ${fmt(km)} км².`); return;
@@ -2224,56 +2332,47 @@ function atkLoop(t) {
   draw();
   requestAnimationFrame(atkLoop);
 }
-function drawWeapon(w, x, y, col, fill) {
-  ctx.strokeStyle = col; ctx.fillStyle = fill; ctx.lineWidth = 1.6;
-  if (w === 'tank') {
-    ctx.beginPath(); ctx.roundRect(x - 9, y - 4, 18, 9, 4); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.arc(x - 1, y - 4, 3.5, Math.PI, 0); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(x + 2, y - 5); ctx.lineTo(x + 11, y - 8); ctx.stroke();
-  } else if (w === 'fpv') {
-    ctx.beginPath(); ctx.moveTo(x - 6, y - 6); ctx.lineTo(x + 6, y + 6); ctx.moveTo(x + 6, y - 6); ctx.lineTo(x - 6, y + 6); ctx.stroke();
-    for (const [a, b] of [[-6, -6], [6, -6], [-6, 6], [6, 6]]) { ctx.beginPath(); ctx.arc(x + a, y + b, 3, 0, 7); ctx.fill(); ctx.stroke(); }
-  } else if (w === 'art') {
-    ctx.beginPath(); ctx.arc(x - 2, y + 3, 4, 0, 7); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(x - 2, y + 3); ctx.lineTo(x + 10, y - 7); ctx.lineWidth = 3; ctx.stroke(); ctx.lineWidth = 1.6;
-    ctx.beginPath(); ctx.moveTo(x - 2, y + 3); ctx.lineTo(x - 11, y + 7); ctx.stroke();
-  } else { // пехота
-    ctx.fillRect(x - 6, y - 4, 12, 8); ctx.strokeRect(x - 6, y - 4, 12, 8);
-    ctx.beginPath(); ctx.moveTo(x - 6, y - 4); ctx.lineTo(x + 6, y + 4); ctx.moveTo(x + 6, y - 4); ctx.lineTo(x - 6, y + 4); ctx.stroke();
-  }
-}
 function drawAttack() {
   const z = view.z, now = performance.now();
-  const poly = LASSO ? LASSO.pts : ATK && ATK.phase === 'choose' ? ATK.pts : null;
+  const poly = LASSO ? LASSO.pts : ATK ? ATK.pts : null;
   if (poly && poly.length > 1) {
-    const col = SIDE[LASSO ? ED.side : ATK.side].color;
-    ctx.beginPath(); poly.forEach(([u, v], i) => i ? ctx.lineTo(sx(u), sy(v)) : ctx.moveTo(sx(u), sy(v)));
-    if (!LASSO) ctx.closePath();
-    ctx.fillStyle = col + '22'; ctx.fill();
-    ctx.setLineDash([7, 5]); ctx.lineDashOffset = -now / 40; ctx.strokeStyle = col; ctx.lineWidth = 2.5; ctx.stroke(); ctx.setLineDash([]);
+    const sd = LASSO ? ED.side : ATK.side, col = SIDE[sd].color, done = ATK && ATK.phase !== 'choose';
+    const path = new Path2D(); poly.forEach(([u, v], i) => i ? path.lineTo(sx(u), sy(v)) : path.moveTo(sx(u), sy(v)));
+    if (!LASSO) {
+      path.closePath();
+      // выбранная территория — штриховка косыми линиями (медленно ползёт), пока идёт наступление
+      ctx.save(); ctx.clip(path);
+      ctx.fillStyle = col + '1f'; ctx.fill(path);
+      let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+      for (const [u, v] of poly) { const X = sx(u), Y = sy(v); if (X < x0) x0 = X; if (X > x1) x1 = X; if (Y < y0) y0 = Y; if (Y > y1) y1 = Y; }
+      const step = 12, off = (now / 90) % step, h = y1 - y0;
+      ctx.strokeStyle = sd === UA ? '#93c5fd' : '#fca5a5'; ctx.globalAlpha = done ? .38 : .55; ctx.lineWidth = 1.4; ctx.beginPath();
+      for (let c = x0 - h - step + off; c < x1 + step; c += step) { ctx.moveTo(c, y1); ctx.lineTo(c + h, y0); }
+      ctx.stroke(); ctx.globalAlpha = 1; ctx.restore();
+    } else { ctx.fillStyle = col + '22'; ctx.fill(path); }
+    ctx.setLineDash([9, 6]); ctx.lineDashOffset = -now / 40;
+    ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 4.5; ctx.stroke(path);
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.2; ctx.stroke(path); ctx.setLineDash([]);
   }
   const A = ATK; if (!A || A.phase === 'choose') return;
-  // значки на острие: оружие и пехота за ним
+  // значки на острие: круглые значки оружия и пехоты, плавно скользят за волной
   const used = new Set(), pts = [];
-  for (let i = A.recent.length - 1; i >= 0 && pts.length < 16; i--) {
-    const k = A.recent[i], key = ((k % COLS) / 10 | 0) + ',' + (((k / COLS) | 0) / 10 | 0);
+  for (let i = A.recent.length - 1; i >= 0 && pts.length < 10; i--) {
+    const k = A.recent[i], key = ((k % COLS) / 14 | 0) + ',' + (((k / COLS) | 0) / 14 | 0);
     if (used.has(key)) continue; used.add(key); pts.push(k);
   }
-  const col = A.side === UA ? '#1e40af' : '#991b1b', fill = A.side === UA ? '#dbeafe' : '#fee2e2';
+  A.tips = A.tips || [];
+  const col = A.side === UA ? '#1d4ed8' : '#b91c1c';
+  const size = clamp(14 + z * 1.6, 20, 34), kind = A.weapon === 'fpv' ? 'recon' : A.weapon === 'art' ? 'arty' : 'tank';
   let cx = 0, cy = 0;
   pts.forEach((k, i) => {
-    const bob = A.phase === 'go' ? Math.sin(now / 160 + i) * 1.5 : 0;
-    const x = sx(k % COLS + .5), y = sy(((k / COLS) | 0) + .5) + bob;
+    const tu = k % COLS + .5, tv = ((k / COLS) | 0) + .5, tp = A.tips[i] || (A.tips[i] = { u: tu, v: tv });
+    const f = A.phase === 'go' ? .08 : .2; tp.u += (tu - tp.u) * f; tp.v += (tv - tp.v) * f;
+    const x = sx(tp.u), y = sy(tp.v);
     cx += x; cy += y;
-    drawWeapon('inf', x - 10, y + 9, col, fill);
-    drawWeapon(A.weapon, x, y, col, fill);
+    drawNato('inf', A.side, x - size * .55, y + size * .45, size * .8);
+    drawNato(kind, A.side, x, y, size);
   });
-  if (A.weapon === 'fpv' && A.phase === 'go') { // дроны летят впереди
-    for (let i = 0; i < 6; i++) {
-      const k = A.cells[Math.min(A.total - 1, A.idx + ((i * 97 + Math.floor(now / 300)) % Math.max(1, Math.min(A.per * .3, 400))))];
-      drawWeapon('fpv', sx(k % COLS + .5), sy(((k / COLS) | 0) + .5) - 6, col, fill);
-    }
-  }
   if (A.phase === 'wait' && pts.length) {
     cx /= pts.length; cy /= pts.length;
     const txt = `Нужна ${A.wave + 1}-я волна: ${WEAPONS[A.weapon].name} ➜`;
@@ -2288,6 +2387,151 @@ function drawAttack() {
   }
 }
 
+
+/* ================= Режим «Оператор» =================
+   Вы — оператор FPV-дронов, танка или артиллерии. Нажимаете на вражеский значок у фронта — летит дрон,
+   снаряд или выстрел танка. Уничтожили несколько целей на участке — ваша пехота продвигается там вперёд.
+   Боезапас пополняется со временем, противник подтягивает резервы на место уничтоженных. */
+const OP_RESPAWN = 45000;
+const OPW = {
+  fpv: { n: 'FPV-дроны', who: 'FPV-дронов', kind: 'recon', icon: '🛸', ammo: 6, reload: 2200, range: 20, fly: 1500, hit: .8, splash: 0 },
+  tank: { n: 'Танки', who: 'танков', kind: 'tank', icon: '🛡', ammo: 8, reload: 1500, range: 15, fly: 380, hit: .85, splash: 0 },
+  art: { n: 'Артиллерия', who: 'артиллерии', kind: 'arty', icon: '💥', ammo: 10, reload: 1700, range: 32, fly: 1800, hit: .6, splash: 4 },
+};
+const MS_OP = { side: UA };
+const kmAt = (v) => Math.sqrt(rowKm2[clamp(v | 0, 0, ROWS - 1)]);
+const kmUV = (a, b) => Math.hypot(a.u - b.u, a.v - b.v) * kmAt((a.v + b.v) / 2);
+function startOperator(side, weapon) {
+  startGame('op', side, false);
+  S.op = { side, weapon, ammo: OPW[weapon].ammo, last: performance.now(), dead: {}, kills: 0, shots: [], press: [], km: 0, post: null };
+  // встать на участок у Покровска / Часова Яра (самый горячий) и выбрать ближайшую свою позицию
+  const c = CITIES.find(c => c.name === 'Покровск') || CITIES.find(c => c.name === 'Константиновка') || CITIES[0];
+  view.z = 7; view.u = c.u - (innerWidth >= 760 ? 120 / view.z : 0); view.v = c.v; clampView();
+  invalidate(); draw();
+  opPickPost(c.u, c.v);
+  addLog(S.player, `Оператор ${OPW[weapon].who}: нажимайте на вражеские значки у фронта.`, 'ev');
+  renderSide(); opRun();
+}
+function opPickPost(u, v) {
+  // сначала ближайший враг у этого места, потом своя позиция прямо напротив него
+  let foe = null, fd = 1e9;
+  for (const w of UNIT_VIS) if (w.un.side !== S.op.side && w.un.row === 0) { const d = Math.hypot(w.u - u, w.v - v); if (d < fd) { fd = d; foe = w; } }
+  if (foe) { u = foe.u; v = foe.v; }
+  let best = null, bd = 1e9;
+  for (const w of UNIT_VIS) if (w.un.side === S.op.side) { const d = Math.hypot(w.u - u, w.v - v); if (d < bd) { bd = d; best = w; } }
+  if (!best) for (const un of UNITS) if (un.side === S.op.side) { const d = Math.hypot(un.k % COLS - u, ((un.k / COLS) | 0) - v); if (d < bd) { bd = d; best = { u: un.k % COLS + .5, v: ((un.k / COLS) | 0) + .5 }; } }
+  if (best) S.op.post = { u: best.u, v: best.v };
+}
+function opClick(x, y) {
+  const O = S.op, u = toU(x), v = toV(y), rr = (unitSize() * .6) / view.z;
+  let hit = null, hd = 1e9;
+  for (const w of UNIT_VIS) { const d = Math.hypot(w.u - u, w.v - v); if (d < rr && d < hd) { hd = d; hit = w; } }
+  if (!hit) return;
+  if (hit.un.side === O.side) { O.post = { u: hit.u, v: hit.v }; toast('Новая позиция: ' + placeName(hit.un.k)); requestDraw(); return; }
+  const W_ = OPW[O.weapon], dist = kmUV(O.post, hit);
+  if (dist > W_.range) return toast(`Цель слишком далеко: ${Math.round(dist)} км (дальность ${W_.range} км). Выберите свою позицию ближе — нажмите на свой значок.`);
+  if (O.ammo < 1) return toast('Боезапас пуст — подождите пополнения.');
+  O.ammo--; O.last = Math.max(O.last, performance.now() - 1);
+  O.shots.push({ from: { u: O.post.u, v: O.post.v }, to: { u: hit.u, v: hit.v }, un: hit.un, t0: performance.now(), dur: W_.fly * (O.weapon === 'tank' ? 1 : .6 + dist / W_.range * .6), hit: Math.random() < W_.hit, weapon: O.weapon });
+  renderOpAmmo(); opRun();
+}
+function opKill(un) {
+  const O = S.op, now = performance.now(), key = un.k + '_' + un.side;
+  if (O.dead[key] && now - O.dead[key] < OP_RESPAWN) return false;
+  O.dead[key] = now; O.kills++; O.press.push({ k: un.k, t: now });
+  return true;
+}
+function opImpact(sh) {
+  const O = S.op, W_ = OPW[sh.weapon], now = performance.now();
+  const k0 = cellAt(sh.to.u, sh.to.v); fxAdd('puff', k0, O.side); fxStart();
+  let n = 0;
+  if (sh.hit && opKill(sh.un)) n++;
+  if (W_.splash) for (const w of UNIT_VIS) if (w.un.side !== O.side && w.un !== sh.un && kmUV(w, sh.to) < W_.splash && Math.random() < .4 && opKill(w.un)) n++;
+  if (n) addLog(O.side, `${W_.n}: уничтожено целей — ${n} (${placeName(sh.un.k)}).`); else addLog(O.side, `${W_.n}: промах у ${placeName(sh.un.k)}.`);
+  // давление на участке: 3 уничтоженные цели в 12 км за минуту — пехота продвигается
+  O.press = O.press.filter(p => now - p.t < 60000);
+  const near = O.press.filter(p => Math.hypot(p.k % COLS - sh.un.k % COLS, ((p.k / COLS) | 0) - ((sh.un.k / COLS) | 0)) * kmAt(sh.to.v) < 12);
+  if (near.length >= 3) { O.press = O.press.filter(p => !near.includes(p)); opAdvance(sh.un.k); }
+  invalidate(); renderSide();
+}
+function opAdvance(k) {
+  const O = S.op, side = O.side, i0 = k % COLS, j0 = (k / COLS) | 0, R = 2.6, list = [];
+  for (let j = j0 - R; j <= j0 + R; j++) for (let i = i0 - R; i <= i0 + R; i++) {
+    if (i < 0 || j < 0 || i >= COLS || j >= ROWS || Math.hypot(i - i0, j - j0) > R + Math.sin(i * 1.3 + j) * .6) continue;
+    const c = j * COLS + i; if (land(c) && owner[c] !== side) list.push(c);
+  }
+  if (!list.length) return;
+  let km = 0; for (const c of list) { owner[c] = side; fort[c] = 0; km += rowKm2[(c / COLS) | 0]; }
+  O.km += km; fxAdd('capture', k, side); fxStart();
+  addLog(side, `Пехота продвинулась у ${placeName(k)}: +${fmt(km)} км².`, 'ev');
+  toast(`Противник отошёл — пехота заняла ${fmt(km)} км² у ${placeName(k)}`);
+  recompute(false);
+}
+let opRunning = false;
+function opRun() { if (!opRunning) { opRunning = true; requestAnimationFrame(opLoop); } }
+function opLoop(t) {
+  if (!S || S.mode !== 'op' || !S.op) { opRunning = false; return; }
+  const O = S.op, W_ = OPW[O.weapon];
+  if (O.ammo < W_.ammo && t - O.last > W_.reload) { O.ammo++; O.last = t; renderOpAmmo(); }
+  if (O.ammo >= W_.ammo) O.last = t;
+  for (let i = O.shots.length - 1; i >= 0; i--) if (t - O.shots[i].t0 >= O.shots[i].dur) { const sh = O.shots.splice(i, 1)[0]; opImpact(sh); }
+  if (!O.tick || t - O.tick > 1000) { O.tick = t; for (const key in O.dead) if (t - O.dead[key] > OP_RESPAWN) { delete O.dead[key]; invalidate(); } }
+  draw();
+  if (O.shots.length || O.ammo < W_.ammo || Object.keys(O.dead).length) requestAnimationFrame(opLoop); else opRunning = false;
+}
+function drawOp() {
+  const O = S.op; if (!O || !O.post) return;
+  const W_ = OPW[O.weapon], now = performance.now(), z = view.z, x = sx(O.post.u), y = sy(O.post.v);
+  const rpx = W_.range / kmAt(O.post.v) * z; // дальность
+  ctx.beginPath(); ctx.arc(x, y, rpx, 0, 7); ctx.fillStyle = 'rgba(250,204,21,.07)'; ctx.fill();
+  ctx.setLineDash([7, 6]); ctx.lineDashOffset = -now / 60; ctx.strokeStyle = 'rgba(250,204,21,.85)'; ctx.lineWidth = 1.8; ctx.stroke(); ctx.setLineDash([]);
+  const sz = unitSize() * 1.25;
+  ctx.strokeStyle = '#facc15'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(x, y, sz * .62, 0, 7); ctx.stroke();
+  drawNato(W_.kind, O.side, x, y, sz);
+  for (const sh of O.shots) {
+    const p = clamp((now - sh.t0) / sh.dur, 0, 1), fx = sx(sh.from.u), fy = sy(sh.from.v), tx = sx(sh.to.u), ty = sy(sh.to.v);
+    let px = fx + (tx - fx) * p, py = fy + (ty - fy) * p;
+    ctx.strokeStyle = '#fde68a'; ctx.globalAlpha = .9;
+    if (sh.weapon === 'fpv') { // дрон летит с покачиванием
+      const nx = -(ty - fy), ny = tx - fx, L = Math.hypot(nx, ny) || 1, wob = Math.sin(p * 9) * 6 * (1 - p);
+      px += nx / L * wob; py += ny / L * wob;
+      drawNato('recon', O.side, px, py, Math.max(14, sz * .6));
+    } else if (sh.weapon === 'art') { // снаряд по дуге
+      py -= Math.sin(Math.PI * p) * Math.min(120, Math.hypot(tx - fx, ty - fy) * .35);
+      ctx.fillStyle = '#fde68a'; ctx.beginPath(); ctx.arc(px, py, 3.2, 0, 7); ctx.fill();
+    } else { // танковый выстрел — трассер
+      const q = Math.max(0, p - .25); ctx.lineWidth = 2.4;
+      ctx.beginPath(); ctx.moveTo(fx + (tx - fx) * q, fy + (ty - fy) * q); ctx.lineTo(px, py); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    // перекрестье на цели
+    ctx.strokeStyle = '#facc15'; ctx.lineWidth = 1.5; const r = 9;
+    ctx.beginPath(); ctx.arc(tx, ty, r, 0, 7); ctx.moveTo(tx - r - 4, ty); ctx.lineTo(tx - r + 3, ty); ctx.moveTo(tx + r - 3, ty); ctx.lineTo(tx + r + 4, ty);
+    ctx.moveTo(tx, ty - r - 4); ctx.lineTo(tx, ty - r + 3); ctx.moveTo(tx, ty + r - 3); ctx.lineTo(tx, ty + r + 4); ctx.stroke();
+  }
+}
+function renderOpAmmo() {
+  const el = $('opAmmo'); if (!el || !S.op) return;
+  const W_ = OPW[S.op.weapon]; el.innerHTML = Array.from({ length: W_.ammo }, (_, i) => `<i class="${i < S.op.ammo ? 'on' : ''}"></i>`).join('');
+}
+function renderOp(body) {
+  const O = S.op; if (!O) { body.innerHTML = ''; return; }
+  const W_ = OPW[O.weapon];
+  body.innerHTML = `<h2>${SIDE[O.side].flag ? `<span class="flag ${SIDE[O.side].flag}"></span>` : ''}Оператор ${W_.who}</h2>
+    <div class="hint">Нажмите на вражеский значок в пределах жёлтого круга — ${O.weapon === 'fpv' ? 'полетит дрон' : O.weapon === 'art' ? 'полетит снаряд (бьёт по площади)' : 'танк выстрелит'}.
+      Нажмите на свой значок — перейти на эту позицию. 3 уничтоженные цели на участке за минуту — пехота продвинется вперёд.</div>
+    <h3>Боезапас</h3><div class="ammo" id="opAmmo"></div>
+    <div class="grid2" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+      <div class="op"><small class="muted">Уничтожено целей</small><div class="big">${fmt(O.kills)}</div></div>
+      <div class="op"><small class="muted">Занято пехотой</small><div class="big">${fmt(O.km)} км²</div></div>
+    </div>
+    <h3>Чем управляете</h3>
+    <div class="tools">${Object.entries(OPW).map(([k, w]) => `<button data-opw="${k}" class="${O.weapon === k ? 'on' : ''}">${natoSVG(w.kind, O.side)} ${w.n}<br><small class="muted">дальность ${w.range} км · ${w.ammo} шт.</small></button>`).join('')}</div>
+    <h3>Журнал</h3><div class="log">${S.log.slice(0, 8).map(l => `<p class="${l.cls === 'ev' ? 'ev' : 's' + l.s}">${l.t}</p>`).join('')}</div>`;
+  renderOpAmmo();
+  body.querySelectorAll('[data-opw]').forEach(el => el.onclick = () => { O.weapon = el.dataset.opw; O.ammo = OPW[O.weapon].ammo; O.shots = []; renderSide(); requestDraw(); });
+}
+
 /* ================= Интерфейс ================= */
 const $ = id => document.getElementById(id);
 function dateStr(ts) { return new Date(ts).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }); }
@@ -2297,7 +2541,7 @@ function renderClock() {
   if (!S) { $('clock').innerHTML = ''; return; }
   const se = season(S.date);
   const rt = S.rt && S.mode !== 'editor' && !S.over;
-  $('clock').innerHTML = S.mode === 'editor' ? '<b>Свободный режим</b>' :
+  $('clock').innerHTML = S.mode === 'editor' ? '<b>Свободный режим</b>' : S.mode === 'op' ? '<b>Оператор</b>' :
     `<b>${dateStr(S.date)}</b> · неделя ${S.turn + 1}<span class="chip">${se.name}${se.k !== 1 ? ' ×' + se.k : ''}</span>` +
     (rt ? `<span class="chip">⏱ ${RT.paused ? 'пауза' : mmss(S.rt - RT.acc)}</span>` : '');
   $('bPause').hidden = !rt; $('bPause').textContent = RT.paused ? '▶' : '⏸';
@@ -2316,6 +2560,7 @@ function renderSide() {
   $('side').hidden = !S;
   if (!S) { body.innerHTML = ''; return; }
   if (S.mode === 'editor') return renderEditor(body);
+  if (S.mode === 'op') return renderOp(body);
   const p = S.player, sim = S.mode === 'sim';
   let h = '';
   if (sim) {
@@ -2327,8 +2572,9 @@ function renderSide() {
   } else {
     h += `<h2><span class="flag ${SIDE[p].flag}"></span>Вы командуете: ${SIDE[p].short}</h2>`;
     const tab = S.tab || 'orders';
-    h += `<div class="tabs grid3">${[['orders', '➜ Приказы'], ['divs', `🎖 Дивизии (${sideDivs(p).length})`], ['econ', '💰 Экономика']].map(([k, n]) => `<button data-tab="${k}" class="${tab === k ? 'on' : ''}">${n}</button>`).join('')}</div>`;
+    h += `<div class="tabs grid4">${[['orders', '➜ Приказы'], ['divs', `🎖 Дивизии (${sideDivs(p).length})`], ['deep', '🎯 Удары вглубь'], ['econ', '💰 Экономика']].map(([k, n]) => `<button data-tab="${k}" class="${tab === k ? 'on' : ''}">${n}</button>`).join('')}</div>`;
     if (tab === 'divs') h += divPanel() + endBtn();
+    else if (tab === 'deep') h += deepPanel() + endBtn();
     else if (tab === 'econ') h += econPanel() + endBtn();
     else {
     h += sideRes(p, false);
@@ -2379,6 +2625,37 @@ function divPanel() {
   return h;
 }
 const supCol = q => q >= .85 ? '#34d399' : q >= .5 ? '#fbbf24' : '#f87171';
+function prodBars(side) {
+  const row = (n, v) => { const c = v > .75 ? '#34d399' : v > .4 ? '#fbbf24' : '#f87171'; return `<div class="pbar"><span>${n}</span><i><b style="width:${Math.round(v * 100)}%;background:${c}"></b></i><b style="color:${c}">${Math.round(v * 100)}%</b></div>`; };
+  const pw = powerMul(side);
+  return row('Танки и БМП', prod(side, 'tankf') * pw) + row('Снаряды', prod(side, 'ammo') * pw) + row('Дроны', prod(side, 'drone') * pw) + row('Топливо', prod(side, 'npz')) + row('Энергетика', prod(side, 'power'));
+}
+function deepPanel() {
+  const p = S.player, E = 3 - p, sd = S.sides[p];
+  const list = ASSETS.filter(a => isStrat(a) && a.home === E && a.k >= 0);
+  const st = a => owner[a.k] !== E ? '<b class="up">захвачен</b>' : assetOff(a) ? `не работает ещё ${S.off[a.id] - S.turn} нед.` : 'работает';
+  let h = `<div class="stat"><small class="muted">Ваши ракеты</small><div class="big">🚀 ${fmt(sd.msl)}</div><small>+${INCOME[p].msl} в неделю · часть собьёт ПВО</small></div>
+    <div class="hint">Подбитые танки противнику привозят снова — пока работают его заводы. Бейте ракетами по заводам, НПЗ, арсеналам и ТЭС в глубине: меньше техники, снарядов и топлива — легче прорвать фронт. Объект выходит из строя на 2–8 недель, потом его чинят.</div>
+    <h3>Производство ${SIDE[E].short}</h3>${prodBars(E)}
+    <h3>Цели</h3>`;
+  for (const t of Object.keys(STRAT)) {
+    const items = list.filter(a => a.type === t); if (!items.length) continue;
+    h += `<div class="hint" style="margin:10px 0 2px"><b>${STRAT[t].ic} ${STRAT[t].n}</b> — ${STRAT[t].what}</div>`;
+    h += items.map(a => `<div class="tgt ${owner[a.k] !== E || assetOff(a) ? 'off' : ''}"><span class="ic">${STRAT[t].ic}</span><div>${a.name}<small>${st(a)}</small></div>
+      ${owner[a.k] === E && !S.over ? `<button class="btn" data-strike="${a.id}">🚀 Удар</button>` : ''}</div>`).join('');
+  }
+  h += `<h3>Ваше производство</h3>${prodBars(p)}`;
+  return h;
+}
+function strikeAt(a) {
+  const sd = S.sides[S.player];
+  if (S.orders.some(o => o.k === a.k && o.type === 'strike')) return toast('По этой цели уже есть приказ на эту неделю.');
+  const c = opCheck('strike', a.k, S.player); if (!c.ok) return toast(c.why);
+  S.tab = 'orders'; S.sel = { k: a.k, dir: [0, -1] };
+  S.draft = { type: 'strike', inf: 0, arm: 0, sh: 0, dr: 0, air: 0, kab: 60, msl: Math.min(sd.msl, 12), bek: 10, hinf: 800, ninf: 1500 };
+  flyTo(a.k); renderSide(); requestDraw();
+  const opEl = document.querySelector('#sideBody .op'); if (opEl) opEl.scrollIntoView({ block: 'nearest' });
+}
 function econPanel() {
   const s = S.player, sd = S.sides[s], inc = income(s), up = upkeep(s), mob = MOB[sd.mob];
   let h = `<div class="stat"><small class="muted">Казна</small><div class="big">${fmt(sd.gold)}</div>
@@ -2391,6 +2668,7 @@ function econPanel() {
       <button data-up="econ" ${sd.econ >= 5 || sd.gold < upCost(s, 'econ') ? 'disabled' : ''}>📈 Экономика · ур. ${sd.econ}/5<br><small class="muted">+12% дохода за уровень · ${sd.econ >= 5 ? 'максимум' : 'улучшить за ' + upCost(s, 'econ')}</small></button>
       <button data-up="dord" ${sd.dord >= 5 || sd.gold < upCost(s, 'dord') ? 'disabled' : ''}>🏭 Оборонный заказ · ур. ${sd.dord}/5<br><small class="muted">+8% к силе дивизий за уровень · ${sd.dord >= 5 ? 'максимум' : 'улучшить за ' + upCost(s, 'dord')}</small></button>
     </div>
+    <h3>Производство (заводы, НПЗ, ТЭС)</h3>${prodBars(s)}<div class="hint">Падает, когда противник бьёт ракетами по вашим объектам в тылу или захватывает их.</div>
     <h3>Окружения</h3>`;
   const mine = S.pockets && S.pockets[s] || [], en = S.pockets && S.pockets[3 - s] || [];
   h += mine.map((p, i) => `<div class="pk bad">⚠ Ваш котёл №${i + 1} · ${placeName(p.k)}<small>${fmt(p.n * rowKm2[(p.k / COLS) | 0])} км² · снабжение 0% · оборона ${Math.max(0, 100 - 25 * p.cut)}% · ходов в окружении: ${p.cut}</small><button class="btn" data-fly="${p.k}">Показать</button></div>`).join('')
@@ -2442,7 +2720,7 @@ function opHint() {
     case 'attack': return 'Снаряды и дроны, оставленные на складе, работают на оборону. Сначала ударьте КАБами — наступать будет легче.';
     case 'fort': return 'Окопы и опорные пункты в круге (до 3 уровней) и 1 500 бойцов из резерва в гарнизон. Наступать на укрепления намного дороже.';
     case 'kab': return `Вылет с аэродрома «${c.af ? c.af.name : '?'}». Разрушает укрепления в радиусе ~9 км и на эту неделю ослабляет оборону для ваших наступлений рядом (−20%).`;
-    case 'strike': return (c.tgt ? `Цель: ${c.tgt.type === 'air' ? 'аэродром' : 'порт'} «${c.tgt.name}» — выйдет из строя на 1–5 недель.` : 'Удар по тылам: склады снарядов и укрепления. Нажмите рядом с аэродромом или портом противника, чтобы ударить по нему.') + ' Часть ракет собьёт ПВО.';
+    case 'strike': return (c.tgt ? (isStrat(c.tgt) ? `Цель: ${STRAT[c.tgt.type].n} «${c.tgt.name}» (${STRAT[c.tgt.type].what}) — выйдет из строя на 2–8 недель, чем больше ракет, тем дольше.` : `Цель: ${assetLabel(c.tgt)} «${c.tgt.name}» — выйдет из строя на 1–5 недель.`) : 'Удар по тылам: склады снарядов и укрепления. Нажмите рядом с заводом, НПЗ, арсеналом, аэродромом или портом противника — или выберите цель во вкладке «🎯 Удары вглубь».') + ' Часть ракет собьёт ПВО.';
     case 'super': return `Мощнейший удар: уничтожает укрепления в радиусе ~9 км${c.tgt ? `, выводит «${c.tgt.name}» из строя на 6 недель` : ''}, бьёт по морали противника. Потом перезарядка ${SUPER_CD[S.player]} недель.`;
     case 'heli': return `Вертолётов: ${Math.ceil(d.hinf / 150)} из ${sd.heli}. Плацдарм в тылу держится 2 недели — пробейтесь к нему наступлением, иначе он попадёт в котёл. Чем глубже, тем больше потерь от ПВО.`;
     case 'naval': return `Из порта «${c.port ? c.port.name : '?'}». Десантных кораблей: ${Math.ceil(d.ninf / 1000)} из ${sd.lships}. Их может потопить флот и морские дроны противника.`;
@@ -2491,6 +2769,7 @@ function bindSide() {
   b.querySelectorAll('[data-mob]').forEach(el => el.onclick = () => { S.sides[S.player].mob = +el.dataset.mob; renderSide(); });
   b.querySelectorAll('[data-up]').forEach(el => el.onclick = () => { const e = upgrade(S.player, el.dataset.up); if (e) toast(e); renderSide(); });
   b.querySelectorAll('[data-fly]').forEach(el => el.onclick = () => flyTo(+el.dataset.fly));
+  b.querySelectorAll('[data-strike]').forEach(el => el.onclick = () => strikeAt(ASSETS[+el.dataset.strike]));
   const selD = () => sideDivs(S.player).find(x => x.id === S.dsel);
   if ($('dBuy')) $('dBuy').onclick = () => { S.dmode = S.dmode === 'place' ? '' : 'place'; renderSide(); if (S.dmode) toast('Нажмите на свою территорию со снабжением — там сформируется дивизия.'); };
   if ($('dBack')) $('dBack').onclick = () => { S.dsel = null; S.dmode = ''; S.droute = null; renderSide(); requestDraw(); };
@@ -2634,6 +2913,7 @@ function showMenu(screen = 'main') {
       ${hasFree && !(S && S.mode === 'editor') ? it('id="bLoadFree"', '↩', 'Продолжить свободный режим') : ''}
       ${it('data-scr="single"', '▶', 'Одиночная игра', 'Кампания за ВСУ или ВС РФ, симуляция ИИ')}
       ${it('data-go="ed"', '➰', 'Свободный режим', 'Лассо, волны атак, дивизии')}
+      ${it('data-scr="op"', '🎯', 'Оператор', 'Дроны, танки или артиллерия — бейте цели у фронта')}
       ${it('data-scr="scen"', '🗺', 'Сценарии', 'Сейчас: ' + scenName)}
       ${it('data-scr="settings"', '⚙', 'Настройки')}
       ${it('data-scr="help"', '?', 'Как играть')}
@@ -2655,6 +2935,13 @@ function showMenu(screen = 'main') {
         <select id="tmode">${[[0, 'Пошагово'], [420000, 'Реалистичное: 1 день = 1 мин'], [60000, 'Неделя = 1 мин'], [15000, 'Неделя = 15 с']].map(([v, n]) => `<option value="${v}" ${MS.rt === v ? 'selected' : ''}>${n}</option>`).join('')}</select>
       </div>
       ${hasCamp && !(active && S.mode !== 'editor') ? '<button class="btn" id="bLoad" style="width:100%;margin-top:10px">↩ Продолжить кампанию</button>' : ''}`;
+  } else if (screen === 'op') {
+    h = `${back}<h2 class="mh">Оператор</h2>
+      <div class="hint" style="margin-bottom:10px">Вы управляете одним видом оружия на участке фронта и сами выбираете цели. Уничтожайте вражеские значки — и ваша пехота будет продвигаться.</div>
+      <h3>Сторона</h3>
+      <div class="tools"><button data-ops="1" class="${MS_OP.side === 1 ? 'on' : ''}"><span class="flag ua"></span>ВСУ</button><button data-ops="2" class="${MS_OP.side === 2 ? 'on' : ''}"><span class="flag ru"></span>ВС РФ</button></div>
+      <h3>Роль</h3>
+      <div class="modes">${Object.entries(OPW).map(([k, w]) => `<button data-opgo="${k}"><b>${natoSVG(w.kind, MS_OP.side)} Оператор ${w.who}</b><small>Дальность ${w.range} км · ${w.ammo} ${k === 'art' ? 'снарядов, бьёт по площади' : k === 'fpv' ? 'дронов, точные удары' : 'выстрелов, только вблизи'}</small></button>`).join('')}</div>`;
   } else if (screen === 'scen') {
     h = `${back}<h2 class="mh">Сценарии <small class="muted">готовые карты</small></h2>
       <div class="scl">${SCENS.map(x => `<button data-scen="${x.id}" class="${SCEN.id === x.id ? 'on' : ''}"><b>${x.n}</b><small>${x.d}</small></button>`).join('')}</div>
@@ -2696,6 +2983,11 @@ function bindMenu(screen) {
     else startGame(g === 'sim' ? 'sim' : 'campaign', g === 'ua' ? UA : g === 'ru' ? RU : 0, false);
   });
   card.querySelectorAll('[data-scen]').forEach(el => el.onclick = () => { pickScen(el.dataset.scen); refreshMenuSrc(); });
+  card.querySelectorAll('[data-ops]').forEach(el => el.onclick = () => { MS_OP.side = +el.dataset.ops; showMenu('op'); });
+  card.querySelectorAll('[data-opgo]').forEach(el => el.onclick = () => {
+    if (LOADING || !FRONT || (SCEN.id === 'hist' && FRONT.src !== 'hist')) return toast('Сначала выберите дату в сценарии «Фронт на любую дату».');
+    startOperator(MS_OP.side, el.dataset.opgo);
+  });
   if ($('diff')) $('diff').onchange = e => { MS.diff = e.target.value; };
   if ($('tmode')) $('tmode').onchange = e => { MS.rt = +e.target.value; };
   if ($('histDate')) $('histDate').onchange = e => { SCEN.date = e.target.value; if (SCEN.date) loadHist(SCEN.date); };
@@ -2748,7 +3040,7 @@ const FREE_KEY = 'frontline-free-v1', LAST_KEY = 'frontline-last';
 const saveKeyFor = mode => mode === 'editor' ? FREE_KEY : SAVE_KEY;
 const hasSaveFor = key => { try { return !!localStorage.getItem(key); } catch (e) { return false; } };
 function save() {
-  if (!S) return;
+  if (!S || S.mode === 'op') return;
   try {
     const st = Object.assign({}, S, { sel: null, draft: null, ed: { side: ED.side, tool: ED.tool, paint: ED.paint, size: ED.size } });
     const key = saveKeyFor(S.mode);
@@ -2817,7 +3109,7 @@ async function boot() {
   refreshMenuSrc();
 }
 function closeLayers() { $('layers').hidden = true; }
-window.__nato = natoSVG; window.__game = { get S() { return S; }, get ATK() { return ATK; }, draw, recompute, layers, touch: touchInput, invalidate, forceRender: () => { renderCache(); draw(); }, ASSETS, owner, country, fort, endTurn, startGame, computeStats, CITIES, cellAt, U, V, COLS, ROWS, localInfo, view, requestDraw, get STATS() { return STATS; } };
+window.__nato = natoSVG; window.__vis = () => UNIT_VIS; window.__game = { get S() { return S; }, get ATK() { return ATK; }, draw, recompute, layers, touch: touchInput, invalidate, forceRender: () => { renderCache(); draw(); }, ASSETS, owner, country, fort, endTurn, startGame, computeStats, CITIES, cellAt, U, V, COLS, ROWS, localInfo, view, requestDraw, get STATS() { return STATS; } };
 boot();
 </script>
 </body>
