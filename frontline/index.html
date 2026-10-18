@@ -589,6 +589,7 @@ function recompute(full = true) {
   buildContour(); buildImage(); placeUnits();
   STATS = computeStats();
   invalidate();
+  if (S && S.mode === 'editor') saveSoon();
 }
 
 /* ================= Состояние игры ================= */
@@ -1765,7 +1766,7 @@ function atkLoop(t) {
         const km = A.taken; ATK = null; recompute(); renderSide();
         toast(`Наступление завершено: захвачено ${fmt(km)} км².`); return;
       }
-      A.phase = 'wait'; renderSide();
+      A.phase = 'wait'; renderSide(); saveSoon();
       toast(`Войска остановились. Нужна ${A.wave + 1}-я волна: ${WEAPONS[A.weapon].name.toLowerCase()}.`);
     }
     if (ATK && ATK.phase === 'go' && $('atkProg')) $('atkProg').textContent = Math.round(A.idx / A.total * 100) + '%';
@@ -2025,7 +2026,7 @@ function renderEditor(body) {
     <div class="row"><button class="btn primary" id="bPlayUA">За ВСУ</button><button class="btn red" id="bPlayRU">За ВС РФ</button></div>
     <div class="row" style="margin-top:6px"><button class="btn" id="bPlaySim">Симуляция ИИ</button></div>`;
   body.querySelectorAll('[data-tool]').forEach(el => el.onclick = () => { ED.tool = el.dataset.tool; renderSide(); });
-  body.querySelectorAll('[data-side]').forEach(el => el.onclick = () => { ED.side = +el.dataset.side; if (ATK && ATK.phase === 'choose') ATK = null; renderSide(); requestDraw(); });
+  body.querySelectorAll('[data-side]').forEach(el => el.onclick = () => { saveSoon(); ED.side = +el.dataset.side; if (ATK && ATK.phase === 'choose') ATK = null; renderSide(); requestDraw(); });
   body.querySelectorAll('[data-paint]').forEach(el => el.onclick = () => { ED.paint = +el.dataset.paint; renderSide(); });
   body.querySelectorAll('[data-w]').forEach(el => el.onclick = () => startAtk(el.dataset.w));
   if ($('brush')) $('brush').oninput = e => { ED.size = +e.target.value; $('brushO').textContent = Math.round(ED.size * 2.6) + ' км'; };
@@ -2072,7 +2073,7 @@ function bindFile() {
 }
 function showMenu() {
   stopAuto();
-  const hasSave = (() => { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } })();
+  const hasCamp = hasSaveFor(SAVE_KEY), hasFree = hasSaveFor(FREE_KEY);
   openModal(`<h1>ЛИНИЯ <i>ФРОНТА</i></h1>
     <div class="sub">Стратегия на реальной карте: линия фронта DeepState, как она есть сегодня или на любую дату. Наступайте, бейте КАБами и ракетами, высаживайте десанты, окружайте — и смотрите, как меняется карта.</div>
     <div class="row" style="align-items:center;margin-bottom:8px;flex-wrap:wrap">
@@ -2097,7 +2098,11 @@ function showMenu() {
       <span class="muted">Время:</span>
       <select id="tmode">${[[0, 'Пошагово'], [420000, 'Реалистичное: 1 день = 1 мин'], [60000, 'Неделя = 1 мин'], [15000, 'Неделя = 15 с']].map(([v, n]) => `<option value="${v}" ${(S ? S.rt : 0) === v ? 'selected' : ''}>${n}</option>`).join('')}</select>
       <span class="spacer" style="flex:1"></span>
-      ${S && S.mode !== 'editor' && !S.over ? '<button class="btn" id="bResume" style="flex:none">Вернуться</button>' : hasSave ? '<button class="btn" id="bLoad" style="flex:none">Продолжить</button>' : ''}
+      ${S && !S.over ? `<button class="btn" id="bResume" style="flex:none">Вернуться${S.mode === 'editor' ? ' в свободный режим' : ''}</button>` : ''}
+    </div>
+    <div class="row" style="margin-top:8px;flex-wrap:wrap">
+      ${hasCamp && !(S && !S.over && S.mode !== 'editor') ? '<button class="btn" id="bLoad">↩ Продолжить кампанию</button>' : ''}
+      ${hasFree && !(S && S.mode === 'editor') ? '<button class="btn" id="bLoadFree">↩ Продолжить свободный режим</button>' : ''}
     </div>
     <details><summary>Как играть</summary>
       <p>Карта — сетка участков ~2×2 км. Стартовая линия фронта берётся из DeepStateMAP: красное — под контролем РФ, серое — серая зона. Вдоль фронта стоят отряды: ▭ с крестом — пехота, с овалом — танки на острие наступления, с «V» — FPV-операторы.</p>
@@ -2127,7 +2132,8 @@ function bindMenu() {
   $('histDate').onchange = e => { SCEN.date = e.target.value; if (SCEN.date) loadHist(SCEN.date); };
   refreshMenuSrc();
   if ($('bResume')) $('bResume').onclick = closeModal;
-  if ($('bLoad')) $('bLoad').onclick = () => { if (load()) closeModal(); else toast('Сохранение повреждено'); };
+  if ($('bLoad')) $('bLoad').onclick = () => { if (S) save(); if (load(SAVE_KEY)) closeModal(); else toast('Сохранение повреждено'); };
+  if ($('bLoadFree')) $('bLoadFree').onclick = () => { if (S) save(); if (load(FREE_KEY)) closeModal(); else toast('Сохранение повреждено'); };
 }
 function showReport(rep) {
   const p = S.player, net = rep.gained[p] - rep.gained[3 - p];
@@ -2154,22 +2160,38 @@ const rleEnc = a => { const o = []; let v = a[0], c = 0; for (let i = 0; i < a.l
 const rleDec = (str, a) => { const x = str.split(',').map(Number); let p = 0; for (let i = 0; i < x.length; i += 2) { a.fill(x[i], p, p + x[i + 1]); p += x[i + 1]; } };
 const toB64 = a => { const u = new Uint8Array(a.buffer, a.byteOffset, a.byteLength); let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); };
 const fromB64 = (s, T) => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return new T(u.buffer); };
+// У свободного режима своё сохранение, чтобы кампания его не затирала (и наоборот).
+// LAST_KEY помнит, во что играли последним, — после перезагрузки страницы игра продолжает именно это.
+const FREE_KEY = 'frontline-free-v1', LAST_KEY = 'frontline-last';
+const saveKeyFor = mode => mode === 'editor' ? FREE_KEY : SAVE_KEY;
+const hasSaveFor = key => { try { return !!localStorage.getItem(key); } catch (e) { return false; } };
 function save() {
-  if (!S || S.mode === 'editor') return;
+  if (!S) return;
   try {
-    const st = Object.assign({}, S, { sel: null, draft: null });
-    localStorage.setItem(SAVE_KEY, JSON.stringify({ N, S: st, stats0: STATS0, frontDate: +FRONT.date,
+    const st = Object.assign({}, S, { sel: null, draft: null, ed: { side: ED.side, tool: ED.tool, paint: ED.paint, size: ED.size } });
+    const key = saveKeyFor(S.mode);
+    localStorage.setItem(key, JSON.stringify({ N, S: st, stats0: STATS0, frontDate: +FRONT.date,
       owner: rleEnc(owner), owner0: rleEnc(owner0), fort: rleEnc(fort), changed: rleEnc(changed), cut: rleEnc(cut), grace: rleEnc(grace) }));
+    localStorage.setItem(LAST_KEY, key);
   } catch (e) { /* хранилище недоступно — игра просто не сохранится */ }
 }
-function load() {
+let saveT = 0;
+function saveSoon() { clearTimeout(saveT); saveT = setTimeout(save, 700); }
+function load(key = SAVE_KEY) {
   try {
-    const d = JSON.parse(localStorage.getItem(SAVE_KEY));
+    const d = JSON.parse(localStorage.getItem(key));
     if (!d || d.N !== N) return false;
+    stopAuto(); ATK = null; LASSO = null; ED.undo = [];
     rleDec(d.owner, owner); rleDec(d.owner0, owner0); rleDec(d.fort, fort); rleDec(d.changed, changed); rleDec(d.cut, cut); rleDec(d.grace, grace);
-    S = d.S; STATS0 = d.stats0; recompute(); renderAll(); return true;
+    S = d.S; STATS0 = d.stats0;
+    if (S.ed) Object.assign(ED, S.ed);
+    try { localStorage.setItem(LAST_KEY, key); } catch (e) { }
+    recompute(); renderAll(); return true;
   } catch (e) { return false; }
 }
+// вкладку свернули или закрывают — сохраняем сразу (в том числе посреди атаки в свободном режиме)
+addEventListener('visibilitychange', () => { if (document.hidden) save(); });
+addEventListener('pagehide', save);
 
 /* ================= Запуск ================= */
 function setFront(fd) {
@@ -2190,7 +2212,10 @@ async function boot() {
   FRONT_NOW = { occ: emb.occ, unk: emb.unk, lib: emb.lib || [], date: new Date(emb.date + 'T12:00:00'), src: 'demo' };
   setFront(FRONT_NOW);
   if (innerWidth < 760) { view.z = Math.min(innerWidth / 230, 2); view.u = U(36.4); view.v = V(47.5); }
-  showMenu();
+  // после перезагрузки страницы продолжаем то, во что играли последним (свободный режим или кампанию)
+  let last = null; try { last = localStorage.getItem(LAST_KEY); } catch (e) { }
+  if (last && load(last)) toast(S.mode === 'editor' ? 'Продолжаем свободный режим' : 'Продолжаем игру');
+  else showMenu();
   try {
     const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 8000);
     const r = await fetch('https://deepstatemap.live/api/history/last', { signal: ctl.signal, cache: 'no-store' });
