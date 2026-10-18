@@ -634,3 +634,29 @@ body.locked { overflow: hidden; }
 .page-curtain { position: fixed; inset: 0; z-index: 200; background: var(--red); pointer-events: none; transform: scaleY(0); transform-origin: bottom; }
 .page-curtain.run { animation: curtain .9s var(--ease); }
 @keyframes curtain { 0% { transform: scaleY(0); transform-origin: bottom; } 45% { transform: scaleY(1); transform-origin: bottom; } 55% { transform: scaleY(1); transform-origin: top; } 100% { transform: scaleY(0); transform-origin: top; } }
+
+/* ---------- Блоки, які заповнюються з config.js ---------- */
+.hp { position: absolute !important; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+.form-note { margin: 0; padding: 12px 16px; border-radius: 10px; background: color-mix(in srgb, var(--red) 7%, transparent); font-size: 14px; color: var(--ink); }
+label.check a { color: var(--red); font-weight: 700; }
+.socials { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+.soc {
+  width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; background: var(--red); color: var(--on-red);
+  transition: transform .4s var(--ease), background-color .3s;
+}
+.soc:hover { transform: translateY(-3px) rotate(-6deg); background: var(--red-hi); }
+.soc svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; padding: 0 !important; background: none !important; }
+.contact-item .soc svg { width: 20px; height: 20px; }
+.map { border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); border: 1px solid var(--line-soft); aspect-ratio: 16 / 10; }
+.map iframe { width: 100%; height: 100%; border: 0; display: block; filter: saturate(.85); }
+.portrait-photo img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 14px; box-shadow: 0 0 0 6px var(--paper), 0 0 0 8px var(--red), var(--shadow-hi); }
+.projects { display: grid; gap: 14px; }
+.project img { width: 120px; height: 80px; object-fit: cover; border-radius: 8px; flex: none; }
+.privacy { max-width: 760px; }
+.privacy h3 { margin-top: 28px; color: var(--red); }
+.privacy p { color: var(--ink); font-size: 17px; }
+.footer-soc { grid-column: 1; margin: 0; }
+.footer-nav { grid-column: 2; grid-row: 1 / span 2; }
+@media (max-width: 760px) { .footer-nav { grid-column: auto; grid-row: auto; } }
+.footer-soc:empty { display: none; }
+.footer-meta a { color: inherit; }
