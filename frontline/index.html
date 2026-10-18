@@ -141,6 +141,25 @@
   .card summary { cursor: pointer; color: var(--ink); }
   .card select { background: var(--panel-2); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; font: inherit; }
   .rep p { margin: 0 0 6px; }
+  /* стартовое меню как в GeoFront: тёмная панель слева, справа живая карта */
+  #modal.gm { justify-content: flex-start; align-items: stretch; padding: 0; background: linear-gradient(90deg, rgba(5,8,12,.25), rgba(5,8,12,.45)); }
+  #modal.gm .card { width: min(500px, 100%); max-height: none; height: 100%; border: 0; border-radius: 0; background: #0b0f15; padding: 0;
+    display: flex; flex-direction: column; position: relative; overflow: visible; box-shadow: 8px 0 40px rgba(0,0,0,.5); }
+  #modal.gm .card::after { content: ""; position: absolute; top: 0; right: -3px; width: 3px; height: 100%; background: linear-gradient(#2563eb, #7c3aed 50%, #dc2626); }
+  .gmw { padding: 24px 28px 8px; flex: 1; overflow-y: auto; }
+  .gmhead { padding: 34px 28px 22px; }
+  .gmlogo { width: 64px; height: 64px; border-radius: 50%; margin-bottom: 14px; display: block; }
+  .gmhead h1 { font-family: var(--head); font-weight: 400; font-style: italic; font-size: 40px; letter-spacing: .02em; margin: 0; line-height: 1.05; }
+  .gmhead h1 i { color: var(--ru); } .gmhead .sub { color: var(--muted); margin: 6px 0 0; font-size: 14px; }
+  .gml { display: flex; flex-direction: column; border-top: 1px solid #1c2430; }
+  .gmi { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; text-align: left; background: none; border: 0;
+    border-bottom: 1px solid #1c2430; border-radius: 0; padding: 17px 28px; font-size: 19px; color: var(--ink); transition: background .15s, padding .15s; }
+  .gmi:hover { background: #121a26; padding-left: 34px; } .gmi small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+  .gmi .ic { font-size: 20px; opacity: .85; flex: none; } .gmi.primary { color: #93c5fd; } .gmi.primary .ic { color: #60a5fa; }
+  .gmfoot { margin-top: auto; padding: 16px 28px 18px; display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 12px; gap: 10px; }
+  .gmfoot .lang { border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; color: var(--ink); white-space: nowrap; }
+  .gmfoot .lang b { color: #93c5fd; font-weight: 600; }
+  #modal.gm .gmw .mback { margin-bottom: 14px; }
   .mmain { display: flex; flex-direction: column; gap: 8px; text-align: center; }
   .mmain h1 { font-size: 34px; } .mmain .sub { margin-bottom: 10px; }
   .mbig { padding: 13px 16px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel-2); font-size: 16px; font-weight: 500; text-align: left; }
@@ -690,6 +709,7 @@ function newSide(s) {
     : { gar: 420000, res: 42000, arm: 280, sh: 260000, dr: 36000, air: 70, heli: 60, kab: 500, msl: 90, ships: 14, lships: 5, bek: 4, superCd: 0, morale: 1, lossP: 0, lossA: 0, km: 0, gold: 700, econ: 0, dord: 0, mob: 0, sanc: 0 };
 }
 function startGame(mode, player, keepMap) {
+  if (menuShift) { view.u += menuShift; menuShift = 0; } // вернуть фронт в центр после стартового меню
   stopAuto();
   if (!keepMap) applyFront(FRONT);
   owner0.set(owner); changed.fill(0); cut.fill(0); grace.fill(0);
@@ -709,7 +729,7 @@ function startGame(mode, player, keepMap) {
   addLog(0, mode === 'editor' ? 'Свободный режим: обведите область лассо.' :
     `Старт: ${FRONT.name ? FRONT.name : FRONT.src === 'hist' ? 'архивная линия фронта DeepState на ' + dateStr(FRONT.date) : 'линия фронта DeepState на ' + dateStr(FRONT.date)}. ${mode === 'sim' ? 'ИИ против ИИ.' : 'Вы командуете: ' + SIDE[player].short + '.'}`, 'ev');
   closeModal(); renderAll();
-  if (mode === 'editor') { ED.undo = []; ATK = null; LASSO = null; }
+  if (mode === 'editor') { ED.undo = []; ATK = null; LASSO = null; sbuAuto(); } // дивизии сразу стоят на фронте
   save();
 }
 function pickObjectives() {
@@ -2043,7 +2063,26 @@ function flyTo(k) { if (k == null || k < 0) return; view.u = k % COLS + .5; view
 const ED = { tool: 'lasso', side: UA, paint: RU, size: 3, undo: [], ukind: 'inf', uname: '', usel: null };
 // Подразделения песочницы: бесплатно, без ограничений; на бои кампании не влияют
 const sbuAt = (x, y) => { let best = null, bd = 16; for (const u of (S && S.sbu) || []) { const v = Math.hypot(sx(u.u) - x, sy(u.v) - y); if (v < bd) { bd = v; best = u; } } return best; };
-function sbuName(side, kind) { const n = (S.sbu.length + 1) * 3 + (side === RU ? 100 : 0); return n + '-я ' + KINDS[kind].toLowerCase().replace(/ая$/, 'ая') + ' бригада'; }
+function sbuName(side, kind) { const n = (S.sbu.length + 1) * 3 + (side === RU ? 100 : 0); return n + '-я ' + KINDS[kind].toLowerCase() + ' дивизия'; }
+// Дивизии в атаке лассо: свои рядом с областью идут вперёд вместе с волной, дивизии противника отходят
+const unitKm = (u, k) => Math.hypot(u.u - (k % COLS + .5), u.v - (((k / COLS) | 0) + .5)) * Math.sqrt(rowKm2[(k / COLS) | 0]);
+function sbuJoin(A) {
+  const first = A.cells[0], mid = A.cells[A.total >> 1];
+  A.divs = (S.sbu || []).filter(u => u.side === A.side && Math.min(unitKm(u, first), unitKm(u, mid)) < 120)
+    .sort((a, b) => unitKm(a, first) - unitKm(b, first)).slice(0, 6);
+}
+function sbuPush(side) {
+  for (const u of (S.sbu || []).slice()) {
+    if (u.side === side) continue;
+    const k = cellAt(u.u, u.v); if (k < 0 || owner[k] !== side) continue;
+    let best = -1; const ci = k % COLS, cj = (k / COLS) | 0;
+    for (let r = 1; r <= 40 && best < 0; r++) for (let dj = -r; dj <= r && best < 0; dj++) for (let di = -r; di <= r; di++) {
+      if (Math.max(Math.abs(di), Math.abs(dj)) !== r) continue;
+      const n = cellAt(ci + di + .5, cj + dj + .5); if (n >= 0 && land(n) && owner[n] !== side) { best = n; break; }
+    }
+    if (best >= 0) { u.u = best % COLS + .5; u.v = ((best / COLS) | 0) + .5; } else S.sbu = S.sbu.filter(x => x !== u); // некуда отходить — разгромлена
+  }
+}
 function sbuPlace(u, v) {
   const k = cellAt(u, v); if (k < 0 || !land(k)) return toast('Ставьте подразделение на сушу.');
   const id = (S.sbuId = (S.sbuId || 0) + 1);
@@ -2126,10 +2165,14 @@ function startAtk(weapon) {
   pushUndo();
   if (weapon === 'now') { // сразу, без боя
     const list = []; for (let i = 0; i < ATK.total; i++) { const k = ATK.cells[i]; owner[k] = ATK.side; fort[k] = 0; list.push(k); }
+    sbuJoin(ATK); ATK.divs.forEach((u, i) => { const k = ATK.cells[Math.floor(ATK.total * (.45 + .08 * i)) % ATK.total]; u.u = k % COLS + .5; u.v = ((k / COLS) | 0) + .5; });
+    sbuPush(ATK.side);
     const km = ATK.km; ATK = null; recompute(); renderSide(); toast(`Захвачено ${fmt(km)} км².`); return;
   }
   const waves = wavesFor(ATK.km, weapon), per = Math.ceil(ATK.total / waves);
-  Object.assign(ATK, { phase: 'go', weapon, waves, wave: 1, per, waveEnd: Math.min(ATK.total, per), idx: 0, acc: 0, recent: [], lastFx: 0, lastContour: 0, last: performance.now(), taken: 0 });
+  Object.assign(ATK, { phase: 'go', weapon, waves, wave: 1, per, waveEnd: Math.min(ATK.total, per), idx: 0, acc: 0, recent: [], lastFx: 0, lastContour: 0, last: performance.now(), taken: 0, lastPush: 0 });
+  sbuJoin(ATK);
+  if (ATK.divs.length) toast(`В наступление идут: ${ATK.divs.map(u => u.n).slice(0, 3).join(', ')}${ATK.divs.length > 3 ? ' и ещё ' + (ATK.divs.length - 3) : ''}`);
   renderSide(); requestAnimationFrame(atkLoop);
 }
 function sendWave() {
@@ -2155,8 +2198,16 @@ function atkLoop(t) {
     if (A.weapon === 'art' && t - A.lastFx > 130) { A.lastFx = t; fxAdd('strike', ahead(), A.side); fxStart(); }
     if (A.weapon === 'fpv' && t - A.lastFx > 260) { A.lastFx = t; fxAdd('strike', ahead(), A.side); fxStart(); }
     if (t - A.lastContour > 450) { A.lastContour = t; buildContour(); mapDirty = true; }
+    // свои дивизии двигаются за наступающей волной
+    const R0 = A.recent.length;
+    if (R0) A.divs.forEach((u, i) => {
+      const k = A.recent[R0 - 1 - ((i * 53) % Math.min(R0, 300))], tu = k % COLS + .5, tv = ((k / COLS) | 0) + .5, f = Math.min(1, dt / 500);
+      u.u += (tu - u.u) * f; u.v += (tv - u.v) * f;
+    });
+    if (t - A.lastPush > 300) { A.lastPush = t; sbuPush(A.side); }
     if (A.idx >= A.waveEnd) {
       buildContour();
+      sbuPush(A.side);
       if (A.idx >= A.total) {
         const km = A.taken; ATK = null; recompute(); renderSide();
         toast(`Наступление завершено: захвачено ${fmt(km)} км².`); return;
@@ -2463,14 +2514,14 @@ function addOrder() {
 }
 function unitsEditor() {
   const sel = (S.sbu || []).find(u => u.id === ED.usel);
-  return `<div class="op" style="margin-top:8px"><b>Редактор подразделений</b><div class="hint">Песочница · бесплатно · без ограничений. Нажмите на карту — подразделение встанет там; значок можно перетащить.</div>
+  return `<div class="op" style="margin-top:8px"><b>Дивизии</b><div class="hint">Бесплатно и без ограничений. Нажмите на карту — дивизия встанет там; значок можно перетащить. При атаке лассо свои дивизии рядом идут вперёд вместе с волной, а дивизии противника отходят.</div>
     <div class="tools">${Object.entries(KINDS).map(([k, n]) => `<button data-ukind="${k}" class="${ED.ukind === k ? 'on' : ''}">${natoSVG(k, ED.side)} ${n}</button>`).join('')}</div>
-    <input id="uName" class="qin" style="width:100%;margin-top:8px" maxlength="40" placeholder="Название (например, 25-я ВДД)" value="${(ED.uname || '').replace(/"/g, '')}">
+    <input id="uName" class="qin" style="width:100%;margin-top:8px" maxlength="40" placeholder="Название (например, 25-я воздушно-десантная)" value="${(ED.uname || '').replace(/"/g, '')}">
     <div class="row" style="margin-top:8px"><button class="btn" id="uAuto">⚑ Расставить</button><button class="btn" id="uClear">Убрать все</button></div>
     ${sel ? `<div style="margin-top:10px"><div class="drow">${natoSVG(sel.kind, sel.side)}<div><b>${sel.n.replace(/</g, '')}</b><small>${KINDS[sel.kind]} · ${SIDE[sel.side].short} · ${placeName(cellAt(sel.u, sel.v) < 0 ? 0 : cellAt(sel.u, sel.v))}</small></div></div>
       <input id="uRen" class="qin" style="width:100%" maxlength="40" value="${sel.n.replace(/"/g, '')}">
       <div class="row" style="margin-top:6px"><button class="btn" id="uSide">⇄ Сменить сторону</button><button class="btn red" id="uDel">× Убрать</button></div></div>` : ''}
-    <div class="hint">Подразделения на карте: ${(S.sbu || []).length}</div></div>`;
+    <div class="hint">Дивизий на карте: ${(S.sbu || []).length}</div></div>`;
 }
 function renderEditor(body) {
   const t = ED.tool, A = ATK;
@@ -2496,7 +2547,7 @@ function renderEditor(body) {
     <div class="tools">
       <button data-tool="lasso" class="${t === 'lasso' ? 'on' : ''}">➰ Лассо</button>
       <button data-tool="brush" class="${t === 'brush' ? 'on' : ''}">🖌 Кисть</button>
-      <button data-tool="units" class="${t === 'units' ? 'on' : ''}">🎖 Подразделения</button>
+      <button data-tool="units" class="${t === 'units' ? 'on' : ''}">🎖 Дивизии</button>
       <button data-tool="hand" class="${t === 'hand' ? 'on' : ''}">✋ Рука</button>
     </div>
     ${t === 'units' ? unitsEditor() : ''}
@@ -2533,7 +2584,7 @@ function startAuto() { stopAuto(); autoTimer = setInterval(() => { if (S && S.mo
 function stopAuto() { if (autoTimer) { clearInterval(autoTimer); autoTimer = null; } }
 
 /* ================= Окна ================= */
-function openModal(html) { $('modalCard').innerHTML = html; $('modal').hidden = false; }
+function openModal(html, menu = false) { $('modal').classList.toggle('gm', menu); $('modalCard').innerHTML = html; $('modalCard').scrollTop = 0; $('modal').hidden = false; }
 function closeModal() { $('modal').hidden = true; fxStart(); }
 function srcLine() {
   if (LOADING) return `<span class="dot"></span>${LOADING}`;
@@ -2568,16 +2619,23 @@ function showMenu(screen = 'main') {
   const scenName = (SCENS.find(x => x.id === SCEN.id) || SCENS[0]).n + (SCEN.id === 'hist' && FRONT && FRONT.src === 'hist' ? ' · ' + new Date(FRONT.date).toLocaleDateString('ru-RU') : '');
   let h = '';
   if (screen === 'main') {
-    h = `<div class="mmain"><h1>ЛИНИЯ <i>ФРОНТА</i></h1><div class="sub">Интерактивная песочница и стратегия на карте фронта</div>
-      ${active ? `<button class="mbig primary" id="bResume">▶ Вернуться${S.mode === 'editor' ? ' в свободный режим' : ' в игру'}</button>` : ''}
-      ${!active && hasCamp ? '<button class="mbig primary" id="bLoad">▶ Продолжить кампанию</button>' : ''}
-      ${hasFree && !(S && S.mode === 'editor') ? '<button class="mbig" id="bLoadFree">↩ Продолжить свободный режим</button>' : ''}
-      <button class="mbig" data-scr="single">🎯 Одиночная игра<small>Кампания за ВСУ или ВС РФ, симуляция ИИ</small></button>
-      <button class="mbig" data-go="ed">➰ Свободный режим<small>Песочница: лассо, волны атак, подразделения</small></button>
-      <button class="mbig" data-scr="scen">🗺 Сценарии<small>Сейчас: ${scenName}</small></button>
-      <button class="mbig" data-scr="settings">⚙ Настройки</button>
-      <button class="mbig" data-scr="help">❓ Как играть</button>
-      <div class="mfoot">v2.0 · линия фронта: DeepStateMAP · карта: Natural Earth</div></div>`;
+    const it = (attr, ic, t, sm, cls = '') => `<button class="gmi ${cls}" ${attr}><span>${t}${sm ? `<small>${sm}</small>` : ''}</span><span class="ic">${ic}</span></button>`;
+    h = `<div class="gmhead"><svg class="gmlogo" viewBox="0 0 64 64"><circle cx="32" cy="32" r="31" fill="#111827" stroke="#2a3443"/>
+        <path d="M32 4a28 28 0 0 0 0 56z" fill="#1d4ed8" opacity=".85"/><path d="M32 4a28 28 0 0 1 0 56z" fill="#b91c1c" opacity=".85"/>
+        <path d="M30 6 36 16 28 24 37 32 29 40 36 48 31 58" fill="none" stroke="#f8fafc" stroke-width="3" stroke-linejoin="round"/></svg>
+      <h1>Линия <i>фронта</i></h1><div class="sub">Интерактивная песочница линии фронта</div></div>
+      <div class="gml">
+      ${active ? it('id="bResume"', '▶', S.mode === 'editor' ? 'Вернуться в свободный режим' : 'Вернуться в игру', S.mode === 'editor' ? '' : `Неделя ${S.turn} · ${dateStr(S.date)}`, 'primary') : ''}
+      ${!active && hasCamp ? it('id="bLoad"', '▶', 'Продолжить кампанию', '', 'primary') : ''}
+      ${hasFree && !(S && S.mode === 'editor') ? it('id="bLoadFree"', '↩', 'Продолжить свободный режим') : ''}
+      ${it('data-scr="single"', '▶', 'Одиночная игра', 'Кампания за ВСУ или ВС РФ, симуляция ИИ')}
+      ${it('data-go="ed"', '➰', 'Свободный режим', 'Лассо, волны атак, дивизии')}
+      ${it('data-scr="scen"', '🗺', 'Сценарии', 'Сейчас: ' + scenName)}
+      ${it('data-scr="settings"', '⚙', 'Настройки')}
+      ${it('data-scr="help"', '?', 'Как играть')}
+      ${it('data-href="https://deepstatemap.live"', '↗', 'Карта DeepState')}
+      </div>
+      <div class="gmfoot"><span>v2.1.0 · линия фронта: DeepStateMAP</span><span class="lang"><b>RU</b> · EN</span></div>`;
   } else if (screen === 'single') {
     h = `${back}<h2 class="mh">Одиночная игра</h2>
       <div class="src">Карта: <b>${scenName}</b> <button class="btn" data-scr="scen" style="padding:3px 10px;margin-left:6px">Сменить</button></div>
@@ -2619,12 +2677,14 @@ function showMenu(screen = 'main') {
       <p><b>Свободный режим</b>: обведите область лассо — выбранная сторона её захватит волнами танков, FPV или артиллерии, противник не мешает. Кисть, редактор подразделений (ставьте и перетаскивайте значки), кнопка «Расставить».</p>
       <p>📏 Линейка в верхней панели меряет расстояние. Это игра, а не прогноз: цифры условные.</p></div>`;
   }
-  openModal(h);
+  openModal(screen === 'main' ? h : `<div class="gmw">${h}</div><div class="gmfoot"><span>v2.1.0</span><span class="lang"><b>RU</b> · EN</span></div>`, true);
   bindMenu(screen);
 }
 function bindMenu(screen) {
   const card = $('modalCard');
   card.querySelectorAll('[data-scr]').forEach(el => el.onclick = () => showMenu(el.dataset.scr));
+  card.querySelectorAll('[data-href]').forEach(el => el.onclick = () => window.open(el.dataset.href, '_blank', 'noopener'));
+  const lang = card.querySelector('.lang'); if (lang) lang.onclick = () => toast('Английская версия пока в разработке');
   card.querySelectorAll('[data-go]').forEach(el => el.onclick = () => {
     if (LOADING || !FRONT || (SCEN.id === 'hist' && FRONT.src !== 'hist')) return toast('Сначала выберите дату в сценарии «Фронт на любую дату».');
     const g = el.dataset.go;
@@ -2706,7 +2766,9 @@ function load(key = SAVE_KEY) {
     for (const sd of [UA, RU]) { const def = newSide(sd); for (const key in def) if (S.sides[sd][key] == null) S.sides[sd][key] = def[key]; }
     S.divs = S.divs || { 1: [], 2: [] }; S.sbu = S.sbu || []; S.pockets = S.pockets || { 1: [], 2: [] }; S.divId = S.divId || 1; S.tab = S.tab || 'orders'; S.dmode = ''; S.droute = null;
     try { localStorage.setItem(LAST_KEY, key); } catch (e) { }
-    recompute(); renderAll(); return true;
+    recompute(); renderAll();
+    if (S.mode === 'editor' && !S.sbu.length) sbuAuto(); // старое сохранение без дивизий — расставляем
+    return true;
   } catch (e) { return false; }
 }
 // вкладку свернули или закрывают — сохраняем сразу (в том числе посреди атаки в свободном режиме)
@@ -2719,10 +2781,12 @@ function setFront(fd) {
   $('credDate').textContent = (fd.src === 'hist' ? '· архив ' : fd.src === 'scen' ? '· сценарий ' : '· ') + new Date(fd.date).toLocaleDateString('ru-RU');
   if (!S || S.over) { applyFront(fd); owner0.set(owner); initForts(); recompute(); }
 }
+let menuShift = 0;
 async function boot() {
   buildBase(); buildPaths(); resize();
   addEventListener('resize', resize);
   $('bMenu').onclick = () => showMenu();
+  $('modal').onclick = e => { if (e.target === $('modal') && $('modal').classList.contains('gm') && S && !S.over) closeModal(); };
   $('bPause').onclick = () => { RT.paused = !RT.paused; renderClock(); };
   $('bRuler').onclick = () => { RULER.on = !RULER.on; RULER.a = RULER.b = null; $('bRuler').classList.toggle('on', RULER.on); toast(RULER.on ? 'Линейка: отметьте первую точку на карте' : 'Линейка выключена'); requestDraw(); };
   $('bLayers').onclick = () => { $('layers').hidden = !$('layers').hidden; };
@@ -2735,8 +2799,9 @@ async function boot() {
   if (innerWidth < 760) { view.z = Math.min(innerWidth / 230, 2); view.u = U(36.4); view.v = V(47.5); }
   // после перезагрузки страницы продолжаем то, во что играли последним (свободный режим или кампанию)
   let last = null; try { last = localStorage.getItem(LAST_KEY); } catch (e) { }
-  if (last && load(last)) toast(S.mode === 'editor' ? 'Продолжаем свободный режим' : 'Продолжаем игру');
-  else showMenu();
+  // как в GeoFront: при запуске всегда стартовое меню слева, а справа — живая карта (и прошлая игра, если была)
+  if (!(last && load(last))) { renderSide(); if (innerWidth >= 760) view.u -= (menuShift = 250 / view.z); } // карта по центру правой части, пока открыто меню
+  showMenu();
   try {
     const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 8000);
     const r = await fetch('https://deepstatemap.live/api/history/last', { signal: ctl.signal, cache: 'no-store' });
