@@ -14,6 +14,14 @@
   • 3 пальца                           — переключить окно (Alt+Tab)
   • «Коза» 🤘 (указательный + мизинец) — все окна (Win+Tab)
   • Кулак                              — пауза / воспроизведение
+  • Большой палец вверх 👍              — следующий трек
+  • Большой палец вниз 👎               — предыдущий трек
+  • «OK» 👌                             — выключить / включить звук
+  • Только мизинец                     — скриншот области (Win+Shift+S)
+  Взмах открытой ладонью (быстро):
+  • вправо / влево                     — вперёд / назад (браузер, проводник)
+  • вверх                              — развернуть окно на весь экран
+  • вниз                               — свернуть окно
 
 ДВЕ руки:
   • Хлопок                             — свернуть все окна (ещё хлопок — вернуть)
@@ -58,24 +66,36 @@ SCROLL_SPEED = 3
 
 GESTURE_HOLD = 0.7      # сколько держать жест левой руки, чтобы он сработал
 VOLUME_REPEAT = 0.15    # как часто менять громкость, пока жест держится
+SWIPE_DIST = 1.6        # насколько далеко махнуть (в размерах ладони)...
+SWIPE_TIME = 0.35       # ...и за сколько секунд
+SWIPE_COOLDOWN = 0.8
 CLAP_FAR = 2.2          # ладони были дальше этого (в размерах ладони)...
 CLAP_CLOSE = 1.2        # ...и быстро сошлись ближе этого — хлопок
 CLAP_WINDOW = 0.6       # за сколько секунд руки должны сойтись
 CLAP_COOLDOWN = 1.5
 
-# «Свернуть все окна» в разных системах
+# Сочетания клавиш в разных системах
 if sys.platform == "darwin":
     SHOW_DESKTOP = ("fn", "f11")
     WINDOW_SWITCH = ("command", "tab")
     TASK_VIEW = ("ctrl", "up")
+    SCREENSHOT = ("command", "shift", "4")
+    GO_BACK, GO_FORWARD = ("command", "["), ("command", "]")
+    MAXIMIZE, MINIMIZE = ("ctrl", "command", "f"), ("command", "m")
 elif os.name == "nt":
     SHOW_DESKTOP = ("win", "d")
     WINDOW_SWITCH = ("alt", "tab")
     TASK_VIEW = ("win", "tab")
+    SCREENSHOT = ("win", "shift", "s")
+    GO_BACK, GO_FORWARD = ("alt", "left"), ("alt", "right")
+    MAXIMIZE, MINIMIZE = ("win", "up"), ("win", "down")
 else:
     SHOW_DESKTOP = ("super", "d")
     WINDOW_SWITCH = ("alt", "tab")
     TASK_VIEW = ("super",)
+    SCREENSHOT = ("shift", "printscreen")
+    GO_BACK, GO_FORWARD = ("alt", "left"), ("alt", "right")
+    MAXIMIZE, MINIMIZE = ("super", "up"), ("super", "h")
 
 MODEL_URL = ("https://storage.googleapis.com/mediapipe-models/hand_landmarker/"
              "hand_landmarker/float16/latest/hand_landmarker.task")
@@ -85,7 +105,7 @@ pyautogui.FAILSAFE = True
 pyautogui.PAUSE = 0
 
 # Номера точек руки в MediaPipe
-WRIST, THUMB_TIP = 0, 4
+WRIST, THUMB_MCP, THUMB_TIP = 0, 2, 4
 INDEX_MCP, INDEX_PIP, INDEX_TIP = 5, 6, 8
 MIDDLE_MCP, MIDDLE_PIP, MIDDLE_TIP = 9, 10, 12
 RING_MCP, RING_PIP, RING_TIP = 13, 14, 16
@@ -294,11 +314,27 @@ COMMANDS = {
     "three": ("Переключить окно", lambda: press(WINDOW_SWITCH), False),
     "rock":  ("Все окна", lambda: press(TASK_VIEW), False),
     "fist":  ("Пауза/плей", lambda: pyautogui.press("playpause"), False),
+    "thumb_up":   ("Следующий трек", lambda: pyautogui.press("nexttrack"), False),
+    "thumb_down": ("Предыдущий трек", lambda: pyautogui.press("prevtrack"), False),
+    "ok":    ("Звук вкл/выкл", lambda: pyautogui.press("volumemute"), False),
+    "pinky": ("Скриншот", lambda: press(SCREENSHOT), False),
+}
+
+# взмах открытой ладонью -> (подпись, действие)
+SWIPES = {
+    "right": ("Вперёд", lambda: press(GO_FORWARD)),
+    "left":  ("Назад", lambda: press(GO_BACK)),
+    "up":    ("Развернуть окно", lambda: press(MAXIMIZE)),
+    "down":  ("Свернуть окно", lambda: press(MINIMIZE)),
 }
 
 
 def classify(pts):
     up = fingers_up(pts)
+    palm = palm_size(pts)
+    # «OK»: большой и указательный сомкнуты в кольцо, остальные подняты
+    if up[1:] == (True, True, True) and dist(pts[THUMB_TIP], pts[INDEX_TIP]) / palm < 0.35:
+        return "ok"
     if up == (True, False, False, False):
         return "one"
     if up == (True, True, False, False):
@@ -307,9 +343,22 @@ def classify(pts):
         return "three"
     if up == (True, False, False, True):
         return "rock"
+    if up == (False, False, False, True):
+        return "pinky"
     if up == (False, False, False, False):
+        # большой палец отставлен и смотрит вверх/вниз — лайк/дизлайк, иначе кулак
+        if dist(pts[THUMB_TIP], palm_center(pts)) / palm > 0.8:
+            dy = (pts[THUMB_TIP][1] - pts[THUMB_MCP][1]) / palm
+            if dy < -0.5:
+                return "thumb_up"
+            if dy > 0.5:
+                return "thumb_down"
         return "fist"
     return None
+
+
+def is_open_palm(pts):
+    return fingers_up(pts) == (True, True, True, True)
 
 
 class CommandHand:
@@ -317,12 +366,50 @@ class CommandHand:
         self.gesture = None
         self.since = 0.0
         self.fired_at = None
+        self.track = deque()        # (время, центр ладони) пока ладонь открыта
+        self.last_swipe = 0.0
+        self.appeared = None        # когда рука появилась в кадре
 
     def reset(self):
         self.gesture = None
         self.fired_at = None
+        self.track.clear()
+        self.appeared = None
 
-    def update(self, pts, frame, now):
+    def swipe(self, pts, now, allowed):
+        """Быстрый взмах открытой ладонью: вернёт 'left'/'right'/'up'/'down' или None."""
+        if not allowed or not is_open_palm(pts):
+            self.track.clear()
+            return None
+        # рука только что влетела в кадр — это не взмах
+        if now - self.appeared < 0.4:
+            self.track.clear()
+            return None
+        self.track.append((now, palm_center(pts)))
+        while now - self.track[0][0] > SWIPE_TIME:
+            self.track.popleft()
+        if now - self.last_swipe < SWIPE_COOLDOWN:
+            return None
+        (_, (x0, y0)), (_, (x1, y1)) = self.track[0], self.track[-1]
+        dx, dy = (x1 - x0) / palm_size(pts), (y1 - y0) / palm_size(pts)
+        if max(abs(dx), abs(dy)) < SWIPE_DIST:
+            return None
+        self.last_swipe = now
+        self.track.clear()
+        if abs(dx) > abs(dy):
+            return "right" if dx > 0 else "left"
+        return "down" if dy > 0 else "up"
+
+    def update(self, pts, frame, now, swipe_allowed=True):
+        if self.appeared is None:
+            self.appeared = now
+        direction = self.swipe(pts, now, swipe_allowed)
+        if direction:
+            label, action = SWIPES[direction]
+            action()
+            self.gesture = None
+            return label
+
         g = classify(pts)
         if g != self.gesture:
             self.gesture, self.since, self.fired_at = g, now, None
@@ -432,6 +519,7 @@ def main():
     mouse = Mouse()
     commands = CommandHand()
     clap = ClapDetector()
+    mouse_track = deque()   # где была рука-мышка недавно (чтобы хлопок не считался взмахом)
     fps_time = time.time()
     fps = 0.0
     flash_text, flash_until = "", 0.0
@@ -472,6 +560,16 @@ def main():
             a, b = sorted(found[:2], key=lambda p: palm_center(p)[0])
             mouse_pts, cmd_pts = (b, a) if MOUSE_HAND == "right" else (a, b)
 
+        mouse_moving = False
+        if mouse_pts:
+            mouse_track.append((now, palm_center(mouse_pts), palm_size(mouse_pts)))
+            while now - mouse_track[0][0] > SWIPE_TIME:
+                mouse_track.popleft()
+            (_, a, _), (_, b, size) = mouse_track[0], mouse_track[-1]
+            mouse_moving = dist(a, b) / size > 0.8
+        else:
+            mouse_track.clear()
+
         status = "Рук не видно"
         if mouse_pts:
             draw_hand(frame, mouse_pts, (255, 255, 255))
@@ -485,7 +583,8 @@ def main():
                 do_clap()
                 status = "Хлопок — свернуть окна"
             else:
-                cmd_status = commands.update(cmd_pts, frame, now)
+                cmd_status = commands.update(cmd_pts, frame, now,
+                                             swipe_allowed=not mouse_moving)
                 if cmd_status:
                     status = f"{status} | {cmd_status}"
         else:
