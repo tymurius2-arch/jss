@@ -1,0 +1,898 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Эволюция: от клетки до человека</title>
+<meta name="description" content="Играй за первую клетку и эволюционируй: выбирай, в кого превратиться, и пройди путь до человека, собаки, мыши, гориллы или одного из 160 существ.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&display=swap">
+<style>
+  /* Экран: мир на весь экран, слева сверху — стеклянная панель существа, окна выбора — по центру. */
+  :root {
+    color-scheme: dark;
+    --bg: #04121f;
+    --panel: rgba(6, 22, 38, 0.84);
+    --panel-solid: #08192b;
+    --line: rgba(140, 210, 255, 0.16);
+    --ink: #e6f5ff;
+    --muted: #8fb0c6;
+    --accent: #4fe0c0;
+    --hp: #ff6b5e;
+    --en: #ffd166;
+    --dna: #4fe0c0;
+    --font: "Rubik", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font-family: var(--font); overflow: hidden; -webkit-user-select: none; user-select: none; }
+  canvas#world { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+
+  .glass { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); box-shadow: 0 10px 40px rgba(0,0,0,.35); }
+  .hud { position: fixed; top: 12px; left: 12px; width: 300px; padding: 12px; z-index: 2; }
+  .who { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
+  .who canvas { width: 56px; height: 56px; border-radius: 12px; background: rgba(0,0,0,.25); border: 1px solid var(--line); flex: none; }
+  .who h1 { font-size: 16px; margin: 0; line-height: 1.2; }
+  .who p { margin: 3px 0 0; font-size: 12px; color: var(--muted); }
+  .bar { display: grid; grid-template-columns: 62px 1fr 46px; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); margin: 5px 0; }
+  .bar .track { height: 8px; background: rgba(255,255,255,.08); border-radius: 4px; overflow: hidden; }
+  .bar .fill { height: 100%; border-radius: 4px; transition: width .2s; }
+  .bar em { font-style: normal; color: var(--ink); text-align: right; font-variant-numeric: tabular-nums; }
+  .row { display: flex; gap: 6px; margin-top: 10px; }
+  .row button { flex: 1; }
+  button {
+    font: inherit; font-size: 13px; color: var(--ink); background: rgba(255,255,255,.06);
+    border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; cursor: pointer; transition: background .15s, transform .1s;
+  }
+  button:hover { background: rgba(255,255,255,.12); }
+  button:active { transform: scale(.97); }
+  button.primary { background: var(--accent); color: #022; border-color: transparent; font-weight: 500; }
+  button.primary:hover { filter: brightness(1.08); }
+  button:disabled { opacity: .45; cursor: default; transform: none; }
+  #evoBtn.ready { background: var(--accent); color: #022; font-weight: 700; animation: glow 1.4s ease-in-out infinite; }
+  @keyframes glow { 50% { box-shadow: 0 0 0 4px rgba(79,224,192,.25), 0 0 24px rgba(79,224,192,.55); } }
+  .hint { font-size: 11px; color: var(--muted); margin: 10px 0 0; line-height: 1.45; }
+  .hud.mini .hint, .hud.mini .row2 { display: none; }
+
+  .dash { position: fixed; right: 18px; bottom: calc(18px + env(safe-area-inset-bottom)); width: 74px; height: 74px; border-radius: 50%; display: none; z-index: 2; font-size: 13px; font-weight: 500; }
+  .toasts { position: fixed; left: 50%; top: 14px; transform: translateX(-50%); display: flex; flex-direction: column; gap: 6px; align-items: center; z-index: 5; pointer-events: none; width: min(460px, calc(100% - 32px)); }
+  .toast { padding: 9px 16px; border-radius: 12px; font-size: 14px; text-align: center; animation: tin .3s ease-out; }
+  .toast.big { font-size: 17px; font-weight: 500; border-color: rgba(79,224,192,.5); }
+  @keyframes tin { from { opacity: 0; transform: translateY(-8px); } }
+
+  .modal { position: fixed; inset: 0; z-index: 10; display: none; align-items: center; justify-content: center; padding: 16px; background: rgba(2,10,18,.55); }
+  .modal.open { display: flex; }
+  .card { width: min(900px, 100%); max-height: calc(100% - 8px); overflow-y: auto; padding: 20px; }
+  .card h2 { margin: 0 0 4px; font-size: 22px; }
+  .card .lead { margin: 0 0 16px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+  .choices { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+  .choice { background: rgba(255,255,255,.04); border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+  .choice canvas { width: 100%; height: 120px; border-radius: 10px; }
+  .choice h3 { margin: 2px 0 0; font-size: 16px; }
+  .choice p { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.45; flex: 1; }
+  .tags { display: flex; flex-wrap: wrap; gap: 4px; }
+  .tag { font-size: 11px; padding: 2px 7px; border-radius: 99px; background: rgba(255,255,255,.07); color: var(--muted); }
+  .tag.top { background: rgba(255,209,102,.16); color: var(--en); }
+  .tag.new { background: rgba(79,224,192,.16); color: var(--accent); }
+  .foot { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; flex-wrap: wrap; }
+
+  .tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+  .tabs button.on { background: var(--accent); color: #022; border-color: transparent; }
+  .path { display: flex; flex-direction: column; gap: 6px; }
+  .step { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 12px; background: rgba(255,255,255,.03); border: 1px solid var(--line); }
+  .step canvas { width: 44px; height: 44px; flex: none; }
+  .step div { flex: 1; min-width: 0; }
+  .step b { display: block; font-size: 14px; }
+  .step span { font-size: 12px; color: var(--muted); }
+  .step.cur { border-color: rgba(79,224,192,.6); }
+  .step button { flex: none; font-size: 12px; padding: 6px 9px; }
+  .coll { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+  .cell { text-align: center; font-size: 11px; color: var(--muted); padding: 6px 4px; border-radius: 10px; background: rgba(255,255,255,.03); border: 1px solid var(--line); }
+  .cell canvas { width: 64px; height: 52px; display: block; margin: 0 auto 2px; }
+  .cell.unk { opacity: .45; }
+  .cell.unk i { display: block; height: 52px; line-height: 52px; font-style: normal; font-size: 22px; }
+  .big-n { font-size: 40px; font-weight: 700; color: var(--accent); }
+
+  @media (max-width: 700px) {
+    .hud { left: 8px; right: 8px; top: 8px; width: auto; padding: 10px; }
+    .who canvas { width: 44px; height: 44px; }
+    .who { margin-bottom: 6px; }
+    .bar { margin: 3px 0; grid-template-columns: 54px 1fr 42px; }
+    .hint { display: none; }
+    .row { margin-top: 6px; }
+    .dash { display: block; }
+    .toasts { top: auto; bottom: calc(104px + env(safe-area-inset-bottom)); }
+    .card { padding: 16px; }
+    .card h2 { font-size: 19px; }
+    .choices { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .choice { padding: 8px; }
+    .choice canvas { height: 84px; }
+    .choice h3 { font-size: 14px; }
+    .choice p { font-size: 12px; }
+  }
+  @media (max-width: 380px) { .choices { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<canvas id="world"></canvas>
+
+<div class="hud glass" id="hud">
+  <div class="who">
+    <canvas id="portrait" width="112" height="112"></canvas>
+    <div><h1 id="name">Первая клетка</h1><p id="sub">Ступень 1 · Микромир</p></div>
+  </div>
+  <div class="bar"><span>Здоровье</span><div class="track"><div class="fill" id="hpFill" style="background:var(--hp)"></div></div><em id="hpTxt">100</em></div>
+  <div class="bar"><span>Энергия</span><div class="track"><div class="fill" id="enFill" style="background:var(--en)"></div></div><em id="enTxt">80</em></div>
+  <div class="bar"><span>ДНК</span><div class="track"><div class="fill" id="dnaFill" style="background:var(--dna)"></div></div><em id="dnaTxt">0/6</em></div>
+  <div class="row">
+    <button id="evoBtn">Эволюция</button>
+    <button id="pathBtn">Путь</button>
+    <button id="pauseBtn" title="Пауза (P)">❚❚</button>
+  </div>
+  <p class="hint" id="hint"></p>
+</div>
+<button class="dash glass" id="dashBtn">Рывок</button>
+<div class="toasts" id="toasts"></div>
+
+<div class="modal" id="introModal">
+  <div class="card glass">
+    <h2>Эволюция</h2>
+    <p class="lead">Вы — первая клетка в тёплом древнем океане. Ешьте, растите и копите <b>ДНК</b>. Когда её хватит — выберите, в кого превратиться дальше. Каждый выбор ведёт по своей ветке: можно стать человеком, собакой, мышью, гориллой, акулой, бабочкой или одним из <b id="totalN">160</b> существ.</p>
+    <p class="lead">На каждой ступени играйте сколько хотите. Когда энергии много, клетка сама делится — это <b>митоз</b>, а у животных появляется потомство, которое следует за вами.</p>
+    <p class="lead"><b>Управление:</b> зажмите мышь или палец — существо поплывёт туда. На клавиатуре — WASD или стрелки. Пробел — рывок. E — эволюция, P — пауза.<br>Зелёная метка — это можно съесть. Красная — опасный хищник, убегайте.</p>
+    <div class="foot">
+      <button id="newBtn">Начать с клетки</button>
+      <button id="contBtn" class="primary" hidden>Продолжить</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="evoModal">
+  <div class="card glass">
+    <h2 id="evoTitle">Куда эволюционировать?</h2>
+    <p class="lead" id="evoLead"></p>
+    <div class="choices" id="choices"></div>
+    <div class="foot"><button id="evoClose">Ещё поиграть</button></div>
+  </div>
+</div>
+
+<div class="modal" id="pathModal">
+  <div class="card glass">
+    <div class="tabs"><button data-tab="path" class="on">Мой путь</button><button data-tab="coll">Коллекция</button></div>
+    <div id="pathTab"></div>
+    <div id="collTab" hidden></div>
+    <div class="foot"><button id="pathClose" class="primary">Играть</button></div>
+  </div>
+</div>
+
+<div class="modal" id="topModal">
+  <div class="card glass" style="max-width:560px;text-align:center">
+    <canvas id="topCanvas" width="320" height="220" style="width:220px;height:150px"></canvas>
+    <h2 id="topTitle"></h2>
+    <p class="lead" id="topLead"></p>
+    <div class="foot" style="justify-content:center">
+      <button id="topPlay" class="primary">Играть дальше</button>
+      <button id="topBack">Вернуться к развилке</button>
+      <button id="topNew">Начать с клетки</button>
+    </div>
+  </div>
+</div>
+
+<script src="tree.js"></script>
+<script src="draw.js"></script>
+<script>
+"use strict";
+// ---------- Константы ----------
+const WORLD = 2400;          // размер мира
+const R0 = 28;               // радиус игрока в мировых единицах
+const HAB = { micro: "Микромир", water: "Океан", land: "Суша" };
+const DIET = { photo: "свет", filter: "частицы", herb: "растения", carn: "хищник", omni: "всеядное" };
+const DIET_HINT = {
+  photo: "Питание — солнечный свет: держитесь в светлых пятнах.",
+  filter: "Питание — мелкие частицы в воде.",
+  herb: "Питание — растения и водоросли.",
+  carn: "Питание — мелкая добыча и существа поменьше (с зелёной меткой).",
+  omni: "Всеядное: растения, мелкая добыча и существа поменьше.",
+};
+const BODY_SPEED = { cell: 150, bacteria: 170, colony: 120, sponge: 55, coral: 55, plant: 55, jelly: 110, worm: 115, star: 85, arthro: 160, snail: 75, octo: 175, fish: 210, quad: 190, bird: 250, ape: 175, biped: 180 };
+const FOOD_KINDS = { micro: ["org"], water: ["plankton", "algae", "fry"], land: ["plant", "berry", "bug"] };
+const EATS = {
+  org: d => d !== "photo",
+  plankton: d => d === "filter" || d === "omni",
+  algae: d => d === "herb" || d === "omni",
+  fry: d => d === "carn" || d === "omni",
+  plant: d => d === "herb" || d === "omni",
+  berry: d => d === "herb" || d === "omni",
+  bug: d => d === "carn" || d === "omni",
+};
+const rand = (a, b) => a + Math.random() * (b - a);
+const pick = a => a[(Math.random() * a.length) | 0];
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+function mulberry(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const costOf = n => Math.round(12 + n.depth * 2.2);
+const isCellLike = n => n.body === "cell" || n.body === "bacteria" || n.body === "colony";
+
+// ---------- Состояние ----------
+const cv = document.getElementById("world"), ctx = cv.getContext("2d");
+let W = 0, H = 0, DPR = 1, VS = 1;
+let node = BY_ID.luca, disc = new Set(["luca"]);
+const P = { x: WORLD / 2, y: WORLD / 2, vx: 0, vy: 0, ang: 0, hp: 100, en: 80, dna: 0, dashT: 0, dashCd: 0, inv: 0, mv: 0, t: 0, repro: 0 };
+let npcs = [], food = [], kin = [], fx = [], floats = [], lights = [], decor = null;
+let paused = false, modalOpen = true, cam = { x: P.x, y: P.y, shake: 0 }, simT = 0, curHab = null;
+const keys = new Set(); const ptr = { down: false, x: 0, y: 0 };
+let pool = [];
+
+// ---------- Сохранение ----------
+function save() {
+  try { localStorage.setItem("evo-save", JSON.stringify({ node: node.id, dna: P.dna, disc: [...disc] })); } catch (e) {}
+}
+function load() {
+  try { const s = JSON.parse(localStorage.getItem("evo-save")); if (s && BY_ID[s.node]) return s; } catch (e) {}
+  return null;
+}
+
+// ---------- Мир ----------
+function buildDecor(hab) {
+  const R = mulberry(hab === "micro" ? 11 : hab === "water" ? 22 : 33);
+  const d = { rocks: [], weeds: [], blobs: [], tufts: [], trees: [], flowers: [], ponds: [], dots: [], patches: [] };
+  if (hab === "micro") {
+    for (let i = 0; i < 70; i++) d.blobs.push({ x: R() * WORLD, y: R() * WORLD, r: 40 + R() * 160, h: 150 + R() * 60, a: R() });
+    for (let i = 0; i < 500; i++) d.dots.push({ x: R() * WORLD, y: R() * WORLD, r: 1 + R() * 2.5 });
+  } else if (hab === "water") {
+    for (let i = 0; i < 40; i++) d.patches.push({ x: R() * WORLD, y: R() * WORLD, r: 120 + R() * 260, k: R() });
+    for (let i = 0; i < 70; i++) d.rocks.push({ x: R() * WORLD, y: R() * WORLD, r: 18 + R() * 50, h: 200 + R() * 30, l: 22 + R() * 14 });
+    for (let i = 0; i < 90; i++) d.weeds.push({ x: R() * WORLD, y: R() * WORLD, n: 4 + (R() * 6 | 0), len: 40 + R() * 70, h: 100 + R() * 60, ph: R() * 6 });
+    for (let i = 0; i < 300; i++) d.dots.push({ x: R() * WORLD, y: R() * WORLD, r: 1 + R() * 2 });
+  } else {
+    for (let i = 0; i < 50; i++) d.patches.push({ x: R() * WORLD, y: R() * WORLD, r: 150 + R() * 300, k: R() });
+    for (let i = 0; i < 14; i++) d.ponds.push({ x: R() * WORLD, y: R() * WORLD, rx: 60 + R() * 120, ry: 40 + R() * 80, rot: R() * 3 });
+    for (let i = 0; i < 1800; i++) d.tufts.push({ x: R() * WORLD, y: R() * WORLD, s: 4 + R() * 7, h: 85 + R() * 40 });
+    for (let i = 0; i < 260; i++) d.flowers.push({ x: R() * WORLD, y: R() * WORLD, h: pick([0, 45, 280, 200, 330, 55]) });
+    for (let i = 0; i < 60; i++) d.rocks.push({ x: R() * WORLD, y: R() * WORLD, r: 12 + R() * 30, h: 35, l: 45 + R() * 12 });
+    for (let i = 0; i < 75; i++) d.trees.push({ x: R() * WORLD, y: R() * WORLD, r: 50 + R() * 60, h: 95 + R() * 40 });
+  }
+  return d;
+}
+
+function scaleOf(n) { return clamp(R0 * Math.pow(1.42, n.sz - node.sz), 6, 150); }
+
+function buildPool() {
+  const S = node.sz, D = node.depth;
+  let cand = TREE.filter(n => n.hab === node.hab && n !== node && !n.f.sessile);
+  cand.forEach(n => n._score = Math.abs(n.sz - S) * 1.1 + Math.abs(n.depth - D) * 0.12 + Math.random() * 0.8);
+  cand.sort((a, b) => a._score - b._score);
+  const chosen = cand.filter(n => Math.abs(n.sz - S) < 2.6).slice(0, 7);
+  // хищнику и всеядному нужна добыча помельче
+  if (node.diet === "carn" || node.diet === "omni") {
+    const prey = cand.filter(n => n.sz <= S - 0.35 && !chosen.includes(n)).slice(0, 3);
+    chosen.push(...prey);
+  }
+  // и пара хищников покрупнее, чтобы было от кого убегать
+  const hunters = cand.filter(n => n.diet === "carn" && n.sz >= S + 0.6 && n.sz <= S + 2.8 && !chosen.includes(n)).slice(0, node.depth < 6 ? 1 : 2);
+  chosen.push(...hunters);
+  for (const n of cand) { if (chosen.length >= 5) break; if (!chosen.includes(n)) chosen.push(n); }
+  pool = chosen;
+}
+
+function edible(n) { return (node.diet === "carn" || node.diet === "omni") && n.sz <= node.sz - 0.3; }
+function danger(n) { return (n.diet === "carn" && n.sz >= node.sz + 0.5) || (n.diet === "omni" && n.sz >= node.sz + 1.3); }
+
+function spawnNpc(far = true) {
+  if (!pool.length) return;
+  let n = pick(pool);
+  if (danger(n) && Math.random() < 0.5) n = pick(pool); // хищников поменьше
+  let x, y, tries = 0;
+  do { x = rand(60, WORLD - 60); y = rand(60, WORLD - 60); tries++; } while (far && Math.hypot(x - P.x, y - P.y) < 520 && tries < 20);
+  npcs.push({ n, x, y, vx: 0, vy: 0, ang: rand(0, 6.28), t: rand(0, 10), r: scaleOf(n), cd: 0, wa: rand(0, 6.28), mv: 0.3, chase: 0, rest: 0 });
+}
+function spawnFood(near) {
+  const kinds = FOOD_KINDS[node.hab];
+  const mine = kinds.filter(k => EATS[k](node.diet));
+  const kind = mine.length && Math.random() < 0.85 ? pick(mine) : pick(kinds);
+  let x, y;
+  if (near) { const a = rand(0, 6.28), d = rand(350, 900); x = clamp(P.x + Math.cos(a) * d, 20, WORLD - 20); y = clamp(P.y + Math.sin(a) * d, 20, WORLD - 20); }
+  else { x = rand(20, WORLD - 20); y = rand(20, WORLD - 20); }
+  food.push({ kind, x, y, vx: 0, vy: 0, ph: rand(0, 6.28), a: rand(0, 6.28) });
+}
+
+function setupStage(fresh) {
+  const habChanged = curHab !== node.hab;
+  curHab = node.hab;
+  if (habChanged || !decor) decor = buildDecor(node.hab);
+  buildPool();
+  npcs = []; food = []; fx = []; floats = [];
+  const npcN = node.f.sessile ? 26 : 44;
+  for (let i = 0; i < npcN; i++) spawnNpc(true);
+  for (let i = 0; i < 200; i++) spawnFood(false);
+  lights = [];
+  if (node.diet === "photo" && node.hab !== "land") {
+    const R = mulberry(5);
+    for (let i = 0; i < 26; i++) lights.push({ x: R() * WORLD, y: R() * WORLD, r: 140 + R() * 120, ph: R() * 6 });
+  }
+  kin.forEach(k => { k.n = node; k.r = R0 * 0.72; });
+  if (fresh) { P.x = WORLD / 2; P.y = WORLD / 2; }
+  updateHud(true);
+  drawPortrait();
+}
+
+// ---------- Эффекты ----------
+function burst(x, y, color, n = 10, sp = 120) { for (let i = 0; i < n; i++) { const a = rand(0, 6.28), s = rand(0.3, 1) * sp; fx.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(0.4, 0.9), max: 0.9, color, r: rand(1.5, 3.5) }); } }
+function ring(x, y, color, r = 80) { fx.push({ ring: true, x, y, life: 0.7, max: 0.7, color, r }); }
+function floatText(x, y, text, color = "#4fe0c0") { floats.push({ x, y, text, color, life: 1.1 }); }
+function toast(msg, big) {
+  const box = document.getElementById("toasts");
+  const el = document.createElement("div"); el.className = "toast glass" + (big ? " big" : ""); el.textContent = msg;
+  box.appendChild(el); while (box.children.length > 3) box.firstChild.remove();
+  setTimeout(() => { el.style.transition = "opacity .4s"; el.style.opacity = 0; setTimeout(() => el.remove(), 400); }, big ? 3600 : 2600);
+}
+
+// ---------- Управление ----------
+addEventListener("keydown", e => {
+  if (e.repeat) { keys.add(e.code); return; }
+  keys.add(e.code);
+  if (e.code === "Space") { e.preventDefault(); dash(); }
+  if (e.code === "KeyE" && !anyModal()) openEvolve();
+  if (e.code === "KeyP" || e.code === "Escape") { if (anyModal()) closeModals(); else togglePause(); }
+});
+addEventListener("keyup", e => keys.delete(e.code));
+addEventListener("blur", () => { keys.clear(); ptr.down = false; });
+cv.addEventListener("pointerdown", e => { ptr.down = true; ptr.x = e.clientX; ptr.y = e.clientY; cv.setPointerCapture?.(e.pointerId); });
+cv.addEventListener("pointermove", e => { ptr.x = e.clientX; ptr.y = e.clientY; });
+const up = () => { ptr.down = false; };
+cv.addEventListener("pointerup", up); cv.addEventListener("pointercancel", up);
+document.getElementById("dashBtn").addEventListener("pointerdown", e => { e.preventDefault(); dash(); });
+
+function dash() {
+  if (paused || modalOpen || P.dashCd > 0 || P.en < 5) return;
+  P.dashT = 0.35; P.dashCd = 2.2; P.en -= 4;
+  ring(P.x, P.y, "rgba(255,255,255,.5)", R0 * 2);
+}
+function togglePause() { paused = !paused; document.getElementById("pauseBtn").textContent = paused ? "▶" : "❚❚"; }
+
+// ---------- Игра ----------
+function playerSpeed() { return (BODY_SPEED[node.body] || 150) * (node.f.fly ? 1.15 : 1); }
+
+function step(dt) {
+  simT += dt; P.t += dt;
+  // направление
+  let dx = 0, dy = 0;
+  if (keys.has("KeyW") || keys.has("ArrowUp")) dy -= 1;
+  if (keys.has("KeyS") || keys.has("ArrowDown")) dy += 1;
+  if (keys.has("KeyA") || keys.has("ArrowLeft")) dx -= 1;
+  if (keys.has("KeyD") || keys.has("ArrowRight")) dx += 1;
+  if (ptr.down && !dx && !dy) {
+    const sx = (P.x - cam.x) * VS + W / 2, sy = (P.y - cam.y) * VS + H / 2;
+    dx = ptr.x - sx; dy = ptr.y - sy;
+    const d = Math.hypot(dx, dy);
+    if (d < 14) { dx = dy = 0; } else { const k = Math.min(1, d / 90); dx = dx / d * k; dy = dy / d * k; }
+  } else { const d = Math.hypot(dx, dy); if (d) { dx /= d; dy /= d; } }
+
+  const maxV = playerSpeed() * (P.dashT > 0 ? 2.3 : 1);
+  const acc = Math.min(1, dt * (P.dashT > 0 ? 10 : 5));
+  P.vx += (dx * maxV - P.vx) * acc; P.vy += (dy * maxV - P.vy) * acc;
+  P.x = clamp(P.x + P.vx * dt, 20, WORLD - 20); P.y = clamp(P.y + P.vy * dt, 20, WORLD - 20);
+  const v = Math.hypot(P.vx, P.vy); P.mv = clamp(v / playerSpeed(), 0, 1);
+  if (v > 8) { const ta = Math.atan2(P.vy, P.vx); let da = ta - P.ang; da = Math.atan2(Math.sin(da), Math.cos(da)); P.ang += da * Math.min(1, dt * 9); }
+  P.dashT -= dt; P.dashCd -= dt; P.inv -= dt;
+
+  // энергия и здоровье
+  P.en -= (1.3 + 0.9 * P.mv) * dt;
+  if (node.diet === "photo") {
+    let lit = node.hab === "land" ? 0.6 : 0;
+    for (const L of lights) { const d = Math.hypot(P.x - L.x, P.y - L.y); if (d < L.r) lit = Math.max(lit, 1 - d / L.r * 0.6); }
+    if (lit > 0) { P.en += 9 * lit * dt; P.dna += 0.3 * lit * dt; P._lit = lit; } else P._lit = 0;
+  }
+  if (P.en <= 0) { P.en = 0; P.hp -= 6 * dt; }
+  else if (P.en > 35) P.hp = Math.min(100, P.hp + 2.5 * dt);
+  P.en = Math.min(100, P.en);
+
+  // размножение: митоз у клеток, потомство у остальных
+  P.repro -= dt;
+  if (P.en >= 96 && P.repro <= 0) reproduce();
+
+  // еда
+  const pr = R0;
+  for (let i = food.length - 1; i >= 0; i--) {
+    const f = food[i];
+    f.ph += dt;
+    if (f.kind === "fry" || f.kind === "bug") {
+      const d = Math.hypot(f.x - P.x, f.y - P.y);
+      if (d < 160 && EATS[f.kind](node.diet)) { f.vx += (f.x - P.x) / d * 160 * dt; f.vy += (f.y - P.y) / d * 160 * dt; }
+      f.a += (Math.random() - 0.5) * 3 * dt; f.vx += Math.cos(f.a) * 40 * dt; f.vy += Math.sin(f.a) * 40 * dt;
+      const s = Math.hypot(f.vx, f.vy), lim = f.kind === "fry" ? 90 : 55; if (s > lim) { f.vx *= lim / s; f.vy *= lim / s; }
+      f.x = clamp(f.x + f.vx * dt, 10, WORLD - 10); f.y = clamp(f.y + f.vy * dt, 10, WORLD - 10);
+    } else if (f.kind === "org" || f.kind === "plankton") { f.x += Math.sin(f.ph * 0.6) * 6 * dt; f.y += Math.cos(f.ph * 0.5) * 5 * dt; }
+    if (!EATS[f.kind](node.diet)) continue;
+    let eater = null;
+    if (Math.abs(f.x - P.x) < pr + 12 && Math.abs(f.y - P.y) < pr + 12 && Math.hypot(f.x - P.x, f.y - P.y) < pr + 8) eater = P;
+    else for (const k of kin) if (Math.hypot(f.x - k.x, f.y - k.y) < k.r + 6) { eater = k; break; }
+    if (eater) {
+      food.splice(i, 1);
+      const big = f.kind === "fry" || f.kind === "bug" || f.kind === "berry";
+      P.en += big ? 12 : 8;
+      const g = eater === P ? (big ? 1 : 0.5) : 0.2; P.dna += g;
+      if (eater === P && big) floatText(f.x, f.y - 10, "+1 ДНК");
+      burst(f.x, f.y, foodColor(f.kind), 6, 70);
+    }
+  }
+  while (food.length < 200) spawnFood(true);
+
+  // родня
+  kin.forEach((k, i) => {
+    const a = P.ang + Math.PI + (i - (kin.length - 1) / 2) * 0.7, d = R0 * 2.4 + i * 6;
+    const tx = P.x + Math.cos(a) * d, ty = P.y + Math.sin(a) * d;
+    // ищем еду поблизости
+    let fx_ = tx, fy_ = ty;
+    if (Math.hypot(k.x - P.x, k.y - P.y) < 260) {
+      let best = 170 * 170;
+      for (const f of food) { if (!EATS[f.kind](node.diet)) continue; const dd = (f.x - k.x) ** 2 + (f.y - k.y) ** 2; if (dd < best) { best = dd; fx_ = f.x; fy_ = f.y; } }
+    }
+    const ddx = fx_ - k.x, ddy = fy_ - k.y, dd = Math.hypot(ddx, ddy) || 1, sp = playerSpeed() * (dd > 60 ? 1.05 : 0.6);
+    k.vx += (ddx / dd * sp - k.vx) * Math.min(1, dt * 3); k.vy += (ddy / dd * sp - k.vy) * Math.min(1, dt * 3);
+    if (dd < 6) { k.vx *= 0.8; k.vy *= 0.8; }
+    k.x = clamp(k.x + k.vx * dt, 20, WORLD - 20); k.y = clamp(k.y + k.vy * dt, 20, WORLD - 20);
+    const kv = Math.hypot(k.vx, k.vy); k.mv = clamp(kv / playerSpeed(), 0, 1); k.t += dt;
+    if (kv > 6) { const ta = Math.atan2(k.vy, k.vx); let da = Math.atan2(Math.sin(ta - k.ang), Math.cos(ta - k.ang)); k.ang += da * Math.min(1, dt * 8); }
+  });
+
+  // существа вокруг
+  for (let i = npcs.length - 1; i >= 0; i--) {
+    const e = npcs[i], n = e.n, sp = (BODY_SPEED[n.body] || 140) * 0.62;
+    e.t += dt; e.cd -= dt; e.rest -= dt;
+    const dP = Math.hypot(e.x - P.x, e.y - P.y);
+    let tx = 0, ty = 0, speed = sp * 0.5;
+    const isDanger = danger(n), isFood = edible(n);
+    if (isDanger && dP < 360 && P.inv <= 0 && e.rest <= 0) {
+      // хищник выдыхается после нескольких секунд погони
+      e.chase += dt; if (e.chase > 4) { e.chase = 0; e.rest = 3.5; }
+      // охотится на игрока или ближайшего родича
+      let target = P, td = dP;
+      for (const k of kin) { const d = Math.hypot(e.x - k.x, e.y - k.y); if (d < td) { td = d; target = k; } }
+      tx = (target.x - e.x) / td; ty = (target.y - e.y) / td; speed = sp * 1.25;
+      if (td < e.r * 0.75 + (target === P ? R0 : target.r) && e.cd <= 0) {
+        e.cd = 1.2;
+        if (target === P) hurt(e); else { kin.splice(kin.indexOf(target), 1); burst(target.x, target.y, "rgba(255,90,80,.9)", 12); toast("Хищник съел вашего потомка"); }
+      }
+    } else if (isFood && dP < 260) {
+      e.chase = 0;
+      tx = (e.x - P.x) / dP; ty = (e.y - P.y) / dP; speed = sp * 1.05;
+    } else {
+      e.wa += (Math.random() - 0.5) * 2.5 * dt;
+      tx = Math.cos(e.wa); ty = Math.sin(e.wa);
+    }
+    // от краёв
+    const m = 120;
+    if (e.x < m) tx += 1.5; if (e.x > WORLD - m) tx -= 1.5; if (e.y < m) ty += 1.5; if (e.y > WORLD - m) ty -= 1.5;
+    const tl = Math.hypot(tx, ty) || 1;
+    e.vx += (tx / tl * speed - e.vx) * Math.min(1, dt * 2.5); e.vy += (ty / tl * speed - e.vy) * Math.min(1, dt * 2.5);
+    e.x = clamp(e.x + e.vx * dt, 10, WORLD - 10); e.y = clamp(e.y + e.vy * dt, 10, WORLD - 10);
+    const ev = Math.hypot(e.vx, e.vy); e.mv = clamp(ev / sp, 0, 1);
+    if (ev > 5) { const ta = Math.atan2(e.vy, e.vx); let da = Math.atan2(Math.sin(ta - e.ang), Math.cos(ta - e.ang)); e.ang += da * Math.min(1, dt * 5); }
+    // игрок ест
+    if (isFood && dP < R0 + e.r * 0.6) {
+      npcs.splice(i, 1);
+      P.en += 25; P.dna += 3; P.hp = Math.min(100, P.hp + 5);
+      floatText(e.x, e.y - 14, "+3 ДНК"); burst(e.x, e.y, hsl(n.c, 10, 0.9), 14, 140);
+    }
+  }
+  while (npcs.length < (node.f.sessile ? 26 : 44)) spawnNpc(true);
+
+  if (P.hp <= 0) die();
+
+  // эффекты
+  for (const p of fx) { p.life -= dt; if (!p.ring) { p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.92; p.vy *= 0.92; } }
+  fx = fx.filter(p => p.life > 0);
+  for (const f of floats) { f.life -= dt; f.y -= 28 * dt; }
+  floats = floats.filter(f => f.life > 0);
+  cam.shake = Math.max(0, cam.shake - dt * 3);
+}
+
+function hurt(e) {
+  let dmg = 8 + (e.n.sz - node.sz) * 4;
+  if (node.f.shell || node.f.spikes || node.f.urchin) dmg *= 0.5;
+  P.hp -= dmg; P.inv = 0.3; cam.shake = 0.5;
+  burst(P.x, P.y, "rgba(255,90,80,.95)", 12, 160);
+  floatText(P.x, P.y - 26, "−" + Math.round(dmg), "#ff6b5e");
+}
+
+function reproduce() {
+  P.en = 55; P.repro = 9; P.dna += 2;
+  const k = { n: node, x: P.x + rand(-8, 8), y: P.y + rand(-8, 8), vx: rand(-80, 80), vy: rand(-80, 80), ang: P.ang, t: rand(0, 5), mv: 0.5, r: R0 * 0.72 };
+  kin.push(k);
+  if (kin.length > 4) kin.shift();
+  ring(P.x, P.y, "rgba(200,255,240,.8)", R0 * 2.5); burst(P.x, P.y, "rgba(200,255,240,.9)", 16);
+  floatText(P.x, P.y - 28, "+2 ДНК");
+  const word = isCellLike(node) ? "Митоз! Клетка разделилась на две" : node.f.sessile ? "Появился новый росток" : "Появилось потомство";
+  toast(word);
+}
+
+function die() {
+  burst(P.x, P.y, "rgba(255,90,80,.95)", 30, 220);
+  toast("Вас съели! Эволюция продолжается в потомке.", true);
+  P.hp = 100; P.en = 60; P.dna = Math.floor(P.dna * 0.85); P.inv = 2.5;
+  if (kin.length) { const k = kin.shift(); P.x = k.x; P.y = k.y; }
+  else { P.x = rand(200, WORLD - 200); P.y = rand(200, WORLD - 200); }
+  save();
+}
+
+// ---------- Эволюция ----------
+function evolveTo(n) {
+  const cost = costOf(node);
+  if (P.dna < cost) return;
+  P.dna -= cost;
+  const from = node; node = n;
+  const isNew = !disc.has(n.id); disc.add(n.id);
+  closeModals();
+  if (from.hab !== n.hab) {
+    toast(n.hab === "land" ? "Выход на сушу!" : n.hab === "water" ? from.hab === "micro" ? "Теперь вы видны без микроскопа!" : "Обратно в океан!" : "", false);
+  }
+  setupStage(from.hab !== n.hab);
+  P.hp = 100; P.en = Math.max(P.en, 70); P.inv = 1.5;
+  ring(P.x, P.y, "rgba(79,224,192,.95)", R0 * 6); ring(P.x, P.y, "rgba(255,255,255,.7)", R0 * 3.5); burst(P.x, P.y, "rgba(79,224,192,.95)", 40, 260);
+  toast("Вы стали: " + n.name + (isNew ? " — новое существо!" : ""), true);
+  save();
+  if (!n.kids.length) setTimeout(() => { if (node === n && !anyModal()) openTop(); }, 900);
+}
+
+function goBackTo(n) {
+  node = n; P.dna = 0; kin = []; P.hp = 100; P.en = 80;
+  closeModals(); setupStage(true);
+  toast("Вы вернулись к развилке: " + n.name, true);
+  save();
+}
+
+// ---------- Отрисовка мира ----------
+function foodColor(k) { return { org: "#c9ff8a", plankton: "#9ff3ff", algae: "#5fd06a", fry: "#cfe6f0", plant: "#6ccf4a", berry: "#ff4d6a", bug: "#3a2a1a" }[k]; }
+function toScreen(x, y) { return [(x - cam.x) * VS + W / 2, (y - cam.y) * VS + H / 2]; }
+const onScreen = (x, y, m) => Math.abs(x - cam.x) * VS < W / 2 + m && Math.abs(y - cam.y) * VS < H / 2 + m;
+
+function drawBackground(t) {
+  const hab = node.hab, d = decor;
+  if (hab === "micro") {
+    const g = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * 0.75);
+    g.addColorStop(0, "#155a54"); g.addColorStop(1, "#05211f"); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  } else if (hab === "water") {
+    const g = ctx.createLinearGradient(0, 0, W, H);
+    g.addColorStop(0, "#0d4a6e"); g.addColorStop(0.55, "#0a3a5a"); g.addColorStop(1, "#062a44"); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  } else {
+    const g = ctx.createLinearGradient(0, 0, W, H);
+    g.addColorStop(0, "#4f8a3a"); g.addColorStop(1, "#3c7130"); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  }
+  ctx.save(); ctx.translate(W / 2, H / 2); ctx.scale(VS, VS); ctx.translate(-cam.x, -cam.y);
+
+  if (hab === "micro") {
+    for (const b of d.blobs) {
+      if (!onScreen(b.x, b.y, b.r * VS)) continue;
+      const gg = ctx.createRadialGradient(b.x, b.y, b.r * 0.2, b.x, b.y, b.r);
+      gg.addColorStop(0, `hsla(${b.h},50%,55%,0.05)`); gg.addColorStop(0.85, `hsla(${b.h},50%,60%,0.09)`); gg.addColorStop(1, `hsla(${b.h},50%,60%,0)`);
+      ctx.fillStyle = gg; circ(ctx, b.x, b.y, b.r); ctx.fill();
+      ctx.strokeStyle = `hsla(${b.h},60%,70%,0.08)`; ctx.lineWidth = 3; circ(ctx, b.x, b.y, b.r * 0.8); ctx.stroke();
+    }
+    ctx.fillStyle = "rgba(180,255,230,.12)";
+    for (const p of d.dots) if (onScreen(p.x, p.y, 10)) { circ(ctx, p.x + Math.sin(t * 0.3 + p.y) * 6, p.y, p.r); ctx.fill(); }
+  } else if (hab === "water") {
+    for (const p of d.patches) if (onScreen(p.x, p.y, p.r * VS)) {
+      const gg = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
+      gg.addColorStop(0, p.k > 0.5 ? "rgba(210,190,140,.16)" : "rgba(0,20,40,.18)"); gg.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = gg; circ(ctx, p.x, p.y, p.r); ctx.fill();
+    }
+    for (const r of d.rocks) if (onScreen(r.x, r.y, r.r * VS * 1.5)) {
+      ctx.fillStyle = "rgba(0,10,20,.3)"; ell(ctx, r.x + r.r * 0.2, r.y + r.r * 0.25, r.r * 1.05, r.r * 0.9); ctx.fill();
+      ctx.fillStyle = shade(ctx, r.x, r.y, r.r, [r.h, 18, r.l]); circ(ctx, r.x, r.y, r.r); ctx.fill();
+    }
+    for (const w of d.weeds) if (onScreen(w.x, w.y, w.len * VS)) {
+      for (let k = 0; k < w.n; k++) {
+        const a = k / w.n * TAU + w.ph;
+        ctx.strokeStyle = `hsla(${w.h + k * 4},50%,${30 + k % 3 * 6}%,.85)`; ctx.lineWidth = 6; ctx.lineCap = "round";
+        ctx.beginPath(); ctx.moveTo(w.x, w.y);
+        for (let s = 1; s <= 6; s++) { const q = s / 6, aa = a + Math.sin(t * 1.2 + w.ph + q * 3) * 0.35 * q; ctx.lineTo(w.x + Math.cos(aa) * w.len * q, w.y + Math.sin(aa) * w.len * q); }
+        ctx.stroke();
+      }
+    }
+  } else {
+    for (const p of d.patches) if (onScreen(p.x, p.y, p.r * VS)) {
+      const gg = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
+      gg.addColorStop(0, p.k > 0.6 ? "rgba(150,120,70,.28)" : p.k > 0.3 ? "rgba(120,180,70,.25)" : "rgba(20,60,20,.22)"); gg.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = gg; circ(ctx, p.x, p.y, p.r); ctx.fill();
+    }
+    for (const p of d.ponds) if (onScreen(p.x, p.y, p.rx * VS)) {
+      ctx.fillStyle = "rgba(30,60,30,.5)"; ell(ctx, p.x, p.y, p.rx + 8, p.ry + 8, p.rot); ctx.fill();
+      ctx.fillStyle = shade(ctx, p.x, p.y, p.rx, [200, 55, 40]); ell(ctx, p.x, p.y, p.rx, p.ry, p.rot); ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,.25)"; ctx.lineWidth = 2; ell(ctx, p.x - p.rx * 0.2, p.y - p.ry * 0.2, p.rx * 0.4, p.ry * 0.2, p.rot); ctx.stroke();
+    }
+    ctx.lineCap = "round";
+    for (const u of d.tufts) if (onScreen(u.x, u.y, 12)) {
+      ctx.strokeStyle = `hsl(${u.h},45%,${28 + u.s * 1.5}%)`; ctx.lineWidth = 2;
+      const sw = Math.sin(t * 1.5 + u.x * 0.01) * 1.5;
+      ctx.beginPath(); ctx.moveTo(u.x, u.y); ctx.lineTo(u.x - u.s * 0.5 + sw, u.y - u.s); ctx.moveTo(u.x, u.y); ctx.lineTo(u.x + sw, u.y - u.s * 1.3); ctx.moveTo(u.x, u.y); ctx.lineTo(u.x + u.s * 0.5 + sw, u.y - u.s); ctx.stroke();
+    }
+    for (const fl of d.flowers) if (onScreen(fl.x, fl.y, 10)) {
+      ctx.fillStyle = `hsl(${fl.h},80%,65%)`; for (let k = 0; k < 5; k++) { circ(ctx, fl.x + Math.cos(k * 1.26) * 3, fl.y + Math.sin(k * 1.26) * 3, 2.4); ctx.fill(); }
+      ctx.fillStyle = "#ffe066"; circ(ctx, fl.x, fl.y, 1.8); ctx.fill();
+    }
+    for (const r of d.rocks) if (onScreen(r.x, r.y, r.r * VS * 1.5)) {
+      ctx.fillStyle = "rgba(0,0,0,.2)"; ell(ctx, r.x + r.r * 0.3, r.y + r.r * 0.3, r.r, r.r * 0.8); ctx.fill();
+      ctx.fillStyle = shade(ctx, r.x, r.y, r.r, [r.h, 10, r.l]); circ(ctx, r.x, r.y, r.r); ctx.fill();
+    }
+    for (const tr of d.trees) if (onScreen(tr.x, tr.y, tr.r * VS * 1.6)) { ctx.fillStyle = "rgba(10,30,10,.28)"; ell(ctx, tr.x + tr.r * 0.35, tr.y + tr.r * 0.4, tr.r * 1.05, tr.r * 0.9); ctx.fill(); }
+  }
+  // светлые пятна для тех, кто питается светом
+  if (lights.length) {
+    ctx.save(); ctx.globalCompositeOperation = "lighter";
+    for (const L of lights) if (onScreen(L.x, L.y, L.r * VS)) {
+      const r = L.r * (1 + 0.05 * Math.sin(t + L.ph));
+      const gg = ctx.createRadialGradient(L.x, L.y, 0, L.x, L.y, r); gg.addColorStop(0, "rgba(255,240,170,.22)"); gg.addColorStop(1, "rgba(255,240,170,0)");
+      ctx.fillStyle = gg; circ(ctx, L.x, L.y, r); ctx.fill();
+    }
+    ctx.restore();
+  }
+  // край мира
+  ctx.fillStyle = hab === "land" ? "rgba(15,40,15,.65)" : "rgba(0,8,16,.6)";
+  const big = 4000;
+  ctx.fillRect(-big, -big, WORLD + big * 2, big); ctx.fillRect(-big, WORLD, WORLD + big * 2, big);
+  ctx.fillRect(-big, 0, big, WORLD); ctx.fillRect(WORLD, 0, big, WORLD);
+  ctx.restore();
+}
+
+function drawFood(t) {
+  ctx.save(); ctx.translate(W / 2, H / 2); ctx.scale(VS, VS); ctx.translate(-cam.x, -cam.y);
+  for (const f of food) {
+    if (!onScreen(f.x, f.y, 20)) continue;
+    const mine = EATS[f.kind](node.diet), a = mine ? 1 : 0.45;
+    switch (f.kind) {
+      case "org": case "plankton": {
+        const col = f.kind === "org" ? [90, 100, 75] : [185, 100, 80], pulse = 0.7 + 0.3 * Math.sin(f.ph * 3);
+        ctx.fillStyle = hsl(col, 0, 0.18 * a * pulse); circ(ctx, f.x, f.y, 8); ctx.fill();
+        ctx.fillStyle = hsl(col, 0, 0.95 * a); circ(ctx, f.x, f.y, f.kind === "org" ? 3 : 2.4); ctx.fill();
+        break;
+      }
+      case "algae": for (let k = 0; k < 4; k++) { ctx.fillStyle = `hsla(${120 + k * 8},55%,${38 + k * 5}%,${a})`; ell(ctx, f.x + Math.cos(k * 1.6 + f.ph * 0.3) * 4, f.y + Math.sin(k * 1.6) * 4, 6, 3, k * 1.6 + Math.sin(f.ph) * 0.2); ctx.fill(); } break;
+      case "plant": for (let k = 0; k < 5; k++) { ctx.fillStyle = `hsla(${100 + k * 6},60%,${36 + k * 4}%,${a})`; ell(ctx, f.x + Math.cos(k * 1.26) * 5, f.y + Math.sin(k * 1.26) * 5, 7, 3.5, k * 1.26); ctx.fill(); } break;
+      case "berry": ctx.fillStyle = `rgba(40,90,30,${a})`; circ(ctx, f.x, f.y, 9); ctx.fill(); for (let k = 0; k < 4; k++) { ctx.fillStyle = `rgba(230,40,70,${a})`; circ(ctx, f.x + Math.cos(k * 1.57 + 0.4) * 4.5, f.y + Math.sin(k * 1.57 + 0.4) * 4.5, 3.4); ctx.fill(); } break;
+      case "fry": {
+        const ang = Math.atan2(f.vy, f.vx); ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(ang);
+        ctx.globalAlpha = a; ctx.fillStyle = "#cfe6f0"; ell(ctx, 0, 0, 6, 2.6); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(-5, 0); ctx.lineTo(-10, -3 + Math.sin(f.ph * 14)); ctx.lineTo(-10, 3 + Math.sin(f.ph * 14)); ctx.fill(); ctx.globalAlpha = 1; ctx.restore(); break;
+      }
+      case "bug": {
+        const ang = Math.atan2(f.vy, f.vx); ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(ang); ctx.globalAlpha = a;
+        ctx.strokeStyle = "#1c120a"; ctx.lineWidth = 1;
+        for (let k = -1; k <= 1; k++) { const s = Math.sin(f.ph * 20 + k) * 1.5; ctx.beginPath(); ctx.moveTo(k * 2, -2); ctx.lineTo(k * 2 + s, -6); ctx.moveTo(k * 2, 2); ctx.lineTo(k * 2 - s, 6); ctx.stroke(); }
+        ctx.fillStyle = "hsl(15,55%,30%)"; ell(ctx, 0, 0, 5, 3.6); ctx.fill(); ctx.fillStyle = "#1c120a"; circ(ctx, 4.5, 0, 2); ctx.fill();
+        ctx.globalAlpha = 1; ctx.restore(); break;
+      }
+    }
+  }
+  ctx.restore();
+}
+
+function drawBeing(x, y, ang, n, r, t, mv, opts = {}) {
+  ctx.save(); ctx.translate(x, y);
+  if (opts.mark) {
+    const p = 1 + 0.08 * Math.sin(t * 6);
+    ctx.strokeStyle = opts.mark === "food" ? "rgba(120,255,160,.55)" : `rgba(255,80,70,${0.55 + 0.25 * Math.sin(t * 8)})`;
+    ctx.lineWidth = opts.mark === "food" ? 2 : 2.5; ctx.setLineDash(opts.mark === "food" ? [4, 5] : []);
+    circ(ctx, 0, 0, r * 1.45 * p); ctx.stroke(); ctx.setLineDash([]);
+  }
+  // тень
+  if (n.hab !== "micro") { ctx.fillStyle = "rgba(0,0,0,.18)"; ell(ctx, r * 0.25, r * 0.35, r * 1.1, r * 0.8); ctx.fill(); }
+  ctx.rotate(ang);
+  if (opts.alpha != null) ctx.globalAlpha = opts.alpha;
+  drawCreature(ctx, n, r, t, mv);
+  ctx.restore();
+}
+
+function drawWorld(t) {
+  drawBackground(t);
+  drawFood(t);
+  ctx.save(); ctx.translate(W / 2, H / 2); ctx.scale(VS, VS); ctx.translate(-cam.x, -cam.y);
+  const sorted = npcs.slice().sort((a, b) => a.r - b.r);
+  for (const e of sorted) {
+    if (!onScreen(e.x, e.y, e.r * 4 * VS)) continue;
+    const dP = Math.hypot(e.x - P.x, e.y - P.y);
+    const mark = dP < 520 ? (danger(e.n) ? "danger" : edible(e.n) ? "food" : null) : null;
+    drawBeing(e.x, e.y, e.ang, e.n, e.r, e.t, e.mv, { mark });
+  }
+  for (const k of kin) drawBeing(k.x, k.y, k.ang, node, k.r, k.t, k.mv);
+  const blink = P.inv > 0 && Math.sin(simT * 30) > 0 ? 0.45 : 1;
+  if (P._lit && node.diet === "photo") { ctx.save(); ctx.globalCompositeOperation = "lighter"; const gg = ctx.createRadialGradient(P.x, P.y, 0, P.x, P.y, R0 * 2.4); gg.addColorStop(0, `rgba(255,240,170,${0.25 * P._lit})`); gg.addColorStop(1, "rgba(255,240,170,0)"); ctx.fillStyle = gg; circ(ctx, P.x, P.y, R0 * 2.4); ctx.fill(); ctx.restore(); }
+  drawBeing(P.x, P.y, P.ang, node, R0, P.t, P.mv, { alpha: blink });
+  // индикатор игрока
+  ctx.strokeStyle = "rgba(79,224,192,.35)"; ctx.lineWidth = 1.5; circ(ctx, P.x, P.y, R0 * 1.9 + Math.sin(simT * 3) * 2); ctx.stroke();
+
+  // кроны деревьев поверх
+  if (node.hab === "land") for (const tr of decor.trees) {
+    if (!onScreen(tr.x, tr.y, tr.r * VS * 1.4)) continue;
+    const under = Math.hypot(P.x - tr.x, P.y - tr.y) < tr.r;
+    ctx.globalAlpha = under ? 0.4 : 0.92;
+    for (let k = 0; k < 5; k++) {
+      const a = k * 1.25, d = k ? tr.r * 0.45 : 0, rr = k ? tr.r * 0.6 : tr.r * 0.75;
+      ctx.fillStyle = shade(ctx, tr.x + Math.cos(a) * d, tr.y + Math.sin(a) * d, rr, [tr.h + k * 4, 45, 30 + k * 2]);
+      circ(ctx, tr.x + Math.cos(a) * d, tr.y + Math.sin(a) * d, rr); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+  // эффекты
+  for (const p of fx) {
+    const k = p.life / p.max;
+    if (p.ring) { ctx.strokeStyle = p.color; ctx.globalAlpha = k; ctx.lineWidth = 3; circ(ctx, p.x, p.y, p.r * (1.4 - k * 0.9)); ctx.stroke(); }
+    else { ctx.globalAlpha = Math.min(1, k * 1.5); ctx.fillStyle = p.color; circ(ctx, p.x, p.y, p.r); ctx.fill(); }
+  }
+  ctx.globalAlpha = 1;
+  ctx.font = "600 13px Rubik, sans-serif"; ctx.textAlign = "center";
+  for (const f of floats) { ctx.globalAlpha = Math.min(1, f.life * 1.5); ctx.fillStyle = f.color; ctx.fillText(f.text, f.x, f.y); }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+
+  // блики воды сверху и виньетка микроскопа
+  if (node.hab === "water") {
+    ctx.save(); ctx.globalCompositeOperation = "lighter";
+    for (let i = 0; i < 7; i++) {
+      const x = W * ((i * 0.17 + t * 0.01 + Math.sin(t * 0.2 + i) * 0.05) % 1.2) - W * 0.1, y = H * (0.2 + 0.6 * ((i * 0.37) % 1));
+      const gg = ctx.createRadialGradient(x, y, 0, x, y, 260); gg.addColorStop(0, "rgba(160,230,255,.06)"); gg.addColorStop(1, "rgba(160,230,255,0)");
+      ctx.fillStyle = gg; circ(ctx, x, y, 260); ctx.fill();
+    }
+    ctx.restore();
+  }
+  if (node.hab === "micro") {
+    const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.72);
+    g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(1, "rgba(0,8,8,.75)"); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  }
+  if (P.hp < 30) { const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.max(W, H) * 0.7); g.addColorStop(0, "rgba(255,0,0,0)"); g.addColorStop(1, `rgba(200,20,20,${0.25 + 0.1 * Math.sin(simT * 6)})`); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); }
+  if (paused) {
+    ctx.fillStyle = "rgba(0,0,0,.3)"; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = "#fff"; ctx.font = "600 24px Rubik, sans-serif"; ctx.textAlign = "center"; ctx.fillText("Пауза", W / 2, H / 2);
+  }
+}
+
+// ---------- Интерфейс ----------
+const $ = id => document.getElementById(id);
+function drawMini(canvas, n, t = 1.3, scale = 0.26) {
+  const g = canvas.getContext("2d"), w = canvas.width, h = canvas.height;
+  g.clearRect(0, 0, w, h);
+  const bg = g.createLinearGradient(0, 0, w, h);
+  if (n.hab === "micro") { bg.addColorStop(0, "#155a54"); bg.addColorStop(1, "#08302c"); }
+  else if (n.hab === "water") { bg.addColorStop(0, "#0d4a6e"); bg.addColorStop(1, "#062a44"); }
+  else { bg.addColorStop(0, "#4f8a3a"); bg.addColorStop(1, "#365f2a"); }
+  g.fillStyle = bg; g.fillRect(0, 0, w, h);
+  // подбираем масштаб, чтобы длинные существа влезли
+  const longish = { worm: 1.6, fish: 1.3, quad: 1.5, octo: 1.5, jelly: 1.4, bird: 1.2 }[n.body] || 1;
+  const r = Math.min(w, h) * scale / longish * (n.f.neck > 1 || n.f.tail > 1.4 ? 0.8 : 1);
+  g.save(); g.translate(w / 2 + r * (longish - 1) * 0.6, h / 2); g.rotate(-0.25);
+  drawCreature(g, n, r, t, 0.5); g.restore();
+}
+function drawPortrait() { drawMini($("portrait"), node, P.t, 0.3); }
+
+let hudAcc = 0;
+function updateHud(force) {
+  const cost = costOf(node);
+  $("name").textContent = node.name;
+  $("sub").textContent = `Ступень ${node.depth + 1} · ${HAB[node.hab]} · ${DIET[node.diet]}`;
+  $("hpFill").style.width = clamp(P.hp, 0, 100) + "%"; $("hpTxt").textContent = Math.max(0, Math.round(P.hp));
+  $("enFill").style.width = clamp(P.en, 0, 100) + "%"; $("enTxt").textContent = Math.round(P.en);
+  const top = !node.kids.length;
+  $("dnaFill").style.width = (top ? 100 : clamp(P.dna / cost * 100, 0, 100)) + "%";
+  $("dnaTxt").textContent = top ? Math.floor(P.dna) : `${Math.floor(P.dna)}/${cost}`;
+  const ready = !top && P.dna >= cost;
+  $("evoBtn").classList.toggle("ready", ready);
+  $("evoBtn").textContent = top ? "Вершина" : ready ? "Эволюция!" : "Эволюция";
+  if (force) {
+    let h = DIET_HINT[node.diet];
+    if (isCellLike(node)) h += " Когда энергии много — произойдёт митоз.";
+    $("hint").textContent = h + ` Открыто существ: ${disc.size} из ${TREE.length}.`;
+  }
+}
+
+function anyModal() { return document.querySelector(".modal.open") !== null; }
+function openModal(id) { document.querySelectorAll(".modal").forEach(m => m.classList.toggle("open", m.id === id)); modalOpen = true; keys.clear(); ptr.down = false; }
+function closeModals() { document.querySelectorAll(".modal").forEach(m => m.classList.remove("open")); modalOpen = false; cardAnims = []; updateHud(true); }
+
+let cardAnims = [];
+function openEvolve() {
+  if (!node.kids.length) { openTop(); return; }
+  const cost = costOf(node), can = P.dna >= cost;
+  $("evoTitle").textContent = can ? "Куда эволюционировать?" : "Варианты эволюции";
+  $("evoLead").innerHTML = can
+    ? `Выберите следующую форму. Это стоит <b>${cost} ДНК</b>, у вас ${Math.floor(P.dna)}. Можно ещё поиграть и выбрать позже.`
+    : `Нужно <b>${cost} ДНК</b>, у вас ${Math.floor(P.dna)}. Ешьте и размножайтесь, чтобы накопить. Вот кем вы сможете стать:`;
+  const box = $("choices"); box.innerHTML = ""; cardAnims = [];
+  for (const k of node.kids) {
+    const el = document.createElement("div"); el.className = "choice";
+    const tags = [`<span class="tag">${HAB[k.hab]}</span>`, `<span class="tag">${DIET[k.diet]}</span>`];
+    if (!k.kids.length) tags.push(`<span class="tag top">вершина ветки</span>`);
+    else tags.push(`<span class="tag">дальше ещё ${k.desc_n}</span>`);
+    if (!disc.has(k.id)) tags.push(`<span class="tag new">новое</span>`);
+    el.innerHTML = `<canvas width="400" height="240"></canvas><h3>${k.name}</h3><p>${k.desc}</p><div class="tags">${tags.join("")}</div>`;
+    const b = document.createElement("button"); b.className = can ? "primary" : ""; b.disabled = !can; b.textContent = can ? "Стать" : `Нужно ${cost} ДНК`;
+    b.onclick = () => evolveTo(k); el.appendChild(b);
+    box.appendChild(el);
+    cardAnims.push([el.querySelector("canvas"), k]);
+  }
+  openModal("evoModal");
+}
+
+function openPath(tab = "path") {
+  const chain = []; let p = node; while (p) { chain.unshift(p); p = p.parent ? BY_ID[p.parent] : null; }
+  const pt = $("pathTab"); pt.innerHTML = `<h2>Ваш путь</h2><p class="lead">${chain.length} ступеней от первой клетки. Можно вернуться к любой развилке и пойти по другой ветке — открытые существа сохранятся, а накопленная ДНК сгорит.</p><div class="path"></div>`;
+  const list = pt.querySelector(".path");
+  chain.forEach((n, i) => {
+    const el = document.createElement("div"); el.className = "step" + (n === node ? " cur" : "");
+    const others = n.kids.length > 1 ? ` · развилка: ${n.kids.length} пути` : "";
+    el.innerHTML = `<canvas width="88" height="88"></canvas><div><b>${i + 1}. ${n.name}</b><span>${HAB[n.hab]} · ${DIET[n.diet]}${others}</span></div>`;
+    if (n !== node) { const b = document.createElement("button"); b.textContent = "Вернуться"; b.onclick = () => goBackTo(n); el.appendChild(b); }
+    list.appendChild(el); drawMini(el.querySelector("canvas"), n, 1.3, 0.3);
+  });
+  const ct = $("collTab"); const tops = TREE.filter(n => !n.kids.length), topsFound = tops.filter(n => disc.has(n.id)).length;
+  ct.innerHTML = `<h2>Коллекция</h2><p class="lead"><span class="big-n">${disc.size}</span> / ${TREE.length} существ открыто · вершин ветвей: ${topsFound} из ${tops.length}</p><div class="coll"></div>`;
+  const grid = ct.querySelector(".coll");
+  for (const n of TREE_ORDER) {
+    const el = document.createElement("div"); const known = disc.has(n.id);
+    el.className = "cell" + (known ? "" : " unk");
+    el.innerHTML = known ? `<canvas width="128" height="104"></canvas>${n.name}` : `<i>?</i>???`;
+    grid.appendChild(el); if (known) drawMini(el.querySelector("canvas"), n, 1.3, 0.3);
+  }
+  setTab(tab); openModal("pathModal");
+}
+function setTab(tab) {
+  document.querySelectorAll("[data-tab]").forEach(b => b.classList.toggle("on", b.dataset.tab === tab));
+  $("pathTab").hidden = tab !== "path"; $("collTab").hidden = tab !== "coll";
+}
+document.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => setTab(b.dataset.tab));
+
+function openTop() {
+  const tops = TREE.filter(n => !n.kids.length), found = tops.filter(n => disc.has(n.id)).length;
+  $("topTitle").textContent = "Вершина эволюции: " + node.name;
+  $("topLead").innerHTML = `${node.desc}<br><br>Вы прошли путь из <b>${node.depth + 1} ступеней</b> от первой клетки. Это одна из ${tops.length} вершин древа — открыто ${found}. Всего существ открыто: ${disc.size} из ${TREE.length}. Вернитесь к развилке и попробуйте другую ветку!`;
+  cardAnims = [[$("topCanvas"), node]];
+  openModal("topModal");
+}
+
+$("evoBtn").onclick = () => openEvolve();
+$("pathBtn").onclick = () => openPath();
+$("pauseBtn").onclick = () => togglePause();
+$("evoClose").onclick = () => closeModals();
+$("pathClose").onclick = () => closeModals();
+$("topPlay").onclick = () => closeModals();
+$("topBack").onclick = () => openPath("path");
+$("topNew").onclick = () => goBackTo(BY_ID.luca);
+$("newBtn").onclick = () => { node = BY_ID.luca; P.dna = 0; kin = []; P.hp = 100; P.en = 80; closeModals(); setupStage(true); toast("Где-то в тёплом океане 4 миллиарда лет назад…", true); save(); };
+$("contBtn").onclick = () => { closeModals(); toast("С возвращением: " + node.name, true); };
+document.querySelectorAll(".modal").forEach(m => m.addEventListener("pointerdown", e => { if (e.target === m && m.id !== "introModal") closeModals(); }));
+
+// ---------- Цикл ----------
+function resize() {
+  DPR = Math.min(devicePixelRatio || 1, 2);
+  W = innerWidth; H = innerHeight;
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  VS = clamp(Math.min(W, H) / 760, 0.72, 1.15);
+}
+addEventListener("resize", resize);
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (!paused && !modalOpen) step(dt);
+  cam.x += (P.x - cam.x) * Math.min(1, dt * 6); cam.y += (P.y - cam.y) * Math.min(1, dt * 6);
+  const sh = cam.shake * 8;
+  ctx.save(); if (sh) ctx.translate(rand(-sh, sh), rand(-sh, sh));
+  drawWorld(simT);
+  ctx.restore();
+  hudAcc += dt; if (hudAcc > 0.12) { hudAcc = 0; updateHud(); drawPortrait(); }
+  for (const [c, n] of cardAnims) drawMini(c, n, now / 1000, 0.3);
+  requestAnimationFrame(frame);
+}
+
+resize();
+$("totalN").textContent = TREE.length;
+const saved = load();
+if (saved) {
+  node = BY_ID[saved.node]; P.dna = saved.dna || 0; disc = new Set(saved.disc || ["luca"]); disc.add(node.id);
+  $("contBtn").hidden = false; $("contBtn").textContent = "Продолжить: " + node.name;
+}
+setupStage(true);
+openModal("introModal");
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

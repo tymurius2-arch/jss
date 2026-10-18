@@ -3,7 +3,7 @@ name: Publish school portal
 on:
   push:
     branches: [main]
-    paths: ["school-portal/public/**", "price-guess/**", "rick-morty/**", "rocket-builder/**", "frontline/**", "podil-dragons/**", "aquarium/**"]
+    paths: ["school-portal/public/**", "price-guess/**", "rick-morty/**", "rocket-builder/**", "frontline/**", "podil-dragons/**", "aquarium/**", "evolution/**"]
   workflow_dispatch:
 
 permissions:
@@ -24,7 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
-      # Портал — в корне сайта, «Угадай цену» — в /price-guess/, «Рик и Морти» — в /rick-morty/, «Ракетостроитель» — в /rocket-builder/, «Линия фронта» — в /frontline/, PODIL DRAGONS — в /podil-dragons/, «Аквариум эволюции» — в /aquarium/
+      # Портал — в корне сайта, «Угадай цену» — в /price-guess/, «Рик и Морти» — в /rick-morty/, «Ракетостроитель» — в /rocket-builder/, «Линия фронта» — в /frontline/, PODIL DRAGONS — в /podil-dragons/, «Аквариум эволюции» — в /aquarium/, «Эволюция» — в /evolution/
       - name: Assemble site
         run: |
           mkdir -p _site
@@ -35,6 +35,7 @@ jobs:
           cp -r frontline _site/frontline
           cp -r podil-dragons _site/podil-dragons
           cp -r aquarium _site/aquarium
+          cp -r evolution _site/evolution
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
