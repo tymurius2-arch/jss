@@ -28,4 +28,5 @@
 | Star Voyage | [star-voyage](https://github.com/tymurius2-arch/star-voyage) | https://tymurius2-arch.github.io/star-voyage/ |
 | Event Horizon | [event-horizon](https://github.com/tymurius2-arch/event-horizon) | https://tymurius2-arch.github.io/event-horizon/ |
 | Кубомир | [cubomir](https://github.com/tymurius2-arch/cubomir) | https://tymurius2-arch.github.io/cubomir/ |
+| Нарисуй идеальный круг | [perfect-circle](https://github.com/tymurius2-arch/perfect-circle) | https://tymurius2-arch.github.io/perfect-circle/ |
 | Hand Mouse (Python) | [hand-mouse](https://github.com/tymurius2-arch/hand-mouse) | — |
