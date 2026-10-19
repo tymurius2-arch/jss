@@ -31,3 +31,5 @@
 | Event Horizon | [event-horizon](https://github.com/tymurius2-arch/event-horizon) | https://tymurius2-arch.github.io/event-horizon/ |
 | Кубомир | [cubomir](https://github.com/tymurius2-arch/cubomir) | https://tymurius2-arch.github.io/cubomir/ |
 | Hand Mouse (Python) | [hand-mouse](https://github.com/tymurius2-arch/hand-mouse) | — |
+| Нарисуй идеальный круг | [perfect-circle](https://github.com/tymurius2-arch/perfect-circle) | https://tymurius2-arch.github.io/perfect-circle/ |
+| Город удачи | [city-rng](https://github.com/tymurius2-arch/city-rng) | https://tymurius2-arch.github.io/city-rng/ |
