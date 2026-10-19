@@ -11,6 +11,7 @@
 3. Подключи его к сессии (`add_repo`) и работай в нём, а не в `jss`.
 4. Если это сайт — положи файлы в корень репозитория и добавь `.github/workflows/pages.yml` (деплой на GitHub Pages через GitHub Actions, как в существующих проектах). Попроси пользователя включить **Settings → Pages → Source: GitHub Actions**. Адрес сайта: `https://tymurius2-arch.github.io/<название>/`.
 5. Добавь проект в список ниже.
+6. Если это игра или сайт — добавь карточку на главную страницу [tymur.fun](https://github.com/tymurius2-arch/tymur.fun) (массивы `projects` и `art` в `index.html`).
 
 Пользователь говорит по-русски/по-украински и не программист — объясняй просто, давай прямые ссылки на нужные страницы настроек.
 
@@ -18,6 +19,7 @@
 
 | Проект | Репозиторий | Сайт |
 |---|---|---|
+| Главная страница со всеми проектами | [tymur.fun](https://github.com/tymurius2-arch/tymur.fun) | https://tymurius2-arch.github.io/tymur.fun/ |
 | Школьный портал | [school-portal](https://github.com/tymurius2-arch/school-portal) | https://tymurius2-arch.github.io/school-portal/ |
 | Линия фронта | [frontline](https://github.com/tymurius2-arch/frontline) | https://tymurius2-arch.github.io/frontline/ |
 | Угадай цену | [price-guess](https://github.com/tymurius2-arch/price-guess) | https://tymurius2-arch.github.io/price-guess/ |
