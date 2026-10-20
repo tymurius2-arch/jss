@@ -865,6 +865,12 @@
       "skillPath": "skills/ads/ima-sdk-client-side/SKILL.md",
       "computedHash": "fc2f46850e05331ed63e3b4519a204f37d79dad72bd2689e903faa4c66754267"
     },
+    "leanrea": {
+      "source": "aicodeking/leanrea",
+      "sourceType": "github",
+      "skillPath": "leanrea/SKILL.md",
+      "computedHash": "a502dd556ca6e5cf812baa616a89915e9dd07f569d9419c2824376598739e475"
+    },
     "managed-airflow-dag-authoring": {
       "source": "google/skills",
       "sourceType": "github",
